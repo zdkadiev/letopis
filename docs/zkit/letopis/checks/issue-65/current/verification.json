@@ -1,0 +1,243 @@
+{
+  "make_verify_baseline": {
+    "log": "make_verify_baseline.log",
+    "sha256": "5cf22b3d36ed2a30a802dc8369613ae6b0c67bbd0e571da3351d213ed3377def",
+    "failed_tests": [
+      "cli::response::tests::signals::repeated_sigint_keeps_one_response",
+      "cli::response::tests::signals::sigint_during_backpressure_finishes_one_response",
+      "cli::response::tests::signals::success_output_survives_late_sigint",
+      "embedding::http::tests::bounds_waiting_for_response_body",
+      "embedding::http::tests::bounds_waiting_for_response_headers",
+      "embedding::http::tests::shares_one_deadline_across_headers_and_body",
+      "filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks",
+      "service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention",
+      "service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic",
+      "service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation",
+      "service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock",
+      "service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock",
+      "service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed",
+      "service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects",
+      "service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit",
+      "service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes",
+      "service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view",
+      "service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock",
+      "service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state",
+      "service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication",
+      "service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication",
+      "service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status",
+      "service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed",
+      "service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state",
+      "service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts",
+      "service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation",
+      "service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock",
+      "service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error",
+      "service::embedding::tests::process::reset_during_http_preserves_current_query_error",
+      "service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector",
+      "storage::cache::cancellation_tests::cancels_inside_sqlite_step",
+      "storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication",
+      "storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication"
+    ],
+    "result": "test result: FAILED. 558 passed; 33 failed; 9 ignored; 0 measured; 0 filtered out; finished in 18.23s"
+  },
+  "strict_rustdoc": {
+    "log": "strict_rustdoc.log",
+    "sha256": "807b85d000b90d7298c3d042ba3d44ab9de545b6d5687909c6a4be995d63576b",
+    "result": [
+      "    Blocking waiting for file lock on artifact directory",
+      " Documenting letopis v0.2.0 (/Users/zdkadiev/Repos/letopis)",
+      "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.88s",
+      "   Generated /Users/zdkadiev/Repos/letopis/target/doc/letopis/index.html"
+    ],
+    "command": "RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline --no-deps",
+    "exit_code": 0
+  },
+  "release_git_tests": {
+    "log": "release_git_tests.log",
+    "sha256": "187e16b4dfc50bdddb54701d5cb909303849d59cee193783b1ba6b2f5d7ffd1d",
+    "result": [
+      "test git::repository::tests::strong_pin_rejects_malformed_nested_trees_like_git ... ok",
+      "",
+      "test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 553 filtered out; finished in 2.90s",
+      ""
+    ],
+    "command": "cargo test --locked --offline --release --lib git::",
+    "exit_code": 0
+  },
+  "python_performance_tests": {
+    "log": "python_performance_tests.log",
+    "sha256": "8d2a6e071fcec94269d73fcc1995c30ea371b128290071b1a97d4bcacbc1466d",
+    "result": [
+      "----------------------------------------------------------------------",
+      "Ran 84 tests in 14.961s",
+      "",
+      "FAILED (errors=4, skipped=8)"
+    ]
+  },
+  "generator_tests": {
+    "log": "generator_tests.log",
+    "sha256": "ccd457e74d7e4ec220e03d0c9a76db222df2f27bb20ac93ea77ae10cec601eb7",
+    "result": [
+      "----------------------------------------------------------------------",
+      "Ran 25 tests in 1.647s",
+      "",
+      "OK"
+    ]
+  },
+  "debug_git_tests": {
+    "log": "debug_git_tests.log",
+    "sha256": "f9ca6e24212642e7b380437ac0a89c8bc6f6041fd04a97b69c355b23361adcb9",
+    "result": [
+      "test git::repository::tests::strong_pin_rejects_malformed_nested_trees_like_git ... ok",
+      "",
+      "test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 553 filtered out; finished in 2.41s",
+      ""
+    ]
+  },
+  "diagnostic_red": {
+    "log": "diagnostic_red.log",
+    "sha256": "89bb7af7700e312c3d126c910c97c82e379e42c47291bb778d4d6307267f7d50",
+    "result": [
+      "",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 604 filtered out; finished in 0.08s",
+      "",
+      "error: test failed, to rerun pass `--lib`"
+    ]
+  },
+  "initial_reuse_red": {
+    "log": "initial_reuse_red.log",
+    "sha256": "7e4e00f17ee15c03c8da0b5ef62086c5d0fe30e2448c2563f78397052404a2e9",
+    "result": [
+      "",
+      "test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 600 filtered out; finished in 0.09s",
+      "",
+      "error: test failed, to rerun pass `--lib`"
+    ]
+  },
+  "architectural_review": {
+    "result": "No remaining Critical or Important findings after one safe-diagnostic fix and scoped sync-helper review",
+    "product_files": [
+      "src/git/cleanup.rs",
+      "src/git/durability.rs",
+      "src/git/objects.rs"
+    ],
+    "limits": "Existing pathname replacement races unchanged; no stronger power-loss guarantees"
+  },
+  "not_run": [
+    "full storage/native runners: unchanged stack/build/vendor inputs",
+    "historical standalone proof harnesses",
+    "real provider/hybrid/model measurements",
+    "Linux/x86_64 campaign"
+  ],
+  "stale_mutant_suite": {
+    "log": "make_verify_final.log",
+    "sha256": "65467fca8241095b4ce184f6715766dc85ab42f9a28763894f67a7509c413aca",
+    "failed_tests": [
+      "cli::response::tests::signals::repeated_sigint_keeps_one_response",
+      "cli::response::tests::signals::sigint_during_backpressure_finishes_one_response",
+      "cli::response::tests::signals::success_output_survives_late_sigint",
+      "embedding::http::tests::bounds_waiting_for_response_body",
+      "embedding::http::tests::bounds_waiting_for_response_headers",
+      "embedding::http::tests::shares_one_deadline_across_headers_and_body",
+      "filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks",
+      "git::durability::tests::existing_object_reuse_propagates_object_and_directory_sync_failures",
+      "service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention",
+      "service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic",
+      "service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation",
+      "service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock",
+      "service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock",
+      "service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed",
+      "service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects",
+      "service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit",
+      "service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes",
+      "service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view",
+      "service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock",
+      "service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state",
+      "service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication",
+      "service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication",
+      "service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status",
+      "service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed",
+      "service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state",
+      "service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts",
+      "service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation",
+      "service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock",
+      "service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error",
+      "service::embedding::tests::process::reset_during_http_preserves_current_query_error",
+      "service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector",
+      "storage::cache::cancellation_tests::cancels_inside_sqlite_step",
+      "storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication",
+      "storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication"
+    ],
+    "result": "test result: FAILED. 562 passed; 34 failed; 9 ignored; 0 measured; 0 filtered out; finished in 18.92s"
+  },
+  "make_verify_final": {
+    "command": "make verify V=1",
+    "exit_code": 2,
+    "log": "make_verify_final_rebuilt.log",
+    "sha256": "bc858fbd6dd8d9f23d6b6554d7fc5ffeded2de074644a34b005bb5f1b63da10e",
+    "result": "test result: FAILED. 563 passed; 33 failed; 9 ignored; 0 measured; 0 filtered out; finished in 17.76s",
+    "failed_tests": [
+      "cli::response::tests::signals::repeated_sigint_keeps_one_response",
+      "cli::response::tests::signals::sigint_during_backpressure_finishes_one_response",
+      "cli::response::tests::signals::success_output_survives_late_sigint",
+      "embedding::http::tests::bounds_waiting_for_response_body",
+      "embedding::http::tests::bounds_waiting_for_response_headers",
+      "embedding::http::tests::shares_one_deadline_across_headers_and_body",
+      "filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks",
+      "service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention",
+      "service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic",
+      "service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation",
+      "service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock",
+      "service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock",
+      "service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed",
+      "service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects",
+      "service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit",
+      "service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes",
+      "service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view",
+      "service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock",
+      "service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state",
+      "service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication",
+      "service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication",
+      "service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status",
+      "service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed",
+      "service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state",
+      "service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts",
+      "service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation",
+      "service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock",
+      "service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error",
+      "service::embedding::tests::process::reset_during_http_preserves_current_query_error",
+      "service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector",
+      "storage::cache::cancellation_tests::cancels_inside_sqlite_step",
+      "storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication",
+      "storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication"
+    ],
+    "passed_steps": [
+      "cargo fmt --all --check",
+      "cargo check --locked --offline --all-targets",
+      "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixed_value_lint tests and root scan"
+    ],
+    "not_reached": [
+      "make verify strict docs step",
+      "make verify full release test step; separate strict docs/release Git commands ran"
+    ]
+  },
+  "no_helper_tests": {
+    "command": "cargo test --locked --offline --test git_no_subprocess -- --skip nonempty_direct_drain_uses_owned_local_provider_without_git_helpers",
+    "exit_code": 0,
+    "log": "no-helper.log",
+    "result": "4 passed, 1 filtered out (requires blocked loopback provider)"
+  },
+  "stale_mutant_rebuild": {
+    "before": "sync-replay-before-rebuild.log",
+    "after": "sync-replay-after-rebuild.log",
+    "result": "focused test failed against stale artifact, forced source rebuild passed; final suite has only original 33 permission failures",
+    "future_rule": "Use a distinct Cargo target directory for mutation experiments in a source copy."
+  },
+  "final_product_build": {
+    "command": "CARGO_PROFILE_RELEASE_DEBUG=1 cargo build --release --locked --offline",
+    "exit_code": 0,
+    "log": "final-product-build.log",
+    "smoke": "final-product-smoke.json",
+    "result": "Actual root release validated on a fresh disabled 60-node fixture; inspect has no diagnostic stderr"
+  }
+}

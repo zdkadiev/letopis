@@ -1,0 +1,22 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.59s
+     Running unittests src/lib.rs (target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation ... FAILED
+
+failures:
+
+---- git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation stdout ----
+
+thread 'git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation' (501148728) panicked at src/git/durability.rs:731:9:
+assertion failed: !diagnostic.contains(&fixture.get_root().display().to_string())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 604 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`

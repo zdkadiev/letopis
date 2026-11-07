@@ -8,7 +8,7 @@ use super::{
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use gix::{
     Repository,
-    hash::ObjectId,
+    hash::{Kind as HashKind, ObjectId},
     objs::{Kind, Write as ObjectWrite},
     refs::Target,
 };
@@ -96,13 +96,7 @@ impl StagedObject {
         gix::fs::set_shared_repository_permissions(&staged, permissions).map_err(|error| {
             SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
         })?;
-        #[cfg(test)]
-        tests::inject_failure(tests::FailurePoint::ObjectSync)?;
-        File::open(&staged)
-            .and_then(|file| file.sync_all())
-            .map_err(|error| {
-                SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-            })?;
+        object_sync(&staged)?;
         let live = gix::odb::loose::Store::at(&object_root, repo.object_hash());
         Ok(Self {
             directory,
@@ -142,13 +136,7 @@ impl StagedObject {
             self.object_verify_existing()?;
         }
         // A racing winner can still be between its link and sync. Sync its inode too.
-        File::open(&self.destination)
-            .and_then(|file| file.sync_all())
-            .map_err(|error| {
-                SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-            })?;
-        #[cfg(test)]
-        tests::inject_failure(tests::FailurePoint::DirectorySync)?;
+        object_sync(&self.destination)?;
         directory_sync_parent_chain(parent, &self.object_root)?;
         self.directory.stage_close()
     }
@@ -178,6 +166,52 @@ impl StagedObject {
         }
         object_verify_identity(self.oid, object.kind, object.data)
     }
+}
+
+/// Verify and sync an existing loose object without staging another compressed copy.
+/// Packed or absent objects use the ordinary publication path instead.
+///
+/// # Errors
+/// Fails closed on cancellation, corrupt existing bytes, invalid configuration or sync failure.
+pub(super) fn object_reuse_existing(
+    repo: &Repository,
+    kind: Kind,
+    bytes: &[u8],
+    cleanup: &GitWriteCleanup,
+) -> Result<Option<ObjectId>, SnapshotError> {
+    cleanup.writes_verify_active()?;
+    let oid = object_compute_oid(repo.object_hash(), kind, bytes)?;
+    let object_root = repo.objects.store_ref().path();
+    let store = gix::odb::loose::Store::at(object_root, repo.object_hash());
+    let mut buffer = Vec::new();
+    let Some(object) = store.try_find(&oid, &mut buffer).map_err(|_| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        )
+    })?
+    else {
+        return Ok(None);
+    };
+    if object.kind != kind {
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        ));
+    }
+    object_verify_identity(oid, object.kind, object.data)?;
+    repository_get_shared_permissions(repo)?;
+    let destination = store.object_path(&oid);
+    object_sync(&destination)?;
+    let parent = destination.parent().ok_or_else(|| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        )
+    })?;
+    directory_sync_parent_chain(parent, object_root)?;
+    cleanup.writes_verify_active()?;
+    Ok(Some(oid))
 }
 
 /// Returns whether the error is contention a command may retry through the full durable protocol.
@@ -402,17 +436,7 @@ fn repository_get_shared_permissions(repo: &Repository) -> Result<i32, SnapshotE
 }
 
 fn object_verify_identity(oid: ObjectId, kind: Kind, bytes: &[u8]) -> Result<(), SnapshotError> {
-    let kind = std::str::from_utf8(kind.as_bytes()).map_err(|_| {
-        SnapshotError::new(
-            SnapshotErrorKind::InternalError,
-            DURABILITY_INTEGRITY_MESSAGE,
-        )
-    })?;
-    let mut hash = ObjectHasher::new(oid.kind().len_in_hex(), kind, bytes.len() as u64)?;
-    for chunk in bytes.chunks(HASH_CHUNK_BYTES) {
-        hash.update(chunk);
-    }
-    if hash.finish()? != oid {
+    if object_compute_oid(oid.kind(), kind, bytes)? != oid {
         return Err(SnapshotError::new(
             SnapshotErrorKind::InternalError,
             DURABILITY_INTEGRITY_MESSAGE,
@@ -421,7 +445,42 @@ fn object_verify_identity(oid: ObjectId, kind: Kind, bytes: &[u8]) -> Result<(),
     Ok(())
 }
 
+fn object_compute_oid(
+    format: HashKind,
+    kind: Kind,
+    bytes: &[u8],
+) -> Result<ObjectId, SnapshotError> {
+    let kind = std::str::from_utf8(kind.as_bytes()).map_err(|_| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        )
+    })?;
+    let mut hash = ObjectHasher::new(format.len_in_hex(), kind, bytes.len() as u64)?;
+    for chunk in bytes.chunks(HASH_CHUNK_BYTES) {
+        hash.update(chunk);
+    }
+    ObjectId::from_hex(hash.finish()?.as_bytes()).map_err(|_| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        )
+    })
+}
+
+fn object_sync(path: &Path) -> Result<(), SnapshotError> {
+    #[cfg(test)]
+    tests::inject_failure(tests::FailurePoint::ObjectSync)?;
+    File::open(path)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| {
+            SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
+        })
+}
+
 fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> {
+    #[cfg(test)]
+    tests::inject_failure(tests::FailurePoint::DirectorySync)?;
     for directory in path.ancestors() {
         File::open(directory)
             .and_then(|file| file.sync_all())

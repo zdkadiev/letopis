@@ -1,0 +1,814 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.60s
+     Running unittests src/lib.rs (target/debug/deps/letopis-43e59323f2756d14)
+
+running 600 tests
+test cli::help_tests::command_names_match_literal_list ... ok
+test cli::help_tests::find_help_ignores_non_utf8_argv ... ok
+test cli::help_tests::parse_request_returns_help_without_reading_stdin ... ok
+test cli::help_tests::command_help_states_side_effects_and_value_forms ... ok
+test cli::help_tests::find_help_ignores_everything_else ... ok
+test cli::help_tests::every_command_help_shows_its_example_and_usage ... ok
+test cli::help_tests::find_help_recognizes_flags_and_every_command ... ok
+test cli::help_tests::config_is_discoverable_and_describes_read_only_configuration ... ok
+test cli::help_tests::general_help_covers_contract ... ok
+test cli::help_tests::write_response_prints_help_as_plain_text_and_reports_write_failure ... ok
+test cli::help_tests::help_lines_fit_eighty_columns_except_copyable_examples ... ok
+test cli::response::tests::signals::backpressure_sigint_child ... ignored, private child fixture for sigint_during_backpressure_finishes_one_response
+test cli::response::tests::signals::late_sigint_child ... ignored, private child fixture for success_output_survives_late_sigint
+test cli::response::tests::signals::repeated_sigint_child ... ignored, private child fixture for repeated_sigint_keeps_one_response
+test cli::help_tests::run_cli_prints_help_without_reading_stdin ... ok
+test cli::index_tests::rejects_unsupported_index_argv_before_reading_stdin ... ok
+test cli::config_tests::rejects_nonempty_config_request_before_io ... ok
+test cli::response::tests::normal_winner_prevents_second_json ... ok
+test cli::response::tests::write_failure_never_retries_output ... ok
+test cli::help_tests::run_cli_keeps_json_error_for_unrecognized_help_forms ... ok
+test cli::response::tests::repeated_cancellation_responses_keep_one_envelope ... ok
+test cli::index_tests::rejects_invalid_index_json_without_exposing_input ... ok
+test cli::search_tests::empty_filters_equal_absence ... ok
+test cli::search_tests::parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs ... ok
+test cli::response::tests::cancel_output_wins_before_main_output ... ok
+test cli::index_tests::accepts_index_modes_and_deduplicates_scoped_paths ... ok
+test cli::help_tests::every_command_example_is_a_valid_request ... ok
+test cli::search_tests::malformed_source_revisions_are_rejected ... ok
+test cli::search_tests::effective_filters_are_typed_and_deduplicated ... ok
+test cli::search_tests::search_response_renders_links ... ok
+test cli::config_tests::renders_exact_contract_object_without_warnings ... ok
+test cli::tests::input_tests::drain_accepts_only_eof_or_empty_object ... ok
+test cli::tests::input_tests::empty_input_uses_empty_request_and_checks_required_fields ... ok
+test cli::tests::input_tests::input_io_failure_is_redacted_invalid_request ... ok
+test cli::tests::input_tests::inspect_rejects_wrong_shapes_unknown_and_duplicate_fields ... ok
+test cli::tests::input_tests::parse_argv_rejects_non_utf8_flags_and_surplus ... ok
+test cli::tests::input_tests::parse_check_requires_object_and_rejects_unknown_or_duplicate_fields ... ok
+test cli::tests::input_tests::parse_inspect_normalizes_without_resolving_membership ... ok
+test cli::tests::transport_tests::background_readiness_error_remains_failure ... ok
+test cli::tests::input_tests::status_accepts_only_empty_object_and_no_extra_argv ... ok
+test cli::tests::transport_tests::check_findings_remain_successful ... ok
+test cli::tests::transport_tests::failure_renders_one_safe_error_without_cause ... ok
+test cli::tests::transport_tests::check_without_background_warning_omits_warnings_field ... ok
+test cli::tests::transport_tests::flush_failure_returns_one_after_one_complete_envelope ... ok
+test cli::tests::transport_tests::output_failures_do_not_attempt_a_second_envelope ... ok
+test cli::tests::transport_tests::run_cli_rejects_invalid_input ... ok
+test cli::tests::transport_tests::status_renders_all_fields ... ok
+test cli::tests::transport_tests::render_every_catalogue_error_without_causes ... ok
+test cli::tests::transport_tests::success_writes_one_complete_envelope_and_flushes_once ... ok
+test cli::traversal_tests::accepts_representable_positive_caps_without_preallocating ... ok
+test cli::traversal_tests::accepts_required_traversal_fields_and_maximum_depth ... ok
+test cli::traversal_tests::normalizes_starts_and_open_types_without_restricting_empty_types ... ok
+test cli::tests::transport_tests::inspection_renders_only_metadata_and_optional_lines ... ok
+test cli::traversal_tests::rejects_malformed_identities_without_source_fallback ... ok
+test cli::traversal_tests::serializes_remote_source_links_without_lines ... ok
+test cli::traversal_tests::rejects_missing_required_traversal_fields ... ok
+test cli::traversal_tests::serializes_requested_empty_and_original_incoming_edges ... ok
+test cli::traversal_tests::traversal_response_preserves_nonfatal_warning ... ok
+test cli::traversal_tests::rejects_numeric_spellings_duplicate_unknown_and_trailing_fields ... ok
+test cli::traversal_tests::rejects_wrong_shapes_values_and_null_optionals ... ok
+test cli::response::tests::signals::sigint_during_backpressure_finishes_one_response ... FAILED
+test cli::response::tests::signals::success_output_survives_late_sigint ... FAILED
+test cli::response::tests::signals::repeated_sigint_keeps_one_response ... FAILED
+test commands::tests::maps_each_service_kind_and_keeps_causes_private ... ok
+test database_path_tests::preserves_non_absence_errors_when_observing_database_identity ... ok
+test database_path_tests::rejects_an_existing_directory_as_a_database_path ... ok
+test database_path_tests::rejects_database_paths_with_nul_bytes ... ok
+test database_path_tests::permits_creation_but_rejects_hard_link_aliases ... ok
+test database_path_tests::rejects_existing_database_alias_before_entering_operation ... ok
+test database_path_tests::rejects_directory_replacement_before_fresh_file_observation ... ok
+test database_path_tests::retries_transient_changed_database_observations ... ok
+test database_tests::reject_cache_attachment_symlink_installed_after_validation ... ok
+test database_tests::reject_database_leaf_symlink_installed_after_directory_validation ... ok
+test database_tests::reject_replaced_service_directory_before_initialization ... ok
+test database_tests::reject_vector_attachment_symlink_installed_after_validation ... ok
+test cli::response::tests::cancellation_winner_prevents_success_exit ... ok
+test cli::response::tests::guard_covers_flush ... ok
+test database_tests::storage_contracts::confined_vector_pruning_uses_read_only_cache_and_closes_cleanly ... ok
+test commands::construction_tests::repository_open_config ... ok
+test domain::validation::tests::accepts_ordinary_cycles_and_shared_child_includes_dags ... ok
+test domain::validation::tests::deduplicates_dangling_pairs_and_rechecks_node_membership ... ok
+test domain::validation::tests::handles_ten_thousand_nodes_without_recursive_traversal ... ok
+test domain::validation::tests::ignores_absent_sources_and_external_source_targets ... ok
+test domain::validation::tests::orders_mixed_findings_and_preserves_inputs ... ok
+test domain::validation::tests::separates_components_without_including_one_way_descendants ... ok
+test embedding::http::tests::bounds_waiting_for_response_body ... FAILED
+test embedding::http::tests::bounds_waiting_for_response_headers ... FAILED
+test embedding::http::tests::classifies_io_timeouts_without_exposing_transport_payloads ... ok
+test embedding::http::tests::shares_one_deadline_across_headers_and_body ... FAILED
+test embedding::openai::tests::accepts_only_nonempty_printable_ascii_credentials ... ok
+test embedding::provider::tests::redacts_captured_credentials_from_owner_debug ... ok
+test database_tests::storage_contracts::nested_read_works_on_both_production_open_paths ... ok
+test filesystem::creation_tests::first_directory_peer_publication_is_adopted_and_pinned ... ok
+test filesystem::creation_tests::observed_unpinned_ancestor_disappearance_and_return_is_changed ... ok
+test filesystem::creation_tests::ordinary_directory_observation_keeps_strict_absence_confirmation ... ok
+test filesystem::creation_tests::held_peer_publication_after_first_absence_preserves_inode_and_owner ... ok
+test commands::construction_tests::repository_open_status ... ok
+test filesystem::creation_tests::pinned_directory_disappearance_and_reappearance_remain_changed ... ok
+test filesystem::creation_tests::ordinary_file_observations_keep_strict_absence_confirmation ... ok
+test filesystem::creation_tests::unheld_peer_publication_after_first_absence_is_acquired_without_replacement ... ok
+test commands::construction_tests::repository_open_direct_drain ... ok
+test filesystem::file_tests::byte_capture_classifies_only_stable_nonregular_leaves_as_exclusions ... ok
+test filesystem::file_tests::bytes_read_ignores_unrepresentable_index_timestamp ... ok
+test filesystem::file_tests::bytes_read_never_follows_leaf_or_parent_symlinks ... ok
+test filesystem::creation_tests::unsafe_directory_peer_publications_are_not_adopted ... ok
+test filesystem::file_tests::bytes_read_rejects_ancestor_replaced_during_reading ... ok
+test filesystem::file_tests::bytes_read_rejects_content_changed_after_reading ... ok
+test commands::construction_tests::repository_open_init ... ok
+test filesystem::file_tests::bytes_read_rejects_symlink_replacing_the_observed_leaf ... ok
+test filesystem::file_tests::configuration_reads_without_sampling_wall_clock ... ok
+test filesystem::file_tests::disappearance_of_a_pinned_ancestor_never_recreates_it ... ok
+test filesystem::file_tests::existence_and_identity_never_enter_the_body_read_protocol ... ok
+test filesystem::file_tests::distinguishes_nonregular_leaves_from_unsafe_parent_paths ... ok
+test filesystem::file_tests::explicit_directory_pins_reject_replacement_without_creating_missing_paths ... ok
+test filesystem::file_tests::external_path_resolution_rejects_aliases_and_preserves_io_failures ... ok
+test filesystem::file_tests::external_resolution_preserves_existing_symlink_canonicalization ... ok
+test filesystem::creation_tests::unsafe_lock_peer_publications_fail_before_mutating_external_bytes ... ok
+test database_tests::storage_contracts::vector_writer_wait_is_bounded_without_changing_cache_or_read_policy ... ok
+test filesystem::file_tests::identity_ignores_content_races_but_metadata_requires_stable_content ... ok
+test filesystem::file_tests::identity_verification_rejects_replaced_or_deleted_files ... ok
+test filesystem::file_tests::indexed_capture_samples_clock_before_reading_bytes ... ok
+test filesystem::file_tests::identity_is_metadata_only_and_ignores_content_updates ... ok
+test filesystem::file_tests::nofollow_rejects_symlink_even_when_it_targets_the_original_inode ... ok
+test filesystem::file_tests::generic_reads_reject_leaf_and_ancestor_replacement ... ok
+test filesystem::file_tests::preserves_real_io_errors_and_safe_diagnostics ... ok
+test filesystem::file_tests::observes_absent_and_present_files_without_creating_entries ... ok
+test filesystem::file_tests::nonregular_leaf_replacement_between_observations_is_a_change ... ok
+test filesystem::file_tests::regular_leaf_replaced_by_directory_before_open_is_a_change ... ok
+test filesystem::file_tests::nonregular_observation_rejects_parent_replacement ... ok
+test filesystem::init_tests::protects_a_preexisting_permissive_service_directory ... ok
+test filesystem::init_tests::directory_sync_failure_after_existing_leaf_retries_durability ... ok
+test filesystem::init_tests::concurrent_publishers_leave_one_complete_configuration ... ok
+test filesystem::init_tests::existing_configuration_is_never_replaced ... ok
+test filesystem::init_tests::installs_exact_private_complete_bytes ... ok
+test filesystem::init_tests::file_sync_failure_leaves_absence_and_retry_publishes ... ok
+test filesystem::init_tests::rejects_replaced_service_directory_and_missing_state_sync ... ok
+test filesystem::init_tests::rejects_symlink_and_nonregular_configuration_leaves ... ok
+test filesystem::init_tests::service_state_sync_retries_after_root_failure_without_creating_files ... ok
+test filesystem::local::tests::aliased_index_and_embed_names_are_rejected_without_mutation ... ok
+test filesystem::local::tests::busy_embed_probe_rejects_new_hardlink_without_touching_owner_bytes ... ok
+test filesystem::local::tests::contended_lock_waits_for_release ... ok
+test filesystem::local::tests::created_lock_files_and_service_directory_have_restrictive_modes ... ok
+test filesystem::local::tests::get_regular_file_preserves_bytes_and_stat ... ok
+test filesystem::local::tests::fifo_replacement_before_open_is_rejected_without_blocking ... ok
+test filesystem::local::tests::embed_probe_preserves_busy_owner_bytes_and_independent_index_lock ... ok
+test commands::construction_tests::repository_open_traverse ... ok
+test commands::construction_tests::repository_open_check ... ok
+test commands::construction_tests::repository_open_search ... ok
+test filesystem::local::tests::hardlink_added_during_index_contention_is_rejected_after_acquiring_ownership ... ok
+test filesystem::local::tests::missing_file_returns_none ... ok
+test filesystem::local::tests::index_owner_writes_pid_after_acquiring_lock ... ok
+test commands::construction_tests::repository_open_index_full ... ok
+test filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks ... FAILED
+test filesystem::local::tests::lock_releases_on_drop ... ok
+test filesystem::local::tests::ordinary_hardlinked_document_reads_remain_supported ... ok
+test filesystem::local::tests::reject_final_and_parent_symlinks ... ok
+test filesystem::local::tests::run_lock_child ... ignored, private lock subprocess entry, invoked by parent tests
+test filesystem::local::tests::nonregular_entry_changes_between_observations_fail ... ok
+test filesystem::local::tests::nonregular_final_entries_are_classified_without_following_symlinks ... ok
+test filesystem::local::tests::reject_service_directory_and_lock_symlinks ... ok
+test filesystem::local::tests::std_file_and_rustix_locks_exclude_each_other_for_both_names ... ok
+test filesystem::local::tests::hardlinked_lock_targets_are_rejected_without_modifying_corpus_or_external_bytes ... ok
+test filesystem::lock::tests::concurrent_creation_after_absent_observation_reopens_the_same_inode ... ok
+test filesystem::lock::tests::preserves_nonretryable_io_errors ... ok
+test filesystem::lock::tests::preserves_nonretryable_lock_errors ... ok
+test filesystem::lock::tests::missing_creation_reopens_existing_lock_without_replacing_it ... ok
+test filesystem::lock::tests::retries_interrupted_io_until_the_operation_succeeds ... ok
+test filesystem::lock::tests::retries_interrupted_lock_acquisition_until_success ... ok
+test filesystem::lock::tests::returns_contention_without_retrying ... ok
+test filesystem::local::tests::replacement_during_read_fails ... ok
+test filesystem::lock::tests::status_lock_open_rejects_inode_replacement ... ok
+test filesystem::lock_tests::concurrent_first_lock_creation_has_one_owner_and_one_persistent_inode ... ok
+test filesystem::lock_tests::generic_locks_reject_hardlinks_and_preserve_external_bytes ... ok
+test filesystem::local::tests::replacement_during_index_contention_is_rejected_before_pid_write ... ok
+test filesystem::lock_tests::generic_owner_drop_unlocks_before_its_last_duplicate_closes ... ok
+test filesystem::lock::tests::owner_drop_unlocks_while_duplicate_descriptor_remains_open ... ok
+test filesystem::lock_tests::lock_open_rejects_replacement_before_writing_owner_bytes ... ok
+test filesystem::path::tests::rejects_each_independent_stat_change ... ok
+test filesystem::path::tests::rejects_nanoseconds_outside_signed_range ... ok
+test filesystem::path::tests::represents_signed_nanosecond_boundaries ... ok
+test filesystem::lock::tests::rejects_each_prior_lock_identity_mismatch_before_writing_pid ... ok
+test filesystem::lock_tests::held_lock_rejects_invalid_bounded_pid_records_without_writing_them ... ok
+test filesystem::lock_tests::lock_observation_is_read_only_and_ownership_persists_until_drop ... ok
+test filesystem::lock_tests::lock_parent_identity_remains_pinned_after_owner_drop ... ok
+test filesystem::publication_tests::concurrent_publications_preserve_one_complete_winner ... ok
+test filesystem::publication_tests::directory_sync_failure_preserves_published_winner_for_retry ... ok
+test filesystem::race_tests::captured_leaf_deleted_before_open_is_changed ... ok
+test filesystem::publication_tests::unsafe_publication_leaves_and_missing_parents_are_preserved ... ok
+test filesystem::local::tests::both_lock_names_reject_unsafe_files_and_service_directories ... ok
+test filesystem::lock::tests::missing_creation_reopen_rejects_absent_and_unsafe_lock_names ... ok
+test filesystem::publication_tests::file_sync_failure_preserves_absence_and_retry_publishes_complete_bytes ... ok
+test filesystem::race_tests::directory_completion_rejects_root_replacement_for_existing_paths ... ok
+test filesystem::race_tests::contended_lock_rejects_root_replacement_before_returning_absence ... ok
+test filesystem::race_tests::existing_lock_deleted_before_open_is_changed_for_nonblocking_acquisition ... ok
+test filesystem::race_tests::existing_lock_deleted_before_open_is_changed_for_acquisition ... ok
+test filesystem::race_tests::distinctness_rejects_a_newly_created_hardlink_alias ... ok
+test filesystem::race_tests::genuine_permission_failure_before_open_remains_io ... ok
+test filesystem::race_tests::missing_directory_completion_rejects_root_replacement ... ok
+test filesystem::publication_tests::no_clobber_publication_preserves_winner_and_private_modes ... ok
+test filesystem::race_tests::existing_lock_deleted_before_open_is_changed_for_observation ... ok
+test filesystem::race_tests::optional_identity_still_permits_creation_of_a_safe_regular_file ... ok
+test filesystem::read_tests::raw_symlink_probe_never_follows_a_parent ... ok
+test filesystem::race_tests::unheld_lock_observation_rejects_root_replacement_before_returning_absence ... ok
+test filesystem::test_support::run_mutation_child ... ok
+test filesystem::read_tests::rejects_device_files_without_reading_them ... ok
+test filesystem::read_tests::symlink_observation_distinguishes_missing_and_nonregular_leaves ... ok
+test filesystem::test_support::selects_inherited_or_owned_process_group ... ok
+test git::cleanup::tests::cancellation_releases_both_confirmation_markers_but_preserves_foreign_lock ... ok
+test git::cleanup::tests::cancelled_ref_writer_cannot_publish_or_touch_successor_lock ... ok
+test filesystem::lock::tests::lock_open_rejects_replacement_and_never_recreates_observed_deletion ... ok
+test git::cleanup::tests::cancelled_stage_cannot_be_recreated_or_published_by_resumed_writer ... ok
+test git::cleanup::tests::failed_stage_cleanup_preserves_owner_and_releases_other_resources ... ok
+test filesystem::local::tests::concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode ... ok
+test filesystem::test_support::forced_watchdog_terminates_nested_descendants ... ok
+test git::cleanup::tests::resolved_parent_operations_remain_confined_to_detached_stage ... ok
+test git::cleanup::tests::handled_sigint_cleans_actual_resources_before_process_exit ... ok
+test filesystem::local::tests::concurrent_first_lock_creation_preserves_one_regular_file ... ok
+test filesystem::read_tests::rejects_observed_changes_after_reading_bytes ... ok
+test filesystem::read_tests::rejects_observed_ancestor_replacement ... ok
+test filesystem::read_tests::rejects_observed_replacement_between_stat_and_open ... ok
+test commands::construction_tests::repository_open_public_constructors_are_independent ... ok
+test commands::construction_tests::repository_open_inspect ... ok
+test git::durability::tests::confirmation::loose_confirmation_syncs_the_existing_backing_without_renaming_it ... ok
+test git::durability::tests::confirmation::concurrent_confirmation_syncs_the_visible_winner_before_success ... ok
+test git::durability::tests::confirmation::packed_confirmation_rejects_a_symlink_backing_instead_of_syncing_the_wrong_parent ... ok
+test git::durability::tests::confirmation::packed_confirmation_syncs_the_existing_backing_without_creating_a_loose_ref ... ok
+test git::durability::tests::confirmation::retry_of_visible_ref_must_complete_sync_before_success ... ok
+test git::durability::tests::confirmation::packed_confirmation_does_not_touch_a_foreign_packing_lock ... ok
+test git::durability::tests::concurrent_creators_and_packed_refs_preserve_exact_target ... ok
+test git::durability::tests::confirmation::packed_confirmation_holds_both_locks_during_backing_sync ... ok
+test git::durability::tests::confirmation::packed_confirmation_requires_backing_file_and_parent_sync ... ok
+test git::hashing::tests::rejects_sha1_collision ... ok
+test git::durability::tests::refuses_corrupt_existing_objects_and_cleans_private_staging ... ok
+test git::reader::tests::run_owned_reader ... ok
+test git::durability::tests::confirmation::concurrent_confirmation_cannot_bypass_sync_or_steal_a_lock ... ok
+test git::durability::tests::rejects_filesystem_symlink_refs_without_touching_the_referent ... ok
+test git::durability::tests::respects_foreign_locks_and_equal_ref_noops ... ok
+test git::durability::tests::reports_directory_sync_failure_after_ref_publication ... ok
+test git::reader::tests::raw_reads_ignore_configured_allocation_caps_replacements_and_payload_caches ... ok
+test git::durability::tests::linked_worktrees_publish_in_common_store_with_shared_permissions ... ok
+test git::durability::tests::leaves_private_reflogs_untouched_under_all_policies ... ok
+test git::repository::tests::discovery_rejects_git_metadata_as_a_working_directory ... ok
+test git::repository::tests::rejects_non_absence_errors_when_inspecting_object_alternates ... ok
+test git::durability::tests::writes_canonical_tree_objects_in_both_formats ... ok
+test git::repository::tests::repository_open_counter_excludes_clones ... ok
+test git::repository::tests::open_rejects_non_repository_and_bare ... ok
+test git::durability::tests::stages_syncs_publishes_and_retains_git_compatible_objects ... ok
+test git::repository::tests::discovers_root_from_subdirectory ... ok
+test git::durability::tests::rejects_symbolic_malformed_and_conflicting_refs_without_replacing_them ... ok
+test git::repository::tests::worktree_paths_preserve_raw_names_and_non_document_entries ... ok
+test git::repository::tests::root_verification_and_addressed_reads_reject_malformed_tree_structure ... ok
+test git::repository::tests::assembly_checks_unique_oids_once_without_weakening_supplied_or_final_validation ... ok
+test markdown::links::tests::rejects_literal_and_encoded_controls_and_backslashes ... ok
+test markdown::links::tests::rejects_malformed_navigation_percent_escapes ... ok
+test markdown::links::tests::rejects_malformed_navigation_utf8 ... ok
+test markdown::parser::tests::parser_interface_preserves_all_free_function_outcomes ... ok
+test process::clock::tests::observes_epoch_time_and_accepts_zero_wait ... ok
+test git::durability::tests::injected_failures_preserve_publication_order_and_report_post_link_errors ... ok
+test process::detached::tests::missing_executable_retains_private_cause ... ok
+test process::detached::tests::removed_working_directory_is_reported ... ok
+test process::signal::tests::handled_sigint_writes_one_cancelled_envelope_and_exits_one ... ok
+test process::signal::tests::listener_installation_failure_returns_one_safe_internal_error ... ok
+test process::signal::tests::ordinary_shutdown_closes_and_joins_without_signal ... ok
+test git::validation::tests::validates_entry_boundaries_like_hash_object ... ok
+test process::signal::tests::registration_or_spawn_failure_returns_error_without_listener ... ok
+test process::signal::tests::sigint_child_waits_for_owned_signal ... ok
+test process::signal::tests::owned_child_wait_fails_after_a_bounded_deadline ... ok
+test process::signal::tests::status_config_and_drain_skip_cancellation_registration ... ok
+test service::background_runner::tests::absent_capability_does_not_probe_or_spawn ... ok
+test git::repository::tests::discovers_trailing_newline_repository_without_touching_sibling ... ok
+test service::background_runner::tests::direct_drain_calls_executor_once_without_second_lock ... ok
+test service::background_runner::tests::busy_probe_does_not_spawn ... ok
+test service::background_runner::tests::direct_drain_preserves_executor_failure ... ok
+test service::background_runner::tests::generated_mocks_do_not_launch_without_work ... ok
+test service::background_runner::tests::probe_and_spawn_failures_return_one_safe_warning ... ok
+test service::background_runner::tests::readiness_error_remains_an_error ... ok
+test service::background_runner::tests::ready_work_releases_probe_before_spawn ... ok
+test git::validation::tests::validates_order_and_nonadjacent_duplicates_like_hash_object ... ok
+test git::validation::tests::validates_hfs_noncharacter_termination_for_symlinks_like_hash_object ... ok
+test process::detached::tests::launches_literal_executable_with_generic_arguments_and_working_directory ... ok
+test process::signal::tests::spawned_listener_is_reaped_after_normal_teardown ... ok
+test service::check::tests::check_filters_snapshot_owners_before_probing_git ... ok
+test service::check::tests::check_propagates_metadata_read_failure_after_graph_findings ... ok
+test service::check::tests::batches::check_batches_selected_owners_without_losing_diagnostic_order ... ok
+test git::validation::tests::validates_hfs_noncharacter_termination_like_hash_object ... ok
+test git::validation::tests::validates_names_like_hash_object ... ok
+test service::configuration::tests::accepts_unconfigured_without_provider_validation ... ok
+test service::configuration::tests::maps_read_failure_without_exposing_causes ... ok
+test service::configuration::tests::reads_configuration_at_extreme_filesystem_times ... ok
+test service::configuration::tests::reads_missing_config_without_creating_service_state ... ok
+test service::configuration::tests::rejects_invalid_config_without_exposing_bytes ... ok
+test service::configuration::tests::reports_legacy_flat_configuration_as_migration ... ok
+test service::check::tests::check_refreshes_before_opening_one_read ... ok
+test service::configuration::tests::retries_a_configuration_observation_that_raced_publication ... ok
+test service::configuration::tests::returns_preserved_config_values ... ok
+test service::configuration::tests::selects_literal_configuration_path_without_writes ... ok
+test service::configuration::tests::validates_configured_disabled_settings_locally ... ok
+test service::check::tests::check_reports_missing_address_from_selected_knowledge ... ok
+test service::check::tests::check_propagates_refresh_storage_and_git_failures_without_partial_report ... ok
+test service::check::tests::scoped_check_requests_routine_refresh ... ok
+test service::document_refresher::corpus::candidates_exclude_raw_git_metadata_components ... ok
+test service::check::tests::whole_check_requests_verified_refresh_and_rejects_a_newer_revision ... ok
+test service::check::tests::check_reuses_same_view_for_each_knowledge_observation ... ok
+test git::validation::tests::validates_raw_modes_like_hash_object ... ok
+test service::check::tests::pinned::check_observes_metadata_and_bindings_from_original_pinned_view ... ok
+test git::repository::tests::snapshots_work_without_git_executable ... ok
+test service::document_refresher::corpus::candidates_deduplicate_unmerged_index_stages ... ok
+test service::document_refresher::corpus::candidate_parent_symlink_is_a_listing_failure ... ok
+test service::document_refresher::corpus::rejects_unterminated_candidates_and_accepts_empty_output ... ok
+test service::document_refresher::corpus::replaced_root_is_rejected_even_when_all_raw_paths_are_irrelevant ... ok
+test service::document_refresher::corpus::root_escape_still_fails_after_skipping_unsafe_raw_probe ... ok
+test service::document_refresher::corpus::scoped_candidates_match_normalized_names_without_probing_raw_dot_paths ... ok
+test service::document_refresher::corpus::candidates_exclude_live_symlinks_independently_of_index_mode ... ok
+test service::document_refresher::corpus::candidates_ignore_symlinks_with_unsupported_names ... ok
+test service::document_refresher::corpus::irrelevant_non_utf8_paths_are_filtered_before_decoding ... ok
+test service::document_refresher::corpus::unsafe_raw_components_skip_probes_and_keep_lexical_normalization ... ok
+test service::document_refresher::corpus::corpus_ignores_replacements_for_index_backed_ignore_files ... ok
+test git::repository::tests::strong_pin_rejects_malformed_nested_trees_like_git ... ok
+test git::validation::tests::validates_special_symlink_names_like_hash_object ... ok
+test service::document_refresher::corpus::candidates_follow_git_ignore_and_preserve_deleted_tracked_paths ... ok
+test service::document_refresher::tests::basis::changed_capture_after_preflight_rolls_back_without_commit ... ok
+test service::document_refresher::tests::basis::initial_build_and_full_reindex_lock_before_capturing_and_validate_basis ... ok
+test service::document_refresher::tests::basis::observation_failure_never_opens_sql_write ... ok
+test service::document_refresher::corpus::corpus_matches_git_for_nested_excludes_staged_deletion_and_symlinks ... ok
+test service::document_refresher::tests::basis::pin_failure_never_opens_sql_write ... ok
+test service::document_refresher::tests::basis::preflight_read_failure_never_opens_sql_write ... ok
+test service::document_refresher::tests::basis::verified_refresh_failure_preserves_previous_publication ... ok
+test service::document_refresher::tests::basis::unchanged_basis_retention_skips_sql_write_and_body_parse ... ok
+test service::document_refresher::tests::basis::retain_under_index_lock_before_sql_publication ... ok
+test service::document_refresher::tests::basis::preflight_batches_only_prepared_bindings_in_bounded_chunks ... ok
+test service::document_refresher::tests::basis::verified_unchanged_refresh_audits_without_sql_write ... ok
+test database_path_tests::rejects_replacement_of_an_observed_database ... ok
+test service::document_refresher::tests::changed_capture_between_locked_detection_and_preparation_aborts ... ok
+test service::document_refresher::corpus::linked_worktree_listing_uses_its_own_index ... ok
+test service::document_refresher::tests::clock_failure_falls_back_to_bytes_without_publishing_unchanged_content ... ok
+test database_tests::rejects_regular_cache_replacement_during_attachment ... ok
+test service::document_refresher::tests::detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes ... ok
+test service::document_refresher::tests::discard_preliminary_capture_and_publish_the_locked_observation ... ok
+test service::document_refresher::tests::fatal_read_is_not_an_invalid_markdown_publication ... ok
+test service::document_refresher::tests::never_published_missing_candidate_is_not_a_delta_after_empty_initial_build ... ok
+test service::document_refresher::tests::joined_publications_advance_the_revision_once ... ok
+test service::document_refresher::tests::nested_publication_rolls_back_with_its_parent ... ok
+test service::document_refresher::corpus::candidates_reject_unsupported_raw_paths ... ok
+test service::document_refresher::corpus::candidates_exclude_metadata_before_validating_paths ... ok
+test service::document_refresher::corpus::shared_repository_observes_index_and_ignore_edits_between_listings ... ok
+test service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention ... FAILED
+test service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic ... FAILED
+test service::document_refresher::tests::process::run_child ... ignored, subprocess entry; invoked only by the production schedule tests
+test service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation ... FAILED
+test service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock ... FAILED
+test service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock ... FAILED
+test service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects ... FAILED
+test service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed ... FAILED
+test service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes ... FAILED
+test service::document_refresher::tests::publication_returns_its_own_revision_after_a_later_commit ... ok
+test service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit ... FAILED
+test service::document_refresher::tests::reading::warm_refresh_reads_basis_roots_without_loading_nodes ... ok
+test service::document_refresher::tests::reindex::reindex_capture_failure_preserves_complete_publication ... ok
+test service::document_refresher::tests::reindex::reindex_rebuilds_unchanged_fts_and_advances_once ... ok
+test service::document_refresher::tests::reject_candidate_reappearing_before_publication ... ok
+test service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view ... FAILED
+test service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state ... FAILED
+test service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock ... FAILED
+test service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication ... FAILED
+test service::embedding::tests::captured_query_never_rereads_or_resets_configuration ... ok
+test service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication ... FAILED
+test service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state ... FAILED
+test service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts ... FAILED
+test service::embedding::tests::captured_query_rejects_invalid_provider_policy_without_reset_or_http ... ok
+test service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation ... FAILED
+test service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock ... FAILED
+test service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error ... FAILED
+test service::embedding::tests::process::run_child ... ignored, private child entrypoint explicitly invoked by process parents
+test service::embedding::tests::process::reset_during_http_preserves_current_query_error ... FAILED
+test service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector ... FAILED
+test service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed ... FAILED
+test service::embedding::tests::captured_query_preserves_readiness_policy_and_document_attempts ... ok
+test service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status ... FAILED
+test service::embedding::tests::configuration_is_reread_and_provider_validation_precedes_identity_reset ... ok
+test service::document_refresher::corpus::sparse_index_expands_index_tree_membership_without_changing_user_state ... ok
+test service::embedding::tests::credential_failures_use_four_durable_attempts_and_three_one_second_waits ... ok
+test service::document_refresher::tests::stat_only_change_preserves_projection_and_invalid_state_without_parsing ... ok
+test service::embedding::tests::strict_capture_preserves_input_and_os_failure_classifications ... ok
+test service::document_refresher::tests::reindex::reindex_reparses_identical_valid_unmarked_and_invalid_bytes ... ok
+test service::embedding::tests::query_rejects_an_inherited_vector_read_before_inference ... ok
+test service::embedding::tests::query_keeps_inference_available_inside_a_pinned_cache_read ... ok
+test service::error::error_tests::preserves_document_context_without_exposing_its_private_cause ... ok
+test service::error::error_tests::process_error_preserves_its_io_cause_without_exposing_private_payload ... ok
+test service::error::error_tests::service_error_keeps_kind_without_exposing_private_cause ... ok
+test service::document_refresher::tests::skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files ... ok
+test service::graph::tests::continues_short_nonempty_pages_until_the_node_cap ... ok
+test service::graph::tests::includes_consumes_one_depth_step ... ok
+test service::graph::tests::intersects_open_types_and_omits_edges_when_not_requested ... ok
+test service::graph::tests::keeps_edge_budget_independent_from_node_budget ... ok
+test service::graph::tests::merges_page_crossing_ties_without_skips_and_bounds_high_degree_reads ... ok
+test service::graph::tests::preserves_original_incoming_edges_and_considered_back_edges ... ok
+test service::graph::tests::previsits_multiple_starts_and_deduplicates_cycles_at_max_depth ... ok
+test service::graph::tests::rejects_a_late_page_error_without_returning_partial_graph ... ok
+test service::graph::tests::rejects_empty_typed_starts_without_any_read ... ok
+test service::graph::tests::returns_requested_empty_edges_after_validating_depth_zero ... ok
+test service::graph::tests::stops_buffered_transitions_and_queries_at_node_cap ... ok
+test service::graph::tests::terminates_includes_cycle_without_returning_start_twice ... ok
+test service::embedding::tests::reservation_joins_the_shared_vector_scope_and_rolls_back_with_its_parent ... ok
+test service::graph::tests::traversal_work_does_not_scale_with_unrelated_nodes_or_hub_degree ... ok
+test service::graph::tests::validates_all_starts_even_at_depth_zero ... ok
+test service::graph::tests::traverses_each_mode_and_direction_in_bfs_order ... ok
+test service::graph_diagnostics::tests::classifies_every_known_cached_message_without_changing_parser_diagnostics ... ok
+test service::graph_diagnostics::tests::hides_unknown_and_absent_cached_reasons ... ok
+test service::embedding::tests::rejected_vector_input_drops_poisoned_unit_before_recording_failure ... ok
+test service::embedding::tests::rejects_a_provider_vector_that_violates_the_first_requested_dimension ... ok
+test service::graph_diagnostics::tests::retains_private_storage_cause_without_public_payload ... ok
+test service::init::tests::bootstrap_failure_stops_before_installation ... ok
+test service::init::tests::fresh_initialization_installs_then_rereads_and_syncs_in_order ... ok
+test service::init::tests::invalid_publication_winner_prevents_success_and_sync ... ok
+test service::embedding::tests::tasks::readiness_preserves_storage_failure_as_a_safe_typed_error ... ok
+test service::init::tests::sync_failure_is_retryable_and_second_call_completes_sync ... ok
+test service::init::tests::validates_disabled_provider_settings_before_storage ... ok
+test service::init::tests::validates_existing_config_before_opening_state_or_storage ... ok
+test service::inspection::tests::capture_writes_each_blob_before_reading_the_next_file ... ok
+test service::inspection::tests::inspect_accepts_unchanged_unmarked_candidate_as_source ... ok
+test service::inspection::tests::inspect_fails_safely_when_declared_source_read_has_io_error ... ok
+test service::inspection::tests::inspect_fails_when_final_pin_fails ... ok
+test service::inspection::tests::inspect_keeps_absent_candidate_source_without_a_hash ... ok
+test service::embedding::tests::tasks::readiness_uses_durable_work_without_http_lock_or_retained_read ... ok
+test service::inspection::tests::inspect_rejects_absent_candidate_changed_to_marked_source ... ok
+test service::inspection::tests::inspect_rejects_unmarked_candidate_changed_to_invalid_source ... ok
+test service::inspection::tests::inspect_rejects_unmarked_candidate_changed_to_marked_source ... ok
+test service::inspection::tests::inspect_reuses_captured_marked_source_after_live_edit ... ok
+test service::inspection::tests::inspection_filters_raw_symlinks_before_decoding_and_normalizes_safe_results ... ok
+test service::inspection::tests::inspection_preserves_listing_error_context_and_cause ... ok
+test service::provenance::tests::batches::batch_does_not_cache_policy_or_io_failure ... ok
+test service::provenance::tests::batches::batch_keys_history_by_exact_tree_and_range ... ok
+test service::provenance::tests::batches::batch_preserves_first_error_and_result_order ... ok
+test service::provenance::tests::batches::batch_observation_detects_edit_between_live_reads ... ok
+test service::provenance::tests::batches::batch_releases_state_between_operations ... ok
+test service::provenance::tests::batches::batch_reclassifies_missing_and_invalid_roots ... ok
+test service::embedding::tests::skipped_ids_are_never_reread_when_processed_work_restarts_selection ... ok
+test service::provenance::tests::batches::batch_reuses_exact_history_but_reads_each_live_binding ... ok
+test service::provenance::tests::batches::singleton_and_batch_observe_the_same_sequence_of_live_edits ... ok
+test service::provenance::tests::full_audit_still_pins_available_roots ... ok
+test service::provenance::tests::batches::root_cache_overflow_also_recomputes_without_rejecting ... ok
+test service::graph::tests::graph_services_join_the_same_cache_snapshot ... ok
+test service::provenance::tests::leave_remote_unknown_without_file_reads_or_retention ... ok
+test service::provenance::tests::preserve_requested_revision_corruption_and_invalid_blob_classifications ... ok
+test service::provenance::tests::propagate_corruption_and_invalid_blob_instead_of_reporting_missing ... ok
+test service::provenance::tests::propagate_retention_and_verification_failures_with_private_causes ... ok
+test service::provenance::tests::propagate_unsafe_live_capture_without_exposing_private_cause ... ok
+test service::provenance::tests::retain_each_unique_available_root_and_skip_missing_or_invalid ... ok
+test service::provenance::tests::verify_each_root_once_and_never_pin_during_read ... ok
+test service::search::comparisons::tests::exact_basis_address_range_and_revision_are_distinct ... ok
+test service::search::comparisons::tests::successful_comparison_variants_are_preserved ... ok
+test service::search::comparisons::tests::unavailable_basis_is_rechecked_when_the_same_key_becomes_available ... ok
+test service::embedding::tests::unsupported_query_timestamp_is_an_internal_error_without_truncation ... ok
+test service::search::comparisons::tests::revision_failures_are_retried_and_overflow_recomputes ... ok
+test service::search::tests::filters::eligible_channel_ranks_are_recomputed_before_fusion ... ok
+test service::search::tests::filters::eligible_ties_and_duplicates_keep_identity_order ... ok
+test service::search::tests::filters::excluded_channel_heads_do_not_consume_limit ... ok
+test service::search::tests::filters::excluded_nonfinite_metrics_remain_integrity_errors ... ok
+test service::provenance::tests::batches::historical_cache_overflow_recomputes_without_rejecting ... ok
+test service::graph_diagnostics::tests::keeps_two_components_in_one_file_with_minimum_local_representatives ... ok
+test service::search::tests::literal_query_quotes_unicode_tokens_without_fts_operators ... ok
+test service::graph_diagnostics::tests::finds_cross_file_cycle_before_filtering_and_deduplicates_selectors ... ok
+test service::search::tests::rank_weight_checks_integer_conversion_and_preserves_reciprocals ... ok
+test service::search::tests::ranking_orders_ties_deduplicates_and_keeps_disjoint_channels ... ok
+test service::search::tests::ranking_rejects_nonfinite_native_metrics ... ok
+test service::search::tests::reciprocal_rank_unions_channels_before_limit ... ok
+test service::search::tests::reciprocal_ranks_reward_overlap_before_applying_small_limit ... ok
+test service::embedding::tests::query_rejects_inherited_writers_before_inference ... ok
+test service::embedding::tests::drain_rejects_inherited_cache_scopes_before_selecting_work ... ok
+test service::graph_diagnostics::tests::orders_file_graph_and_distinct_anchor_findings_by_safe_context ... ok
+test service::document_refresher::tests::treat_racy_boundary_clock_regression_and_checked_arithmetic_conservatively ... ok
+test service::search::tests::candidate_metadata_rejects_wrong_rows_and_search_hashes ... ok
+test service::search::tests::malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed ... ok
+test service::search::tests::signed_zero_metrics_tie_by_identity_in_both_channels ... ok
+test service::search::tests::filters::changing_observer_is_called_once_and_retained_flags_drive_rendering ... ok
+test service::search::tests::captured_vector_configuration_requires_matching_identity_and_native_dimensions ... ok
+test service::search::tests::scoped::metadata_failure_after_query_releases_pinned_view ... ok
+test service::search::tests::unavailable_or_changed_vector_channel_keeps_fts_fallback ... ok
+test service::search::tests::scoped::revisions::first_observation_failure_precedes_later_candidate_comparison ... ok
+test service::search::tests::scoped::revisions::revision_cache_keeps_demand_order_and_resets_between_searches ... ok
+test service::search::tests::scoped::search_observes_metadata_and_bindings_from_original_pinned_view ... ok
+test service::embedding::tests::service_defensively_rejects_provider_cardinality_and_nonfinite_vectors ... ok
+test service::status::tests::configuration::keeps_captured_config_after_live_config_changes ... ok
+test service::source::tests::observe_live_source_without_referrer_edits ... ok
+test service::search::tests::scoped::late_provenance_failure_releases_pinned_view_while_service_stays_alive ... ok
+test service::search::tests::filters::revision_comparison_errors_preserve_typed_codes ... ok
+test service::status::tests::configuration::mismatched_identity_keeps_exhausted_hash_in_backlog ... ok
+test service::status::tests::malformed_owner_retains_safe_status_diagnostic ... ok
+test service::source::tests::publish_remote_without_file_capture_and_group_local_ranges ... ok
+test service::status::tests::observes_both_literal_lock_paths_in_order_and_preserves_labels ... ok
+test service::status::tests::disabled_configuration_hides_execution_failures_and_reports_zero_counts ... ok
+test service::status::tests::reports_null_revision_without_publication ... ok
+test service::source::tests::propagate_private_source_failure ... ok
+test service::status::tests::invalid_disabled_configuration_remains_a_visible_problem ... ok
+test service::source::tests::skip_io_for_unknown_or_knowledge_address ... ok
+test service::source::tests::return_unfetched_remote_without_io ... ok
+test service::status::tests::keeps_query_error_without_mutation ... ok
+test service::search::tests::scoped::non_ready_configuration_preserves_fts_and_one_pinned_consumer_view ... ok
+test service::status::tests::reports_invalid_config_with_unavailable_counts ... ok
+test service::status::tests::matches_check_findings_in_one_view ... ok
+test service::status::tests::reports_unreadable_and_unsupported_config_without_payloads ... ok
+test service::status::tests::returns_error_after_late_provenance_failure ... ok
+test service::status::tests::disabled_mode_still_rejects_invalid_scope_metadata_and_revision ... ok
+test service::status::tests::storage_status::ignores_vectors_for_mismatched_identity ... ok
+test service::status::tests::storage_status::counts_distinct_current_hashes ... ok
+test service::status::tests::storage_status::disabled_policy_returns_zero_without_touching_execution_state ... ok
+test service::status::tests::storage_status::opens_missing_files_without_creating_them ... ok
+test service::traversal::tests::bindings::observes_empty_bindings_once_to_preserve_basis_validation ... ok
+test service::traversal::tests::bindings::observes_large_source_bindings_pagewise ... ok
+test service::traversal::tests::bindings::propagates_late_provenance_failure_without_partial_flags_or_further_pages ... ok
+test service::traversal::tests::bindings::reports_late_binding_page_failure_after_completed_observations ... ok
+test service::status::tests::storage_status::pins_status_revision_and_counts ... ok
+test service::status::tests::storage_status::rejects_current_vector_key_without_native_row ... ok
+test service::types::command_tests::preserve_local_anchor_and_range_normalization ... ok
+test service::types::command_tests::preserve_opaque_http_addresses ... ok
+test service::types::command_tests::retain_error_cause_without_exposing_it_in_diagnostics ... ok
+test service::types::command_tests::reject_malformed_absolute_urls_and_source_http_fallbacks ... ok
+test service::types::command_tests::round_trip_http_prefix_knowledge_addresses ... ok
+test service::types::configuration_value_tests::parses_generated_defaults_and_preserves_retry_setting ... ok
+test service::types::configuration_value_tests::identity_excludes_enabled_and_the_root_wrapper ... ok
+test service::types::configuration_value_tests::reports_legacy_flat_document_for_migration ... ok
+test service::types::embedding_config_tests::bounds_raw_token_traversal_before_canonicalization ... ok
+test service::types::configuration_value_tests::shared_corpus_agrees_with_local_parse_and_validation ... ok
+test service::types::embedding_config_tests::rejects_trailing_json_after_configuration ... ok
+test service::types::model_tests::query_request_debug_omits_text_and_provider_parameters ... ok
+test service::types::search_filters_tests::default_filters_impose_no_restrictions ... ok
+test service::types::search_filters_tests::not_required_recheck_matches_no_flags_and_rejects_each_current_flag ... ok
+test service::types::search_filters_tests::required_recheck_matches_each_current_flag_and_rejects_no_flags ... ok
+test storage::cache::cancellation_tests::after_commit_child ... ignored, private after-commit child, invoked only by termination_after_commit_keeps_new_publication
+test storage::cache::cancellation_tests::before_commit_child ... ignored, private before-commit child, invoked only by termination_before_commit_keeps_old_publication
+test storage::cache::cancellation_tests::sqlite_step_child ... ignored, private SQL-step child, invoked only by cancels_inside_sqlite_step
+test storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication ... FAILED
+test storage::cache::cancellation_tests::cancels_inside_sqlite_step ... FAILED
+test storage::cache::file_tests::rejects_an_out_of_range_persisted_valid_flag ... ok
+test storage::cache::graph_tests::rejects_each_inconsistent_persisted_source_field ... ok
+test service::status::tests::storage_status::preserves_files_and_orders_only_uncovered_current_failures ... ok
+test storage::cache::neighbor_tests::narrow_basis_query_deduplicates_non_null_roots_and_rejects_bad_oids ... ok
+test storage::cache::tests::absent_status_storage_skips_observation_without_opening_a_database ... ok
+test storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication ... FAILED
+test service::status::tests::storage_status::respects_attempt_boundary ... ok
+test storage::cache::tests::caught_nested_panic_rolls_back_and_storage_can_be_reused ... ok
+test storage::cache::tests::caught_database_operation_error_prevents_commit ... ok
+test storage::cache::tests::caught_write_attempt_poisons_an_observed_read_scope ... ok
+test storage::cache::neighbor_tests::pages_retain_limit_bounded_top_k_for_every_query_variant ... ok
+test storage::cache::tests::joined_read_inside_write_observes_uncommitted_revision ... ok
+test storage::cache::tests::caught_write_attempt_cannot_upgrade_a_read_scope ... ok
+test service::traversal::tests::scoped::retains_original_graph_bindings_and_revision_across_pages ... ok
+test storage::cache::tests::publication_revision_is_provisional_until_the_outer_scope_commits ... ok
+test storage::cache::tests::read_scope_pins_revision_while_another_connection_publishes ... ok
+test storage::cache::tests::joined_scope_does_not_commit_and_caught_error_prevents_commit ... ok
+test storage::cache::tests::caught_sql_failure_restores_metadata_and_the_fts_schema ... ok
+test storage::cache::tests::read_scope_pins_vector_identity_before_callback ... ok
+test storage::connection::policy_tests::does_not_retry_non_contention_storage_errors ... ok
+test storage::connection::policy_tests::initialization_retry_stops_at_the_exact_budget_without_retrying_other_errors ... ok
+test storage::connection::policy_tests::attached_cache_is_read_only_with_encoded_path_delimiters ... ok
+test storage::cache::tests::standalone_scope_commits_once ... ok
+test storage::connection::policy_tests::rejects_a_database_that_cannot_enable_wal ... ok
+test storage::cache::tests::status_skips_callback_until_a_revision_is_published ... ok
+test storage::connection::policy_tests::rejects_a_service_symlink_back_to_the_pinned_directory ... ok
+test storage::connection::policy_tests::reads_the_existing_database_journal_mode ... ok
+test storage::connection::policy_tests::rejects_non_regular_database_leaves_before_sqlite_opens_them ... ok
+test storage::query::tests::every_primitive_null_remains_null ... ok
+test storage::query::tests::nullable_and_blob_values_preserve_sqlite_types ... ok
+test storage::connection::policy_tests::both_database_connections_enforce_policy ... ok
+test storage::query::tests::quoted_unicode_text_remains_bound ... ok
+test storage::query::tests::numeric_values_preserve_bounds_and_reject_overflow ... ok
+test storage::schema::tests::cache_and_vector_versions_are_independent ... ok
+test storage::schema::tests::accepts_keyword_case_without_ignoring_literal_case ... ok
+test storage::connection::policy_tests::rejects_service_directory_replacement_with_a_fifo_without_blocking ... ok
+test storage::schema::tests::keyword_normalization_preserves_quotes_and_comments ... ok
+test storage::connection::policy_tests::rejects_each_policy_setting_that_sqlite_does_not_apply ... ok
+test storage::schema::tests::schema_commit_contention_is_retried_until_the_reader_releases ... ok
+test storage::native::tests::native_capabilities_match_pinned_stack ... ok
+test service::status::tests::selects_only_required_observations_for_each_configuration_mode ... ok
+test storage::transaction::tests::failed_commit_rolls_back_and_allows_reuse ... ok
+test storage::transaction::tests::failed_rollback_disables_the_connection ... ok
+test storage::schema::tests::waiting_initializer_rejects_incompatible_schema_committed_by_owner ... ok
+test service::traversal::tests::scoped::releases_read_after_normal_and_depth_zero_empty_results ... ok
+test storage::vector::query_tests::rejects_empty_or_partially_encoded_stored_vectors ... ok
+test storage::vector::tests::caught_vector_write_error_rolls_back_earlier_changes ... ok
+test storage::vector::tests::failed_reset_cleanup_reports_failure_and_disables_the_connection ... ok
+test storage::vector::tests::incompatible_nested_identity_skips_callback_and_keeps_outer_work ... ok
+test storage::vector::tests::malformed_identity_skips_vector_scopes_without_decoding_it ... ok
+test storage::vector::tests::reads_embedding_failure_from_vector_database_inside_scope ... ok
+test storage::vector::tests::reads_query_error_from_vector_database_inside_scope ... ok
+test storage::vector::tests::reset_is_rejected_inside_an_active_vector_scope ... ok
+test storage::vector::tests::vector_read_scope_rejects_mismatched_identity_without_calling_operation ... ok
+test storage::schema::tests::existing_schemas_validate_on_query_only_connections ... ok
+test service::traversal::tests::scoped::synchronizes_readiness_before_one_pinned_read_without_query_inference ... ok
+test storage::vector::query_tests::gets_identity_and_dimensions_from_selected_schema ... ok
+test storage::schema::tests::waiting_initializer_rechecks_committed_schema_for_both_databases ... ok
+test storage::transaction::tests::write_scope_waits_for_a_concurrent_writer_to_release ... ok
+test storage::schema::tests::old_cache_rejection_preserves_populated_vectors_config_and_locks ... ok
+test service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives ... ok
+test service::status::tests::storage_status::rejects_malformed_persisted_counts_and_read_failure ... ok
+test service::source::tests::excludes_only_stable_nonregular_source_leaves ... ok
+test service::search::tests::filters::revision_preflight_precedes_provider_and_candidate_dependent_exits ... ok
+test service::document_refresher::corpus::sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely ... ok
+test storage::schema::tests::initialization_contention_expires_and_can_be_retried_safely ... ok
+test service::init::tests::rejects_service_directory_changes_during_final_root_sync ... ok
+
+failures:
+
+---- cli::response::tests::signals::sigint_during_backpressure_finishes_one_response stdout ----
+
+thread 'cli::response::tests::signals::sigint_during_backpressure_finishes_one_response' (501006266) panicked at src/cli/response.rs:343:61:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- cli::response::tests::signals::success_output_survives_late_sigint stdout ----
+
+thread 'cli::response::tests::signals::success_output_survives_late_sigint' (501006269) panicked at src/cli/response.rs:343:61:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- cli::response::tests::signals::repeated_sigint_keeps_one_response stdout ----
+
+thread 'cli::response::tests::signals::repeated_sigint_keeps_one_response' (501006265) panicked at src/cli/response.rs:343:61:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- embedding::http::tests::bounds_waiting_for_response_body stdout ----
+
+thread 'embedding::http::tests::bounds_waiting_for_response_body' (501006815) panicked at src/embedding/http.rs:293:57:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- embedding::http::tests::bounds_waiting_for_response_headers stdout ----
+
+thread 'embedding::http::tests::bounds_waiting_for_response_headers' (501006816) panicked at src/embedding/http.rs:293:57:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- embedding::http::tests::shares_one_deadline_across_headers_and_body stdout ----
+
+thread 'embedding::http::tests::shares_one_deadline_across_headers_and_body' (501006818) panicked at src/embedding/http.rs:293:57:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks stdout ----
+
+thread 'filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks' (501007197) panicked at src/filesystem/document_tests.rs:699:53:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention stdout ----
+
+thread 'service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention' (501013277) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic stdout ----
+
+thread 'service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic' (501013285) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation stdout ----
+
+thread 'service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation' (501013295) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock stdout ----
+
+thread 'service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock' (501013313) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock stdout ----
+
+thread 'service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock' (501013339) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects stdout ----
+
+thread 'service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects' (501013399) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed stdout ----
+
+thread 'service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed' (501013359) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes stdout ----
+
+thread 'service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes' (501013417) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit stdout ----
+
+thread 'service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit' (501013411) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view stdout ----
+
+thread 'service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view' (501013596) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state stdout ----
+
+thread 'service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state' (501013801) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock stdout ----
+
+thread 'service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock' (501013601) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication stdout ----
+
+thread 'service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication' (501013890) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication stdout ----
+
+thread 'service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication' (501013942) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state stdout ----
+
+thread 'service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state' (501014270) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts stdout ----
+
+thread 'service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts' (501014276) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation stdout ----
+
+thread 'service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation' (501014278) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock stdout ----
+
+thread 'service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock' (501014291) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error stdout ----
+
+thread 'service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error' (501014292) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::reset_during_http_preserves_current_query_error stdout ----
+
+thread 'service::embedding::tests::process::reset_during_http_preserves_current_query_error' (501014305) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector stdout ----
+
+thread 'service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector' (501014309) panicked at src/service/embedding.rs:1373:65:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed stdout ----
+
+thread 'service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed' (501013960) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status stdout ----
+
+thread 'service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status' (501013947) panicked at src/service/document_refresher.rs:2396:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication stdout ----
+
+thread 'storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication' (501015631) panicked at src/storage/cache.rs:2288:57:
+control listener: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- storage::cache::cancellation_tests::cancels_inside_sqlite_step stdout ----
+
+thread 'storage::cache::cancellation_tests::cancels_inside_sqlite_step' (501015630) panicked at src/storage/cache.rs:2288:57:
+control listener: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication stdout ----
+
+thread 'storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication' (501015632) panicked at src/storage/cache.rs:2288:57:
+control listener: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+
+failures:
+    cli::response::tests::signals::repeated_sigint_keeps_one_response
+    cli::response::tests::signals::sigint_during_backpressure_finishes_one_response
+    cli::response::tests::signals::success_output_survives_late_sigint
+    embedding::http::tests::bounds_waiting_for_response_body
+    embedding::http::tests::bounds_waiting_for_response_headers
+    embedding::http::tests::shares_one_deadline_across_headers_and_body
+    filesystem::local::tests::process_owner_drop_or_death_releases_both_persistent_locks
+    service::document_refresher::tests::process::duplicate_publishers_commit_once_after_real_contention
+    service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic
+    service::document_refresher::tests::process::late_storage_error_rolls_back_every_cache_mutation
+    service::document_refresher::tests::process::noop_finishes_while_another_process_holds_index_lock
+    service::document_refresher::tests::process::normal_open_and_noop_finish_during_vector_write_and_held_index_lock
+    service::document_refresher::tests::process::normal_open_redetects_after_active_cache_writer_is_killed
+    service::document_refresher::tests::process::normal_open_waits_at_index_lock_during_cache_write_then_redetects
+    service::document_refresher::tests::process::pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit
+    service::document_refresher::tests::process::reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes
+    service::document_refresher::tests::process::reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view
+    service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock
+    service::document_refresher::tests::process::reindex::reindex_sigint_preserves_exact_old_or_complete_new_state
+    service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication
+    service::document_refresher::tests::process::sigkill_keeps_exact_old_or_complete_new_publication
+    service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status
+    service::document_refresher::tests::process::waiting_publisher_redetects_newer_edit_after_owner_is_killed
+    service::embedding::tests::process::configuration::configuration_change_after_storage_observation_never_resets_newer_state
+    service::embedding::tests::process::configuration::stale_configuration_observation_preserves_current_vectors_and_attempts
+    service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation
+    service::embedding::tests::process::killed_reservation_keeps_budget_and_releases_stable_lock
+    service::embedding::tests::process::reset_during_http_discards_late_document_success_and_error
+    service::embedding::tests::process::reset_during_http_preserves_current_query_error
+    service::embedding::tests::process::two_drains_have_one_owner_and_one_stored_vector
+    storage::cache::cancellation_tests::cancels_inside_sqlite_step
+    storage::cache::cancellation_tests::termination_after_commit_keeps_new_publication
+    storage::cache::cancellation_tests::termination_before_commit_keeps_old_publication
+
+test result: FAILED. 558 passed; 33 failed; 9 ignored; 0 measured; 0 filtered out; finished in 18.23s
+
+error: test failed, to rerun pass `--lib`
+make: *** [_check] Error 101

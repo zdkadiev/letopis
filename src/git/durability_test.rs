@@ -545,6 +545,122 @@ fn rejects_filesystem_symlink_refs_without_touching_the_referent() {
     assert_eq!(fs::read_to_string(referent).unwrap(), bytes);
 }
 
+#[test]
+fn existing_object_reuse_requires_verified_bytes_without_residual_entries() {
+    // Given: an independently named existing loose blob in both supported formats.
+    for format in FORMATS {
+        let fixture = TempRepo::new(format);
+        let repo = gix::open(fixture.get_root()).unwrap();
+        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+        let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+        let before = fs::read_dir(repo.objects.store_ref().path())
+            .unwrap()
+            .count();
+        // When: confirming existing content and probing content that is absent.
+        let actual =
+            super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup).unwrap();
+        let absent =
+            super::object_reuse_existing(&repo, Kind::Blob, b"absent bytes", &cleanup).unwrap();
+        // Then: exact Git identity is reused without leaving new directory entries.
+        assert_eq!(actual.unwrap().to_string(), expected);
+        assert!(absent.is_none());
+        assert_eq!(
+            fs::read_dir(repo.objects.store_ref().path())
+                .unwrap()
+                .count(),
+            before
+        );
+    }
+}
+
+#[test]
+fn existing_object_reuse_refuses_corruption_and_cancellation() {
+    // Given: corrupt bytes at the independently computed loose-object identity.
+    let fixture = TempRepo::new(FORMATS[0]);
+    let repo = gix::open(fixture.get_root()).unwrap();
+    let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+    let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+    let path = repo
+        .objects
+        .store_ref()
+        .path()
+        .join(&expected[..2])
+        .join(&expected[2..]);
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&path, b"invalid zlib").unwrap();
+    // When: a reuse probe encounters corruption, then a cancelled owner.
+    let corrupt = super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup);
+    cleanup.writes_cancel_and_cleanup().unwrap();
+    let cancelled = super::object_reuse_existing(&repo, Kind::Blob, b"absent bytes", &cleanup);
+    // Then: neither failure becomes absence or a successful write.
+    let error = corrupt.unwrap_err();
+    let diagnostic = format!("{error} {error:?}");
+    assert!(!diagnostic.contains(&fixture.get_root().display().to_string()));
+    assert!(!diagnostic.contains("invalid zlib"));
+    assert!(cancelled.is_err());
+    assert_eq!(fs::read(path).unwrap(), b"invalid zlib");
+}
+
+#[test]
+fn existing_object_reuse_rechecks_decodable_content_identity() {
+    // Given: a valid compressed blob installed under a different blob identity.
+    let fixture = TempRepo::new(FORMATS[0]);
+    let repo = gix::open(fixture.get_root()).unwrap();
+    let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+    let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+    let other = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"different bytes"));
+    let root = repo.objects.store_ref().path();
+    let destination = root.join(&expected[..2]).join(&expected[2..]);
+    fs::set_permissions(&destination, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::copy(root.join(&other[..2]).join(&other[2..]), &destination).unwrap();
+    // When: the reuse path decodes a valid object whose hash is wrong.
+    let result = super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup);
+    // Then: successful decompression cannot substitute for identity verification.
+    assert!(result.is_err());
+}
+
+#[test]
+fn existing_object_reuse_supports_trees_and_defers_packed_objects() {
+    // Given: an existing empty tree, independently written and named by Git.
+    for format in FORMATS {
+        let fixture = TempRepo::new(format);
+        let repo = gix::open(fixture.get_root()).unwrap();
+        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+        let expected = fixture.get_oid(&["hash-object", "-w", "-t", "tree", "--stdin"], Some(b""));
+        // When: confirming its loose representation.
+        let loose = super::object_reuse_existing(&repo, Kind::Tree, b"", &cleanup).unwrap();
+        // Then: tree identities are preserved in both formats.
+        assert_eq!(loose.unwrap().to_string(), expected);
+        // Given: that tree is now reachable only through a pack.
+        fixture.run_git_successfully(&["update-ref", "refs/letopis/reuse-test", &expected], None);
+        fixture.run_git_successfully(&["repack", "-ad"], None);
+        fixture.run_git_successfully(&["prune-packed"], None);
+        let root = repo.objects.store_ref().path();
+        assert!(!root.join(&expected[..2]).join(&expected[2..]).exists());
+        // When: the loose-only optimization encounters the packed object.
+        let packed = super::object_reuse_existing(&repo, Kind::Tree, b"", &cleanup).unwrap();
+        // Then: it defers to ordinary staging instead of pretending to sync a pack.
+        assert!(packed.is_none());
+    }
+}
+
+#[test]
+fn existing_object_reuse_propagates_object_and_directory_sync_failures() {
+    // Given: an existing object and independently injected synchronization failures.
+    let fixture = TempRepo::new(FORMATS[0]);
+    let repo = gix::open(fixture.get_root()).unwrap();
+    let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+    fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+    for point in [FailurePoint::ObjectSync, FailurePoint::DirectorySync] {
+        FAILURE.with(|slot| slot.set(Some(point)));
+        // When: reuse encounters the failing durability step.
+        let result = super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup);
+        FAILURE.with(|slot| slot.set(None));
+        // Then: equality cannot bypass either durability requirement.
+        assert!(result.is_err(), "{point:?}");
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum FailurePoint {
     ObjectSync,

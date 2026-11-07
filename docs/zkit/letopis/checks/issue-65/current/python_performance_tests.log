@@ -1,0 +1,115 @@
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.3147692088969052, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.030078499810770154, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.024893834022805095, "validation": {"valid": false, "reason": "required Git counter failed"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.024916167138144374, "validation": {"valid": false, "reason": "required Git counter failed"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.026614166097715497, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.02587945805862546, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.02464129077270627, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.02480354206636548, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "timeout", "duration_seconds": 120, "validation": {"valid": true}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 1, "validation": {"valid": true}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 1, "validation": {"valid": true}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 1, "validation": {"valid": true}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.21564650000073016, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.06056950008496642, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.02794074988923967, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.0262645841576159, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.024582582991570234, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.024830957874655724, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.02632187493145466, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.025955416960641742, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.22394633409567177, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.03135195793583989, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.24418591591529548, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.030244291992858052, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.3009334590751678, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.04086549999192357, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "conditioning", "pair": -2, "outcome": "success", "duration_seconds": 0.02715895907022059, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "conditioning", "pair": -2, "outcome": "success", "duration_seconds": 0.027535291155800223, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "conditioning", "pair": -1, "outcome": "success", "duration_seconds": 0.02850904082879424, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "conditioning", "pair": -1, "outcome": "success", "duration_seconds": 0.029739709105342627, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.02925458294339478, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.029130708891898394, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.027417917037382722, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.03201549989171326, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.4368732909206301, "validation": {"valid": false, "reason": "ValueError"}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.025789625011384487, "validation": {"valid": false, "reason": "ValueError"}}
+{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "timeout", "duration_seconds": 0.008334500016644597, "validation": {"valid": false, "reason": "process or capture failure"}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "timeout", "duration_seconds": 0.008216541027650237, "validation": {"valid": false, "reason": "process or capture failure"}}
+{"scenario": "search", "phase": "conditioning", "index": 0, "seconds": 0.1, "valid": false}
+======================================================================
+ERROR: test_timeout_reaps_grandchild_retaining_pipe (test_measure.MeasurementTests.test_timeout_reaps_grandchild_retaining_pipe)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_measure.py", line 97, in test_timeout_reaps_grandchild_retaining_pipe
+    state = subprocess.run(["ps", "-o", "stat=", "-p", pid], capture_output=True, text=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1950, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+PermissionError: [Errno 1] Operation not permitted: 'ps'
+
+======================================================================
+ERROR: test_rejects_invalid_input_without_forwarding (test_provider.ProviderTests.test_rejects_invalid_input_without_forwarding)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_provider.py", line 34, in test_rejects_invalid_input_without_forwarding
+    with start_provider(Path(directory).resolve() / "server") as server:
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/provider.py", line 35, in __enter__
+    self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/socketserver.py", line 457, in __init__
+    self.server_bind()
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/server.py", line 136, in server_bind
+    socketserver.TCPServer.server_bind(self)
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/socketserver.py", line 473, in server_bind
+    self.socket.bind(self.server_address)
+PermissionError: [Errno 1] Operation not permitted
+
+======================================================================
+ERROR: test_returns_known_vectors_and_records_only_counters (test_provider.ProviderTests.test_returns_known_vectors_and_records_only_counters)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_provider.py", line 18, in test_returns_known_vectors_and_records_only_counters
+    with start_provider(root / "server") as server:
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/provider.py", line 35, in __enter__
+    self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/socketserver.py", line 457, in __init__
+    self.server_bind()
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/server.py", line 136, in server_bind
+    socketserver.TCPServer.server_bind(self)
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/socketserver.py", line 473, in server_bind
+    self.socket.bind(self.server_address)
+PermissionError: [Errno 1] Operation not permitted
+
+======================================================================
+ERROR: test_outer_timeout_stops_nested_group_and_pipe_holding_descendant (test_window.WindowTests.test_outer_timeout_stops_nested_group_and_pipe_holding_descendant)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_window.py", line 37, in test_outer_timeout_stops_nested_group_and_pipe_holding_descendant
+    state = subprocess.run(["ps", "-o", "stat=", "-p", path.read_text()], capture_output=True, text=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1950, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+PermissionError: [Errno 1] Operation not permitted: 'ps'
+
+----------------------------------------------------------------------
+Ran 84 tests in 14.961s
+
+FAILED (errors=4, skipped=8)

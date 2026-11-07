@@ -84,6 +84,20 @@ impl GitWriteCleanup {
         self.cancelled.load(Ordering::SeqCst)
     }
 
+    /// Require an active command before and after confirming existing durable resources.
+    ///
+    /// # Errors
+    /// Returns the terminal cancellation error once cleanup has begun.
+    pub(super) fn writes_verify_active(&self) -> Result<(), SnapshotError> {
+        if self.writes_is_cancelled() {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                WRITE_CANCELLED_MESSAGE,
+            ));
+        }
+        Ok(())
+    }
+
     /// Creates and registers an outer stage atomically with respect to cancellation.
     ///
     /// # Arguments
@@ -165,12 +179,7 @@ impl GitWriteCleanup {
 
     fn write_admit(&self) -> Result<MutexGuard<'_, WriteState>, SnapshotError> {
         let state = self.state_lock();
-        if self.writes_is_cancelled() {
-            return Err(SnapshotError::new(
-                SnapshotErrorKind::InternalError,
-                WRITE_CANCELLED_MESSAGE,
-            ));
-        }
+        self.writes_verify_active()?;
         Ok(state)
     }
 

@@ -1,0 +1,48 @@
+{
+  "requested_by_user": true,
+  "host": "127.0.0.1",
+  "port": 11434,
+  "installed_local_models": [
+    {
+      "model": "embeddinggemma:300m-qat-q4_0",
+      "manifest_sha256": "2976692e42bc18fe50ec5dc2bc2fd8d5e40a51a4cac28847fd2e3b4e6fb1ea90",
+      "manifest": {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "config": {
+          "mediaType": "application/vnd.docker.container.image.v1+json",
+          "digest": "sha256:44379bd8753e8ad855fa4d9a82e35a6a7bd794d0f38855d09f6a8edb0bc2b0e5",
+          "size": 416
+        },
+        "layers": [
+          {
+            "mediaType": "application/vnd.ollama.image.model",
+            "digest": "sha256:98e0321ff4472646a1f3a1301a051f80388fdb0e8d2e3dc7b814cd734c90b717",
+            "size": 238530688,
+            "from": "embeddinggemma:300m-qat-q4_0"
+          },
+          {
+            "mediaType": "application/vnd.ollama.image.license",
+            "digest": "sha256:1adbfec9dcf025cbf301c072f3847527468dcfa399da7491ee4a1c9e9f1b33e9",
+            "size": 8363
+          },
+          {
+            "mediaType": "application/vnd.ollama.image.params",
+            "digest": "sha256:45dc10444b87e50e9c97d26ca2449f4c810ba1fc48d3d25e98d8917e0c39dad5",
+            "size": 34
+          },
+          {
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "digest": "sha256:101341d65c2ccbf23f16650b79d30b9fca94a45ffa09a9984c600157b81a58df",
+            "size": 745
+          }
+        ]
+      }
+    }
+  ],
+  "started_utc": "2026-11-06T08:52:55Z",
+  "outcome": "unavailable",
+  "error_type": "PermissionError",
+  "errno": 1,
+  "reason": "[Errno 1] Operation not permitted"
+}

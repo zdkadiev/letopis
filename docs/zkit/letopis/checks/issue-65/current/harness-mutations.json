@@ -1,0 +1,20 @@
+[
+  {
+    "test": "test_scenarios.ScenarioTests.test_full_rebuild_uses_current_index_command",
+    "mutation": "argv = [\"reindex\"] if command == \"index\" else [command]",
+    "exit_code": 1,
+    "output": "======================================================================\nFAIL: test_full_rebuild_uses_current_index_command (test_scenarios.ScenarioTests.test_full_rebuild_uses_current_index_command)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/zdkadiev/Repos/letopis/tests/performance/test_scenarios.py\", line 24, in test_full_rebuild_uses_current_index_command\n    self.assertEqual(scenario[\"argv\"], [\"index\", \"--full\"])\nAssertionError: Lists differ: ['reindex'] != ['index', '--full']\n\nFirst differing element 0:\n'reindex'\n'index'\n\nSecond list contains 1 additional elements.\nFirst extra element 1:\n'--full'\n\n- ['reindex']\n+ ['index', '--full']\n\n----------------------------------------------------------------------\nRan 1 test in 0.078s\n\nFAILED (failures=1)\n"
+  },
+  {
+    "test": "test_report.ReportTests.test_index_requires_a_positive_published_revision",
+    "mutation": "command == \"reindex\"",
+    "exit_code": 1,
+    "output": "======================================================================\nFAIL: test_index_requires_a_positive_published_revision (test_report.ReportTests.test_index_requires_a_positive_published_revision)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/zdkadiev/Repos/letopis/tests/performance/test_report.py\", line 34, in test_index_requires_a_positive_published_revision\n    self.assertTrue(valid[\"valid\"])\nAssertionError: False is not true\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (failures=1)\n"
+  },
+  {
+    "test": "test_contention.ContentionTests.test_writer_executes_full_index_command",
+    "mutation": "argv = [\"reindex\"] if role == \"writer\"",
+    "exit_code": 1,
+    "output": "======================================================================\nFAIL: test_writer_executes_full_index_command (test_contention.ContentionTests.test_writer_executes_full_index_command)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/zdkadiev/Repos/letopis/tests/performance/test_contention.py\", line 37, in test_writer_executes_full_index_command\n    self.assertEqual(record[\"outcome\"], \"success\")\nAssertionError: 'nonzero' != 'success'\n- nonzero\n+ success\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.384s\n\nFAILED (failures=1)\n"
+  }
+]

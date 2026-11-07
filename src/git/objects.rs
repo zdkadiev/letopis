@@ -1,7 +1,7 @@
 use super::{
     GitRepository,
     constants::{BLOB_KIND, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
-    durability::StagedObject,
+    durability::{StagedObject, object_reuse_existing},
     tree::tree_entry_get,
     validation::tree_bytes_validate,
 };
@@ -264,6 +264,9 @@ impl<'a> Directory<'a> {
 }
 
 fn object_write(git: &GitRepository, kind: Kind, bytes: &[u8]) -> Result<String, SnapshotError> {
+    if let Some(oid) = object_reuse_existing(&git.repo, kind, bytes, &git.cleanup)? {
+        return Ok(oid.to_string());
+    }
     let object = StagedObject::new_with_cleanup(&git.repo, kind, bytes, &git.cleanup)?;
     let oid = object.object_get_oid().to_string();
     object.object_publish()?;
