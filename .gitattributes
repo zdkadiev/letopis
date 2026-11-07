@@ -1,2 +1,5 @@
 tests/fixtures/markdown/*.md -text whitespace=cr-at-eol
 docs/zkit/letopis/checks/TK-7/**/*.log whitespace=-blank-at-eof
+
+# Preserve captured evidence bytes, including original line endings.
+/docs/zkit/letopis/checks/issue-65/** -text

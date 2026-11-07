@@ -13,6 +13,18 @@ from scenarios import (ROOT, build_release, build_traversal_oracle, prepare_exis
 
 
 class ScenarioTests(unittest.TestCase):
+    def test_full_rebuild_uses_current_index_command(self):
+        # Given: the historical reindex scenario on a fresh synthetic repository.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            fixture = prepare_fixture(root / "fixture", 60)
+            # When: preparing a full projection rebuild.
+            scenario = prepare_scenario(fixture, "reindex", root / "case")
+            # Then: the current CLI receives index --full and an empty JSON request.
+            self.assertEqual(scenario["argv"], ["index", "--full"])
+            self.assertEqual(scenario["stdin"], b"{}\n")
+            self.assertEqual(scenario["expected"]["command"], "index")
+
     def test_packing_control_preserves_target_bytes_and_source_tree(self):
         # Given: identical seed/count/fragment bytes with different file packing.
         with tempfile.TemporaryDirectory() as directory:

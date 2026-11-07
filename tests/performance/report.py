@@ -84,7 +84,7 @@ def validate_command(scenario: dict, result) -> dict:
         if result["problems"] or result["revision"] is None or result["locks"]:
             raise ValueError("unexpected problems or locks")
         return {"revision": result["revision"], "backlog": result["embedding_backlog"]}
-    if command == "reindex":
+    if command in ("index", "reindex"):
         if type(result["revision"]) is not int or result["revision"] < 1:
             raise ValueError("invalid publication")
         return {"revision": result["revision"]}
