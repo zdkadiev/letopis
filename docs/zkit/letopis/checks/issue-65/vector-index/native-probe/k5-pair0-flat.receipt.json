@@ -1,0 +1,26 @@
+{
+  "name": "k5-pair0-flat",
+  "mode": "flat",
+  "argv": [
+    "/opt/homebrew/opt/sqlite/bin/sqlite3",
+    "-readonly",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 0.06075174990110099,
+  "process_user_seconds": 0.019731,
+  "process_system_seconds": 0.03866499999999995,
+  "stdout": "",
+  "stderr": "",
+  "sqlite_timers": [
+    {
+      "wall_seconds": 0.05452,
+      "user_seconds": 0.017892,
+      "system_seconds": 0.036559,
+      "cpu_seconds": 0.054451
+    }
+  ],
+  "K": 5,
+  "rows": 5,
+  "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+}

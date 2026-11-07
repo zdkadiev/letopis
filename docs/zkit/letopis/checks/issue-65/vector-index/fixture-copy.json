@@ -1,0 +1,6 @@
+{
+  "method": "APFS clone source/Git files; SQLite online backup of both DBs, discarded copied DB/WAL/SHM only inside owned copy",
+  "repository": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/repository",
+  "canonical_hashes_verified": 4334,
+  "original_untouched": true
+}

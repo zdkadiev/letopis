@@ -1,0 +1,16 @@
+{
+  "name": "metadata-v2-flat",
+  "mode": "flat",
+  "argv": [
+    "/opt/homebrew/opt/sqlite/bin/sqlite3",
+    "-readonly",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 0.922612207941711,
+  "process_user_seconds": 0.049839999999999995,
+  "process_system_seconds": 0.1871,
+  "stdout": "[{\"keys\":100000}]\n[{\"model_header\":\"000000040000000100000000000000000000000000000002\"}]\n[{\"idx_blocks\":295,\"idx_bytes\":307603540}]\n[{\"base_rows\":100000,\"base_bytes\":100000}]\n[{\"id\":0,\"val\":2},\n{\"id\":2,\"val\":768},\n{\"id\":5,\"val\":4}]\n[{\"quick_check\":\"ok\"}]\n",
+  "stderr": "",
+  "sqlite_timers": []
+}

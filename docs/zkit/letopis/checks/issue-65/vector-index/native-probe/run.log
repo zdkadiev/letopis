@@ -1,0 +1,9 @@
+rebuild-flat 2.240598167059943 [{'wall_seconds': 2.174718, 'user_seconds': 0.313094, 'system_seconds': 0.917522, 'cpu_seconds': 1.230616}]
+metadata-none 0.824870124924928 []
+warmup-none 0.13734800019301474 []
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/run-probe.py", line 47, in <module>
+    query(f'warmup-{mode}',mode,5)
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/run-probe.py", line 38, in query
+    assert receipt['rows']==k,(name,receipt['rows'])
+AssertionError: ('warmup-none', 6)

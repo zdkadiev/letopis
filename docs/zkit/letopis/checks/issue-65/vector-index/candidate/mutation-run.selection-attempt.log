@@ -1,0 +1,5 @@
+skip-migration CAUGHT
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/candidate/source/../mutation-check.py", line 16, in <module>
+    assert original.count(old)==1,(name,original.count(old))
+AssertionError: ('skip-writer-model-recheck', 2)

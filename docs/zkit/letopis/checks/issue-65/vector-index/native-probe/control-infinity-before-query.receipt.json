@@ -1,0 +1,7 @@
+{
+  "name": "control-infinity-before-query",
+  "exit_code": 0,
+  "wall_seconds": 0.004848791053518653,
+  "stdout": "[{\"rowid\":1,\"distance\":\"0.0\"},\n{\"rowid\":2,\"distance\":\"0.0\"},\n{\"rowid\":3,\"distance\":\"0.29289321881345254\"}]\n",
+  "stderr": ""
+}

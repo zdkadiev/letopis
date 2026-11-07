@@ -1,0 +1,6 @@
+{
+  "request": {},
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"revision\":99,\"embedding_backlog\":0,\"embedding_failed\":1,\"locks\":[{\"name\":\"embed\",\"pid\":23078}],\"problems\":[{\"code\":\"embedding_failed\",\"message\":\"embedding attempts exhausted\",\"details\":{\"reason\":\"embedding_attempts_exhausted\",\"target\":\"df1fb4afb8bb51ed2849deec1cb5098a6a03b1d84688b3921092eae96a276224\"}}]}}\n",
+  "stderr": ""
+}

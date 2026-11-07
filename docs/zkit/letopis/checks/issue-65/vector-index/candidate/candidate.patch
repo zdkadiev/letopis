@@ -1,0 +1,570 @@
+diff --git a/docs/zkit/letopis/mechanics/storage-schema.sql b/docs/zkit/letopis/mechanics/storage-schema.sql
+index ec8cc6d..b39dee9 100644
+--- a/docs/zkit/letopis/mechanics/storage-schema.sql
++++ b/docs/zkit/letopis/mechanics/storage-schema.sql
+@@ -72,7 +72,7 @@ create table files(
+ -- create virtual table vec.vector_index using vec1(vector);  -- rowid = vector_keys.row_id
+ -- create table vec.query_error(id integer primary key check(id=1), at integer not null, error text not null);  -- D-62, cleared on success
+ -- create table vec.embed_failures(search_hash text primary key, attempts integer not null check(attempts>=1), error text);
+--- insert into vec.vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
++-- insert into vec.vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
+ -- Work: nodes.search_hash without vec.vector_keys row and not exhausted in embed_failures.
+ -- Publish: one vec transaction checks meta.config_identity, INSERT OR IGNORE key+vector,
+ -- DELETE the embed_failures row. Config reset: BEGIN IMMEDIATE, re-check identity, recreate.
+diff --git a/src/storage/mod.rs b/src/storage/mod.rs
+index 6b4b03a..acb6951 100644
+--- a/src/storage/mod.rs
++++ b/src/storage/mod.rs
+@@ -6,6 +6,7 @@ mod query;
+ mod schema;
+ mod transaction;
+ mod vector;
++mod vector_index;
+ 
+ pub(crate) use cache::CacheStorage;
+ pub(crate) use connection::{
+diff --git a/src/storage/schema.rs b/src/storage/schema.rs
+index 02bdeed..09ab36d 100644
+--- a/src/storage/schema.rs
++++ b/src/storage/schema.rs
+@@ -1,6 +1,7 @@
+ use super::{
+     connection::{map_sqlite, wait_for_storage_contention},
+     native::register_vec1,
++    vector_index::vector_index_prepare,
+ };
+ use crate::service::{StorageError, StorageErrorKind, StorageResult};
+ use rusqlite::{Connection, Transaction, TransactionBehavior};
+@@ -31,7 +32,8 @@ pub(crate) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()>
+ }
+ 
+ pub(crate) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
+-    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
++    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)?;
++    vector_index_prepare(connection)
+ }
+ 
+ pub(crate) fn validate_cache(connection: &Connection) -> StorageResult<()> {
+diff --git a/src/storage/vector.rs b/src/storage/vector.rs
+index 5538673..7d7f5eb 100644
+--- a/src/storage/vector.rs
++++ b/src/storage/vector.rs
+@@ -26,7 +26,7 @@ const NATIVE_DIMENSION_MAX: usize = 4096;
+ const RESET_INDEX: &str = r#"
+     drop table vector_index;
+     create virtual table vector_index using vec1(vector);
+-    insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
++    insert into vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
+ "#;
+ 
+ /// Select the vector database on a write connection or a cache read connection.
+@@ -611,7 +611,11 @@ pub(super) fn vector_keys_get_by_search_hash(
+         .transpose()
+ }
+ 
+-fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
++/// Decode native-endian f32 values without accepting empty, truncated or nonfinite payloads.
++///
++/// # Errors
++/// Returns an internal storage error for invalid stored vector bytes.
++pub(super) fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
+     if bytes.is_empty() || !bytes.len().is_multiple_of(4) {
+         return Err(StorageError::new(
+             StorageErrorKind::InternalError,
+diff --git a/src/storage/vectors.sql b/src/storage/vectors.sql
+index de1c5cd..c7ca955 100644
+--- a/src/storage/vectors.sql
++++ b/src/storage/vectors.sql
+@@ -3,4 +3,4 @@ create table vector_keys(row_id integer primary key, search_hash text not null u
+ create virtual table vector_index using vec1(vector);
+ create table query_error(id integer primary key check(id=1), at integer not null, error text not null);
+ create table embed_failures(search_hash text primary key, attempts integer not null check(attempts>=1), error text);
+-insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
++insert into vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
+diff --git a/src/storage/vector_index.rs b/src/storage/vector_index.rs
+new file mode 100644
+index 0000000..94ad6f8
+--- /dev/null
++++ b/src/storage/vector_index.rs
+@@ -0,0 +1,481 @@
++use super::{
++    connection::{map_sqlite, wait_for_storage_contention},
++    vector::{VectorSchema, decode_vector, vector_index_config_get_by_id},
++};
++use crate::service::{StorageError, StorageErrorKind, StorageResult};
++use rusqlite::{Connection, Transaction, TransactionBehavior, types::ValueRef};
++
++// Pinned native MODEL version key; rebuild increments this integer before reloading its model.
++const NATIVE_MODEL_VERSION_FIELD: i64 = 0;
++
++/// Prepare only the recognized legacy none/cos physical representation.
++/// Read-only/query-only handles preserve their existing compatible observation path.
++///
++/// # Errors
++/// Returns a storage error for unsupported native state, corrupt legacy vectors,
++/// contention exceeding the bounded wait, or an unsuccessful atomic rebuild.
++pub(super) fn vector_index_prepare(connection: &mut Connection) -> StorageResult<()> {
++    let flat = wait_for_storage_contention(|| {
++        let read = connection.transaction().map_err(map_sqlite)?;
++        let flat = is_exact_flat_index(&read)?;
++        read.commit().map_err(map_sqlite)?;
++        Ok(flat)
++    })?;
++    let query_only: bool = connection
++        .pragma_query_value(None, "query_only", |row| row.get(0))
++        .map_err(map_sqlite)?;
++    if flat || query_only || connection.is_readonly("main").map_err(map_sqlite)? {
++        return Ok(());
++    }
++    wait_for_storage_contention(|| {
++        let transaction = Transaction::new_unchecked(connection, TransactionBehavior::Immediate)
++            .map_err(map_sqlite)?;
++        // Recheck after acquiring the writer; another opener may already have converted it.
++        if !is_exact_flat_index(&transaction)? {
++            verify_legacy_vectors(&transaction)?;
++            transaction.execute(
++                "insert into vector_index(cmd,arg) values('rebuild','{index:\"flat\",distance:\"cos\"}')",
++                [],
++            ).map_err(map_sqlite)?;
++            if !is_exact_flat_index(&transaction)? {
++                return Err(StorageError::new(
++                    StorageErrorKind::InternalError,
++                    "invalid stored vector model",
++                ));
++            }
++        }
++        transaction.commit().map_err(map_sqlite)
++    })
++}
++
++/// Recognize only opaque models created by this pinned native module for the application.
++/// Factory equality rejects unknown tags without interpreting or repairing a private header.
++fn is_exact_flat_index(connection: &Connection) -> StorageResult<bool> {
++    let reference = Connection::open_in_memory().map_err(map_sqlite)?;
++    reference
++        .execute_batch(include_str!("vectors.sql"))
++        .map_err(map_sqlite)?;
++    let flat: Vec<u8> = reference
++        .query_row("select val from vector_index_model where id=1", [], |row| {
++            row.get(0)
++        })
++        .map_err(map_sqlite)?;
++    reference.execute(
++        "insert into vector_index(cmd,arg) values('rebuild','{index:\"none\",distance:\"cos\"}')", [],
++    ).map_err(map_sqlite)?;
++    let none: Vec<u8> = reference
++        .query_row("select val from vector_index_model where id=1", [], |row| {
++            row.get(0)
++        })
++        .map_err(map_sqlite)?;
++    let flat: Option<bool> = connection
++        .query_row(
++            "select case when val=?1 then 1 when val=?2 then 0 else null end
++         from vector_index_model where id=1",
++            rusqlite::params![flat, none],
++            |row| row.get(0),
++        )
++        .map_err(map_sqlite)?;
++    flat.ok_or_else(|| {
++        StorageError::new(
++            StorageErrorKind::InternalError,
++            "unsupported stored vector model",
++        )
++    })
++}
++
++fn verify_legacy_vectors(connection: &Connection) -> StorageResult<()> {
++    let model_version: i64 = connection
++        .query_row(
++            "select val from vector_index_config where id=?1",
++            [NATIVE_MODEL_VERSION_FIELD],
++            |row| row.get(0),
++        )
++        .map_err(map_sqlite)?;
++    if model_version <= 0 || model_version == i64::MAX {
++        return Err(StorageError::new(
++            StorageErrorKind::InternalError,
++            "invalid stored vector model version",
++        ));
++    }
++    let dimensions = vector_index_config_get_by_id(connection, VectorSchema::Main)?;
++    let mut statement = connection
++        .prepare("select vector from vector_index")
++        .map_err(map_sqlite)?;
++    let mut rows = statement.query([]).map_err(map_sqlite)?;
++    while let Some(row) = rows.next().map_err(map_sqlite)? {
++        let value = row.get_ref(0).map_err(map_sqlite)?;
++        let ValueRef::Blob(bytes) = value else {
++            return Err(StorageError::new(
++                StorageErrorKind::InternalError,
++                "invalid stored vector data",
++            ));
++        };
++        if dimensions.is_none_or(|size| size.get() * size_of::<f32>() != bytes.len()) {
++            return Err(StorageError::new(
++                StorageErrorKind::InternalError,
++                "invalid stored vector data",
++            ));
++        }
++        decode_vector(bytes)?;
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use crate::storage::{
++        bootstrap_vectors,
++        connection::{ON_STORAGE_CONTENTION, open_database},
++    };
++    use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
++    use std::{path::Path, sync::mpsc, thread, time::Duration};
++    use tempfile::TempDir;
++
++    #[test]
++    fn exact_flat_bootstrap_preserves_populated_state_and_is_idempotent() {
++        // Given: a populated recognized none/cos database with signed-zero vector payload and application state.
++        let root = TempDir::new().unwrap();
++        let mut connection = build_legacy_vectors(&root.path().join("vectors"));
++        let before = get_vector_state(&connection);
++        // When: writable bootstrap prepares the exact flat representation twice.
++        bootstrap_vectors(&mut connection).unwrap();
++        let total_changes = connection.total_changes();
++        bootstrap_vectors(&mut connection).unwrap();
++        // Then: the native mode changes once while original bytes, rowids, identity, dimensions and errors remain exact.
++        assert_eq!(get_native_mode(&connection), "flat");
++        assert_eq!(get_vector_state(&connection), before);
++        assert_eq!(connection.total_changes(), total_changes);
++        assert_eq!(
++            connection
++                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
++                .unwrap(),
++            1
++        );
++    }
++
++    #[test]
++    fn exact_flat_upgrade_preserves_a_separate_pinned_reader() {
++        // Given: a separate reader has pinned the old valid none representation with no live cursor.
++        let root = TempDir::new().unwrap();
++        let path = root.path().join("vectors");
++        let mut writer = build_legacy_vectors(&path);
++        let reader = open_database(&path).unwrap();
++        reader.execute_batch("begin").unwrap();
++        let before = get_vector_state(&reader);
++        assert_eq!(get_native_mode(&reader), "none");
++        // When: another writable connection publishes the physical index upgrade.
++        bootstrap_vectors(&mut writer).unwrap();
++        // Then: the pinned read still sees its original bytes and mode; a new view sees flat and the same bytes.
++        assert_eq!(get_vector_state(&reader), before);
++        assert_eq!(get_native_mode(&reader), "none");
++        reader.execute_batch("commit").unwrap();
++        assert_eq!(get_native_mode(&reader), "flat");
++        assert_eq!(get_vector_state(&reader), before);
++    }
++
++    #[test]
++    fn exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors() {
++        // Given: old none vectors are independently corrupted at the native shadow boundary.
++        for bytes in [
++            vec![0],
++            [f32::NAN.to_ne_bytes(), 0.0_f32.to_ne_bytes()].concat(),
++        ] {
++            let root = TempDir::new().unwrap();
++            let mut connection = build_legacy_vectors(&root.path().join("vectors"));
++            connection
++                .execute(
++                    "update vector_index_base set vector=?1 where id=7",
++                    [&bytes],
++                )
++                .unwrap();
++            let model: Vec<u8> = connection
++                .query_row("select val from vector_index_model", [], |row| row.get(0))
++                .unwrap();
++            // When: writable bootstrap encounters malformed data before any conversion.
++            let result = bootstrap_vectors(&mut connection);
++            // Then: corruption stays an error, original model and corrupt bytes remain untouched, and the transaction closes.
++            assert!(result.is_err());
++            assert_eq!(get_native_mode(&connection), "none");
++            assert_eq!(
++                connection
++                    .query_row("select val from vector_index_model", [], |row| row
++                        .get::<_, Vec<u8>>(0))
++                    .unwrap(),
++                model
++            );
++            assert_eq!(
++                connection
++                    .query_row(
++                        "select vector from vector_index_base where id=7",
++                        [],
++                        |row| row.get::<_, Vec<u8>>(0)
++                    )
++                    .unwrap(),
++                bytes
++            );
++            assert!(connection.is_autocommit());
++        }
++    }
++
++    #[test]
++    fn exact_flat_query_only_bootstrap_preserves_legacy_observation() {
++        // Given: a recognized legacy none database is explicitly query-only.
++        let root = TempDir::new().unwrap();
++        let mut connection = build_legacy_vectors(&root.path().join("vectors"));
++        connection.pragma_update(None, "query_only", true).unwrap();
++        // When: bootstrap validates this observation-only handle.
++        bootstrap_vectors(&mut connection).unwrap();
++        // Then: existing query-only compatibility is retained without a hidden migration writer.
++        assert_eq!(get_native_mode(&connection), "none");
++    }
++
++    #[test]
++    fn exact_flat_failed_native_rebuild_rolls_back_model_and_retries_cleanly() {
++        // Given: native index insertion will fail after rebuild has written a new model.
++        let root = TempDir::new().unwrap();
++        let path = root.path().join("vectors");
++        let mut connection = build_legacy_vectors(&path);
++        let before = get_vector_state(&connection);
++        connection.execute_batch("create trigger fail_rebuild before insert on vector_index_idx begin select raise(abort,'injected native failure'); end").unwrap();
++        // When: private migration encounters the injected native failure, then the fault is removed.
++        assert!(super::vector_index_prepare(&mut connection).is_err());
++        // Then: rollback unloads the changed native model and preserves the old logical contents.
++        assert!(connection.is_autocommit());
++        assert_eq!(get_native_mode(&connection), "none");
++        assert_eq!(get_vector_state(&connection), before);
++        connection
++            .execute_batch("drop trigger fail_rebuild")
++            .unwrap();
++        // When: bootstrap retries on the same connection, then reopens independently.
++        bootstrap_vectors(&mut connection).unwrap();
++        let mut reopened = open_database(&path).unwrap();
++        bootstrap_vectors(&mut reopened).unwrap();
++        // Then: both handles see exact flat bytes without a lingering rolled-back cached model.
++        assert_eq!(get_native_mode(&connection), "flat");
++        assert_eq!(get_native_mode(&reopened), "flat");
++        assert_eq!(get_vector_state(&reopened), before);
++    }
++
++    #[test]
++    fn exact_flat_competing_opener_rechecks_the_committed_model() {
++        // Given: an owner holds the writer while a second legacy opener reaches migration.
++        let root = TempDir::new().unwrap();
++        let path = root.path().join("vectors");
++        let mut owner = build_legacy_vectors(&path);
++        let mut waiter = open_database(&path).unwrap();
++        let transaction = owner
++            .transaction_with_behavior(TransactionBehavior::Immediate)
++            .unwrap();
++        let (contended, observed) = mpsc::channel();
++        let (release, released) = mpsc::channel();
++        let worker = thread::spawn(move || {
++            ON_STORAGE_CONTENTION.set(Some(Box::new(move || {
++                contended.send(()).unwrap();
++                released.recv_timeout(Duration::from_secs(20)).unwrap();
++            })));
++            bootstrap_vectors(&mut waiter).unwrap();
++            waiter
++                .query_row(
++                    "select val from vector_index_config where id=0",
++                    [],
++                    |row| row.get::<_, i64>(0),
++                )
++                .unwrap()
++        });
++        // When: the first owner publishes flat before the waiting opener acquires its writer.
++        observed.recv_timeout(Duration::from_secs(20)).unwrap();
++        transaction.execute("insert into vector_index(cmd,arg) values('rebuild','{index:\"flat\",distance:\"cos\"}')", []).unwrap();
++        let published_version: i64 = transaction
++            .query_row(
++                "select val from vector_index_config where id=0",
++                [],
++                |row| row.get(0),
++            )
++            .unwrap();
++        transaction.commit().unwrap();
++        release.send(()).unwrap();
++        // Then: the waiter recognizes flat and does not increment the published native model version.
++        assert_eq!(worker.join().unwrap(), published_version);
++        assert_eq!(get_native_mode(&owner), "flat");
++    }
++
++    #[test]
++    fn exact_flat_fresh_query_only_and_empty_retained_dimensions_are_compatible() {
++        // Given: a fresh database and a legacy database retaining dimensions after deletion.
++        let root = TempDir::new().unwrap();
++        let mut fresh = open_database(&root.path().join("fresh")).unwrap();
++        bootstrap_vectors(&mut fresh).unwrap();
++        let mut legacy = build_legacy_vectors(&root.path().join("legacy"));
++        legacy.execute("delete from vector_index", []).unwrap();
++        legacy.execute("delete from vector_keys", []).unwrap();
++        // When: fresh flat is reopened query-only and the empty legacy index is upgraded.
++        fresh.pragma_update(None, "query_only", true).unwrap();
++        bootstrap_vectors(&mut fresh).unwrap();
++        bootstrap_vectors(&mut legacy).unwrap();
++        // Then: both models are flat, and deleting all old rows did not erase native dimensions.
++        assert_eq!(get_native_mode(&fresh), "flat");
++        assert_eq!(get_native_mode(&legacy), "flat");
++        assert_eq!(
++            legacy
++                .query_row(
++                    "select val from vector_index_config where id=2",
++                    [],
++                    |row| row.get::<_, i64>(0)
++                )
++                .unwrap(),
++            2
++        );
++    }
++
++    #[test]
++    fn exact_flat_bootstrap_rejects_an_unrecognized_metric() {
++        // Given: a structurally compatible index has an explicit L2 physical model.
++        let root = TempDir::new().unwrap();
++        let mut connection = build_legacy_vectors(&root.path().join("vectors"));
++        connection.execute("insert into vector_index(cmd,arg) values('rebuild','{index:\"none\",distance:\"l2\"}')", []).unwrap();
++        let before = get_vector_state(&connection);
++        // When: bootstrap checks this unrecognized migration source.
++        let result = bootstrap_vectors(&mut connection);
++        // Then: migration refuses rather than silently changing metric or rewriting state.
++        assert!(result.is_err());
++        assert_eq!(get_vector_state(&connection), before);
++        assert_eq!(get_native_mode(&connection), "none");
++    }
++
++    #[test]
++    fn exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog() {
++        // Given: the pinned native header's big-endian distance field is changed from2 to unknown3.
++        let root = TempDir::new().unwrap();
++        let path = root.path().join("vectors");
++        let connection = build_legacy_vectors(&path);
++        let mut model: Vec<u8> = connection
++            .query_row("select val from vector_index_model", [], |row| row.get(0))
++            .unwrap();
++        model[20..24].copy_from_slice(&3_u32.to_be_bytes());
++        connection
++            .execute("update vector_index_model set val=?1", [&model])
++            .unwrap();
++        drop(connection);
++        let mut reopened = open_database(&path).unwrap();
++        // When: catalog output deceptively says none/cos, and bootstrap considers migration.
++        assert_eq!(get_native_mode(&reopened), "none");
++        let result = bootstrap_vectors(&mut reopened);
++        // Then: the unknown exact model is rejected without repairing its corrupt original header.
++        assert!(result.is_err());
++        assert_eq!(
++            reopened
++                .query_row("select val from vector_index_model", [], |row| row
++                    .get::<_, Vec<u8>>(0))
++                .unwrap(),
++            model
++        );
++        assert!(reopened.is_autocommit());
++    }
++
++    #[test]
++    fn exact_flat_upgrade_does_not_repair_a_corrupt_native_model_version() {
++        // Given: recognized legacy model bytes have a missing, invalidly typed, nonpositive or overflowing native version.
++        for statement in [
++            "delete from vector_index_config where id=0",
++            "update vector_index_config set val=0 where id=0",
++            "update vector_index_config set val=-1 where id=0",
++            "update vector_index_config set val=1.5 where id=0",
++            "update vector_index_config set val=9223372036854775807 where id=0",
++        ] {
++            let root = TempDir::new().unwrap();
++            let mut connection = build_legacy_vectors(&root.path().join("vectors"));
++            connection.execute(statement, []).unwrap();
++            let before = get_model_version_value(&connection);
++            let model: Vec<u8> = connection
++                .query_row("select val from vector_index_model where id=1", [], |row| {
++                    row.get(0)
++                })
++                .unwrap();
++            // When: physical index preparation considers this corrupt source configuration.
++            let result = bootstrap_vectors(&mut connection);
++            // Then: corruption is rejected without recreating version state or replacing model bytes.
++            assert!(result.is_err(), "{statement}");
++            assert_eq!(get_model_version_value(&connection), before);
++            assert_eq!(
++                connection
++                    .query_row("select val from vector_index_model where id=1", [], |row| {
++                        row.get::<_, Vec<u8>>(0)
++                    })
++                    .unwrap(),
++                model
++            );
++            assert!(connection.is_autocommit());
++        }
++    }
++
++    fn get_model_version_value(connection: &Connection) -> Option<String> {
++        connection
++            .query_row(
++                "select typeof(val)||':'||quote(val) from vector_index_config where id=0",
++                [],
++                |row| row.get(0),
++            )
++            .optional()
++            .unwrap()
++    }
++
++    fn build_legacy_vectors(path: &Path) -> Connection {
++        let connection = open_database(path).unwrap();
++        connection
++            .execute_batch(include_str!(
++                "../../tests/fixtures/storage/legacy-vectors.sql"
++            ))
++            .unwrap();
++        connection.pragma_update(None, "user_version", 1).unwrap();
++        let bytes = [2.0_f32.to_ne_bytes(), (-0.0_f32).to_ne_bytes()].concat();
++        connection
++            .execute(
++                "insert into vector_index(rowid,vector) values(7,?1)",
++                [&bytes],
++            )
++            .unwrap();
++        connection.execute_batch("insert into meta values(1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
++            insert into vector_keys values(7,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
++            insert into embed_failures values('cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',3,'failure sentinel');
++            insert into query_error values(1,17,'query sentinel');").unwrap();
++        connection
++    }
++    fn get_native_mode(connection: &Connection) -> String {
++        connection
++            .prepare("select vector from vector_index limit 0")
++            .unwrap();
++        let model: String = connection
++            .query_row(
++                "select model from vec1cat where database='main' and name='vector_index'",
++                [],
++                |row| row.get(0),
++            )
++            .unwrap();
++        serde_json::from_str::<serde_json::Value>(&model).unwrap()["index"]
++            .as_str()
++            .unwrap()
++            .to_owned()
++    }
++    fn get_vector_state(connection: &Connection) -> String {
++        let mut result = String::new();
++        for sql in [
++            "select rowid,hex(vector) from vector_index order by rowid",
++            "select * from meta",
++            "select * from vector_keys",
++            "select * from embed_failures",
++            "select * from query_error",
++            "select id,val from vector_index_config where id=2",
++        ] {
++            let mut statement = connection.prepare(sql).unwrap();
++            let columns = statement.column_count();
++            let mut rows = statement.query([]).unwrap();
++            while let Some(row) = rows.next().unwrap() {
++                for column in 0..columns {
++                    result.push_str(&format!("{:?};", row.get_ref(column).unwrap()));
++                }
++            }
++        }
++        result
++    }
++}

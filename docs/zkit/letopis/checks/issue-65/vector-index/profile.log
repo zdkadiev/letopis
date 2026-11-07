@@ -1,0 +1,82 @@
+{
+  "validation": {
+    "samples": 79244,
+    "usable_stacks": 79244,
+    "threads": 2,
+    "sha256": "bc7a3c5166b7c1ef03257e2d597f2ac1900b574bbbb5607ee040b738cf983125",
+    "bytes": 853519,
+    "libraries": [
+      "dyld",
+      "letopis",
+      "libsystem_pthread.dylib",
+      "libsystem_kernel.dylib",
+      "libsystem_platform.dylib",
+      "libsystem_malloc.dylib",
+      "libsystem_c.dylib",
+      "libsamply_mac_preload.dylib"
+    ]
+  },
+  "observed_cpu_delta": 70303137,
+  "functions": [
+    {
+      "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+      "inclusive_cpu_delta": 70303137,
+      "stack_observations": 79244
+    },
+    {
+      "function": "letopis::run_process_cli",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "std::rt::lang_start_internal::{closure#0}",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "main",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "letopis::commands::run_request::{{closure}}",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "std::panicking::catch_unwind::do_call::<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync, i32>",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "letopis::execute_request::{{closure}}",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "core::result::Result<T,E>::and_then",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "letopis::commands::run_search",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "std::panicking::catch_unwind::<i32, &dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync>",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "std::panicking::catch_unwind::<isize, std::rt::lang_start_internal::{closure#0}>",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    },
+    {
+      "function": "core::ops::function::FnOnce::call_once",
+      "inclusive_cpu_delta": 70303078,
+      "stack_observations": 79242
+    }
+  ]
+}

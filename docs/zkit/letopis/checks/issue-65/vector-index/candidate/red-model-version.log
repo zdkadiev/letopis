@@ -1,0 +1,13 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/candidate/source)
+error: variable does not need to be mutable
+   --> src/storage/vector_index.rs:404:13
+    |
+404 |         let mut connection = open_database(path).unwrap();
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `-D unused-mut` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_mut)]`
+
+error: could not compile `letopis` (lib test) due to 1 previous error

@@ -1,0 +1,34 @@
+{"label": "before", "seconds": 75.46495524980128, "conditioning": false, "stdout_sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2", "valid": true}
+{"label": "after", "seconds": 65.82987516606227, "conditioning": false, "stdout_sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2", "valid": true}
+{"label": "after", "seconds": 66.98608800000511, "conditioning": false, "stdout_sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2", "valid": true}
+{"label": "before", "seconds": 65.20979791600257, "conditioning": false, "stdout_sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2", "valid": true}
+{"label": "before", "seconds": 65.5928157500457, "conditioning": false, "stdout_sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2", "valid": true}
+{"label": "after", "seconds": 62.75632154196501, "conditioning": false, "stdout_sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2", "valid": true}
+{
+  "before": {
+    "seconds": [
+      75.46495524980128,
+      65.20979791600257,
+      65.5928157500457
+    ],
+    "median_seconds": 65.5928157500457,
+    "median_cpu_seconds": 61.260561,
+    "max_rss_bytes": 197066752
+  },
+  "after": {
+    "seconds": [
+      65.82987516606227,
+      66.98608800000511,
+      62.75632154196501
+    ],
+    "median_seconds": 65.82987516606227,
+    "median_cpu_seconds": 60.878424,
+    "max_rss_bytes": 166641664
+  },
+  "n_per_side": 3,
+  "valid_calls": 6,
+  "output_identical": true,
+  "speedup": 0.996398908316041,
+  "latency_reduction_percent": -0.3614106412505924,
+  "scope": "Steady-state full CLI on one copied synthetic100k real-provider corpus; mode setup/warmup/help/conditioning excluded; no intentional concurrent owned build/test/profile/drain; host and OS cache uncontrolled"
+}

@@ -1,0 +1,26 @@
+{
+  "name": "k100000-pair0-none",
+  "mode": "none",
+  "argv": [
+    "/opt/homebrew/opt/sqlite/bin/sqlite3",
+    "-readonly",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 2.4900710419751704,
+  "process_user_seconds": 0.564536,
+  "process_system_seconds": 1.584397,
+  "stdout": "",
+  "stderr": "",
+  "sqlite_timers": [
+    {
+      "wall_seconds": 2.483382,
+      "user_seconds": 0.562841,
+      "system_seconds": 1.582382,
+      "cpu_seconds": 2.145223
+    }
+  ],
+  "K": 100000,
+  "rows": 100000,
+  "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+}

@@ -1,4 +1,8 @@
-use super::{connection::wait_for_storage_contention, native::register_vec1};
+use super::{
+    connection::wait_for_storage_contention,
+    native::register_vec1,
+    vector_index::vector_index_prepare,
+};
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
@@ -28,7 +32,8 @@ pub(crate) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> 
 }
 
 pub(crate) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
-    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
+    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)?;
+    vector_index_prepare(connection)
 }
 
 pub(crate) fn validate_cache(connection: &Connection) -> StorageResult<()> {

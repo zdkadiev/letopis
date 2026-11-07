@@ -1,0 +1,7 @@
+{
+  "name": "control-short-migration",
+  "exit_code": 1,
+  "wall_seconds": 0.004990875022485852,
+  "stdout": "",
+  "stderr": "Error near line 4: vec1: unexpected vector size in vector_index_base: 3\n"
+}

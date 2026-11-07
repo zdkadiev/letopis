@@ -1,0 +1,9 @@
+{
+  "seconds": 1.9845550409518182,
+  "sql": ".bail on\n.load /Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/oracle-vec1.dylib sqlite3_extension_init\nselect model from vec1cat where database='main' and name='vector_index';\ninsert into vector_index(cmd,arg) values('rebuild','{index:\"flat\",distance:\"cos\"}');\nselect model from vec1cat where database='main' and name='vector_index';\n",
+  "stdout": "[{\"model\":\"{\\\"index\\\": \\\"flat\\\", \\\"distance\\\": \\\"cos\\\"}\"}]\n[{\"model\":\"{\\\"index\\\": \\\"flat\\\", \\\"distance\\\": \\\"cos\\\"}\"}]\n",
+  "stderr": "",
+  "exit_code": 0,
+  "outcome": "success",
+  "scope": "Owned fixture physical-mode rebuild outside timed CLI; unchanged vectors/model identity"
+}

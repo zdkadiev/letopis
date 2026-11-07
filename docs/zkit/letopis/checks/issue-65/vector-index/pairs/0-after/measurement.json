@@ -1,0 +1,54 @@
+{
+  "started_monotonic": 1600844.756960875,
+  "duration_seconds": 65.82987516606227,
+  "pid": 9306,
+  "outcome": "success",
+  "exit_code": 0,
+  "resources": {
+    "cpu_seconds": {
+      "value": 60.878424,
+      "unit": "seconds",
+      "scope": "wait4_direct_child_and_OS_accounted_reaped_descendants",
+      "method": "wait4"
+    },
+    "peak_rss": {
+      "value": 166641664,
+      "unit": "bytes",
+      "scope": "wait4_direct_child_and_OS_accounted_reaped_descendants",
+      "method": "wait4_lifetime_max_not_simultaneous_tree_peak"
+    },
+    "io_blocks": {
+      "read": 0,
+      "written": 0,
+      "unit": "OS_block_operations",
+      "scope": "wait4_direct_child_and_OS_accounted_reaped_descendants",
+      "method": "wait4"
+    },
+    "io_bytes": {
+      "unavailable": "portable per-process byte counters not collected"
+    }
+  },
+  "stdout": {
+    "bytes": 647,
+    "sha256": "0049eca6e5b11edf62ed5bf46ba40b1f89be69d48b3b408856ccf56589da85a2",
+    "capture_hex": "7b226f6b223a747275652c22726573756c74223a5b7b22656c656d656e745f6964223a226b6e6f776c656467652f706172742d303030302e6d64236e6f64652d303030303030222c2270617468223a226b6e6f776c656467652f706172742d303030302e6d64222c226c696e6573223a5b312c31315d2c227265766973696f6e223a352c22666c616773223a5b5d7d2c7b22656c656d656e745f6964223a226b6e6f776c656467652f706172742d303636362e6d64236e6f64652d303139393939222c2270617468223a226b6e6f776c656467652f706172742d303636362e6d64222c226c696e6573223a5b3231302c3232305d2c227265766973696f6e223a352c22666c616773223a5b5d7d2c7b22656c656d656e745f6964223a226b6e6f776c656467652f706172742d303939392e6d64236e6f64652d303239393939222c2270617468223a226b6e6f776c656467652f706172742d303939392e6d64222c226c696e6573223a5b3332302c3333305d2c227265766973696f6e223a352c22666c616773223a5b5d7d2c7b22656c656d656e745f6964223a226b6e6f776c656467652f706172742d333333302e6d64236e6f64652d303939393030222c2270617468223a226b6e6f776c656467652f706172742d333333302e6d64222c226c696e6573223a5b312c31315d2c227265766973696f6e223a352c22666c616773223a5b5d7d2c7b22656c656d656e745f6964223a226b6e6f776c656467652f706172742d303733332e6d64236e6f64652d303232303030222c2270617468223a226b6e6f776c656467652f706172742d303733332e6d64222c226c696e6573223a5b3131312c3132315d2c227265766973696f6e223a352c22666c616773223a5b5d7d5d7d0a",
+    "truncated": false
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "capture_hex": "",
+    "truncated": false
+  },
+  "validation": {
+    "valid": true,
+    "known_current_results": 5,
+    "literal_lexical_hit_retained": true,
+    "exact_five_id_set_matches_prior_frozen_baseline": true,
+    "unchanged_vector_state": true,
+    "native_model_before": {
+      "index": "flat",
+      "distance": "cos"
+    }
+  }
+}

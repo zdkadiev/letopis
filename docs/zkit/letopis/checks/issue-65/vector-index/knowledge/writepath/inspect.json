@@ -1,0 +1,11 @@
+{
+  "request": {
+    "element_ids": [
+      "letopis/architecture/storage.md",
+      "vendor/vec1/vec1.c"
+    ]
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"snapshot\":\"d99064e7c7a1e063c62fe3362998d236f9659df0\",\"elements\":{\"letopis/architecture/storage.md\":{\"path\":\"letopis/architecture/storage.md\",\"lines\":[1,159],\"hash\":\"8bff24f1e459b7b0f2725b9669e1b3fca24e55e1632e05c4f6dce0c8a1ec8f2f\"},\"vendor/vec1/vec1.c\":{\"path\":\"vendor/vec1/vec1.c\",\"hash\":\"a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9\"}}}}\n",
+  "stderr": ""
+}

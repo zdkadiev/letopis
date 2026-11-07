@@ -1,0 +1,8 @@
+{
+  "accepted": false,
+  "reason": "Assertion compared sha3_query with differently spelled SELECT; exact baseline SELECT is being rerun before drawing payload conclusion.",
+  "query_used": "select rowid,vector from vector_index order by rowid",
+  "baseline_query": "select rowid, vector from vector_index order by rowid",
+  "observed_sha3": "E73A61DCF720BF5DAA9F5CC1F299F989ED8E28A8503795D91CA6C473A7682C1B",
+  "expected_baseline_sha3": "4ED319020B3ADFE2FD6FC375EE308B6266F2D9E74689A6DE1EF7E22488218EE4"
+}

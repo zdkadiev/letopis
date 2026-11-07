@@ -1,0 +1,17 @@
+{
+  "source_restored": true,
+  "files_match_frozen_manifest": true,
+  "patch_sha256": "8e8430da61504f6e84f63aeadb7a6e17f9010c6aa90b4d5e5e59f7b6d624175b",
+  "mutants_caught": 6,
+  "mutants_total": 6,
+  "candidate_make_check_exit": 0,
+  "candidate_root_debug": {
+    "exit": 0,
+    "root_passed": 1217,
+    "root_failed": 0,
+    "root_ignored": 11,
+    "example_tests": 9
+  },
+  "background_work": "none",
+  "coordinator_full_verify_native_runner": "not claimed by this worker"
+}

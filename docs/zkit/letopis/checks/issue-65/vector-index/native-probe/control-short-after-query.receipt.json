@@ -1,0 +1,7 @@
+{
+  "name": "control-short-after-query",
+  "exit_code": 1,
+  "wall_seconds": 0.0044729579240083694,
+  "stdout": "",
+  "stderr": "Error near line 4: SQL logic error\n"
+}

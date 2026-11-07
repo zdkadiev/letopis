@@ -1,0 +1,14 @@
+{
+  "request": {
+    "element_ids": [
+      "letopis/architecture/storage.md",
+      "src/storage/vector_index.rs",
+      "docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json",
+      "docs/zkit/letopis/checks/issue-65/vector-index/verification.json",
+      "docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json"
+    ]
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"snapshot\":\"6868ba7403ab7e20e785e99b160e7b148e7950b9\",\"elements\":{\"docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json\":{\"path\":\"docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json\",\"hash\":\"e6ae9a75d1c26551c9b9c3d04e908f03faafe8a19625cd18975880c169b0eb49\"},\"docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json\":{\"path\":\"docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json\",\"hash\":\"15f28e21c747e76ab9d674311defd26a7513024cd86cfceb01da55ecbc17ad3f\"},\"docs/zkit/letopis/checks/issue-65/vector-index/verification.json\":{\"path\":\"docs/zkit/letopis/checks/issue-65/vector-index/verification.json\",\"hash\":\"0e210be0e441f25b2eed2838029060de9b669929809e1ea9172eb6eaf6e20561\"},\"letopis/architecture/storage.md\":{\"path\":\"letopis/architecture/storage.md\",\"lines\":[1,195],\"hash\":\"ef328931a67902f23bb57936ab17d2158c596f98296c809d0beebfe46aa63570\"},\"src/storage/vector_index.rs\":{\"path\":\"src/storage/vector_index.rs\",\"hash\":\"caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a\"}}}}\n",
+  "stderr": ""
+}

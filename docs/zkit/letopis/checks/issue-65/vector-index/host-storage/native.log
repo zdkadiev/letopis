@@ -1,0 +1,464 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 05s
+     Running unittests src/lib.rs (target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+SQLite=3.53.2 vec1=version 0.8 (NEON, multi-threaded)
+journal_mode=wal
+synchronous=2
+foreign_keys=1
+fullfsync=1
+test storage::native::tests::native_capabilities_match_pinned_stack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 627 filtered out; finished in 0.04s
+
+     Running unittests src/main.rs (target/debug/deps/letopis-68067605f9dccc86)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cancellation_concurrency.rs (target/debug/deps/cancellation_concurrency-1b397c1713d81350)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/check_command.rs (target/debug/deps/check_command-eface5dc5c0fd7ba)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/check_lifecycle.rs (target/debug/deps/check_lifecycle-2995b13fccf8595f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/cli_cancellation.rs (target/debug/deps/cli_cancellation-e9db3a7978051e72)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/cli_drain.rs (target/debug/deps/cli_drain-654932fe4980a266)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/cli_help.rs (target/debug/deps/cli_help-df4e19384de07ea9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/cli_process.rs (target/debug/deps/cli_process-ce99984688eca25c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/cli_reading.rs (target/debug/deps/cli_reading-f18be973f5f214fc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/cli_runtime.rs (target/debug/deps/cli_runtime-3e0b80816957d563)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/cli_session_failure.rs (target/debug/deps/cli_session_failure-35f47b11e1de198a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/cli_traversal.rs (target/debug/deps/cli_traversal-4d6985a7a76e6759)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/config_command.rs (target/debug/deps/config_command-e10103ddaba31f73)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/corruption_diagnostics.rs (target/debug/deps/corruption_diagnostics-f52247c95fc1372e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/corruption_recovery.rs (target/debug/deps/corruption_recovery-56ceecb72247f89e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/corruption_reindex.rs (target/debug/deps/corruption_reindex-a303215f3fdb26c1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/database.rs (target/debug/deps/database-7b0fbcbf8c3cb690)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/document_refresh.rs (target/debug/deps/document_refresh-8e525f9d6d1e1a3e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+     Running tests/document_reindex.rs (target/debug/deps/document_reindex-eea8bbce17b0db37)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/document_scope.rs (target/debug/deps/document_scope-93b9d727dcd89eab)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/domain_values.rs (target/debug/deps/domain_values-1608e23111440f54)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/embedding_boundaries.rs (target/debug/deps/embedding_boundaries-11b40916ea6e50fc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/embedding_files.rs (target/debug/deps/embedding_files-d2c6cf79642a427c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/embedding_lifecycle.rs (target/debug/deps/embedding_lifecycle-2c200e3badf9aa9f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/embedding_provider.rs (target/debug/deps/embedding_provider-078b13e6fffef86f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+     Running tests/embedding_service.rs (target/debug/deps/embedding_service-0f0acd3d9cb3d2b1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+
+     Running tests/git_corruption.rs (target/debug/deps/git_corruption-a5cc14eb3307115b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/git_no_subprocess.rs (target/debug/deps/git_no_subprocess-31279e310fc69f4d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/git_retention.rs (target/debug/deps/git_retention-570e2d8f84f6dae6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-addabf4e1caedf09)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/git_streaming.rs (target/debug/deps/git_streaming-03eb0b6d045777b8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/graph_diagnostics.rs (target/debug/deps/graph_diagnostics-7122c45a4ceee1aa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/graph_read.rs (target/debug/deps/graph_read-a3ac77ac8bbf8af6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/index_command.rs (target/debug/deps/index_command-9ca86f486dbe29dd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/init_command.rs (target/debug/deps/init_command-0e7d1761eb0c8aff)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/knowledge_inspection.rs (target/debug/deps/knowledge_inspection-1823507c8112badb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/knowledge_search.rs (target/debug/deps/knowledge_search-3fe0a649623e3b57)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/maintenance_workflow.rs (target/debug/deps/maintenance_workflow-970bb45a4fc4ea81)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-c4e21ca0b637474f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/markdown_link_lifecycle.rs (target/debug/deps/markdown_link_lifecycle-80b0757a988b0029)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/markdown_link_paths.rs (target/debug/deps/markdown_link_paths-7236c4fb09d61b17)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-c59d185af2fd8e15)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-09d32edd236e837f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/process_supervision.rs (target/debug/deps/process_supervision-f39a7b6f250c996f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/provenance_commands.rs (target/debug/deps/provenance_commands-13be35ec2aa02bc8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/provenance_indexing.rs (target/debug/deps/provenance_indexing-8f72e44ef46971e2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/provenance_observation.rs (target/debug/deps/provenance_observation-0d37d4a6b4873648)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/provenance_revisions.rs (target/debug/deps/provenance_revisions-1fb8e4aeef953316)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/read_verification.rs (target/debug/deps/read_verification-979a2172f3675447)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/reindex_command.rs (target/debug/deps/reindex_command-c20a75b747b6eddf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/search_consistency.rs (target/debug/deps/search_consistency-07de2b54c8f333fd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/search_contention.rs (target/debug/deps/search_contention-5e1e4bb9c0d07635)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/search_filter_fallback.rs (target/debug/deps/search_filter_fallback-e5527ca4a1c9e566)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/search_filters.rs (target/debug/deps/search_filters-b5e9e6a952b96606)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/snapshot_verification.rs (target/debug/deps/snapshot_verification-24ed4378511341b1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/source_addresses.rs (target/debug/deps/source_addresses-f40668fce6fccc90)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/source_inspection.rs (target/debug/deps/source_inspection-38ce8c3db5535516)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/source_lifecycle.rs (target/debug/deps/source_lifecycle-e1b8995b9ad3084a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/source_projection.rs (target/debug/deps/source_projection-8f6f10cafdfc0d88)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/source_reading.rs (target/debug/deps/source_reading-11defa22a9f6153a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/status_command.rs (target/debug/deps/status_command-6e79f269188d8b88)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/status_files.rs (target/debug/deps/status_files-2a867b2b2d1db0b8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/storage_bootstrap.rs (target/debug/deps/storage_bootstrap-c5134628621ebfd1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+     Running tests/storage_cache.rs (target/debug/deps/storage_cache-3c57354589c457e1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.00s
+
+     Running tests/storage_configuration.rs (target/debug/deps/storage_configuration-c452559da6dc5f3b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/storage_corruption.rs (target/debug/deps/storage_corruption-f569d3bc05950018)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/storage_embedding_work.rs (target/debug/deps/storage_embedding_work-d3bb722ec5aa3a7d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+     Running tests/storage_failure_atomicity.rs (target/debug/deps/storage_failure_atomicity-5636d215d9d168b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/storage_failures.rs (target/debug/deps/storage_failures-0969aa8521705c2a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/storage_read_scope_failures.rs (target/debug/deps/storage_read_scope_failures-a754293989fab984)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/storage_status.rs (target/debug/deps/storage_status-37f757e09c8ad186)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/storage_vectors.rs (target/debug/deps/storage_vectors-a26abeac900b6854)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/target_corpus.rs (target/debug/deps/target_corpus-108a3f319cb53a0e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s
+
+     Running tests/thin_slice.rs (target/debug/deps/thin_slice-715216a973f7f4ea)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/traversal.rs (target/debug/deps/traversal-4ef7b98a3290933a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+

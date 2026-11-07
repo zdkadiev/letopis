@@ -1,0 +1,16 @@
+{
+  "captured_commit": "016eae8fa9705a209b01555a32877702b70cf74a",
+  "scope": "Measurement commit in isolated candidate clone only; actual root remains dirty/uncommitted",
+  "source_manifest": {
+    "baseline": "2db40fd82fd8b504ebb2040b96b248031ce5d791",
+    "patch_sha256": "8e8430da61504f6e84f63aeadb7a6e17f9010c6aa90b4d5e5e59f7b6d624175b",
+    "files": {
+      "src/storage/mod.rs": "e3b9effda91383c361a829291a8183c7ea73e97fd476510fac68be6dd46d83a7",
+      "src/storage/schema.rs": "d440844eaaf1d36c99eb6740206022cc4eec9527eaefd359113beb4a9f2dd481",
+      "src/storage/vector.rs": "fbfac32e414f8d7818e78c4fe6a31623aaa3c1329fd62b3ff82f27e835aeaa84",
+      "src/storage/vectors.sql": "3a934553394c296ee5dfe680440c1b61c16eb288121f935f72739bb951d321a5",
+      "src/storage/vector_index.rs": "caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a",
+      "docs/zkit/letopis/mechanics/storage-schema.sql": "835817d47e98a665a263f1158018ca0645b4e5a4485c50cc3f05cc6bc414fd77"
+    }
+  }
+}

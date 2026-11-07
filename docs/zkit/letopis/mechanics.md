@@ -138,7 +138,18 @@ Drain (`letopis embed --drain`, MC-5) обрабатывает один текс
 
 Векторы хранятся в `.letopis/vectors.db` ([D-92](decisions.md#D-92)), подключаемом через ATTACH: vector_keys(row_id, search_hash UNIQUE), vec1 vector_index с тем же rowid, meta(config_identity), embed_failures(search_hash PK, attempts, error). Удаление кэша не затрагивает vectors.db: после пересборки работа — только новые тексты. Удаление или повреждение vectors.db — полный пересчёт векторов и попыток без потери знаний. В выдачу попадают только векторы, соединённые с nodes.search_hash текущего read view.
 
-VectorPort принимает конечные float32 одинаковой длины, проверяет размерность/непустоту и запрещает некорректные значения. Native Ollama использует truncate:false, совместимый API проверяет индексы соответствия. Baseline vec1 no-index/cos без training/ANN и лишнего flat rebuild; при config reset vec1 в `.letopis/vectors.db` пересоздаётся транзакционно, чтобы очистить старую размерность. Совместимость schema change/rollback со старым read view — обязательная реализационная проверка R-8/P-2, не доказанная моделью.
+VectorPort принимает конечные float32 одинаковой длины, проверяет размерность/непустоту и запрещает некорректные значения. Native Ollama использует truncate:false, совместимый API проверяет индексы соответствия. Текущая реализация использует точный vec1 flat/cos без training/ANN ([D-107](decisions.md#D-107)); исходный no-index/cos baseline сохраняет исторический смысл. При config reset vec1 в `.letopis/vectors.db` пересоздаётся транзакционно с flat/cos, чтобы очистить старую размерность. Совместимость schema change/rollback со старым read view проверяется отдельно; модель сама её не доказывает.
+
+Writable bootstrap однократно переводит распознанный none/cos в flat/cos до
+создания consumer read views. Opaque model сравнивается с моделями, созданными
+тем же закреплённым native module; описание vec1cat само по себе скрывает
+неизвестные distance tags. Под bounded immediate transaction повторяется проверка
+режима, проверяется native MODEL version и исходные finite vector bytes, затем
+native rebuild сохраняет rowids, payload, dimensions, identity и execution state.
+Ошибка откатывает переход; уже-flat не требует writer. Legacy query-only и
+наблюдательный status не перестраивают данные. Flat blocks содержат авторитетные
+векторы и не являются удаляемой избыточной копией. Детали и проверки:
+[exact-index design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md).
 
 ### MC-4 — источники и актуальность
 

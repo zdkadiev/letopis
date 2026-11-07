@@ -1,0 +1,7 @@
+{
+  "name": "vector-hash-flat",
+  "exit_code": 0,
+  "wall_seconds": 4.027435999829322,
+  "stdout": "[{\"ordered_vector_sha3_256\":\"4ED319020B3ADFE2FD6FC375EE308B6266F2D9E74689A6DE1EF7E22488218EE4\"}]\n[{\"rows\":100000,\"vector_bytes\":307200000}]\n",
+  "stderr": ""
+}

@@ -1,0 +1,8 @@
+    Checking ring v0.17.14
+    Checking rustls-webpki v0.103.16
+    Checking rustls v0.23.46
+    Checking rustls-platform-verifier v0.7.1
+    Checking ureq v3.4.2
+ Documenting letopis v0.2.0 (/Users/zdkadiev/Repos/letopis)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.00s
+   Generated /Users/zdkadiev/Repos/letopis/target/doc/letopis/index.html

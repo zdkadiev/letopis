@@ -22,4 +22,4 @@ create table embed_failures
     error       text
 );
 insert into vector_index(cmd, arg)
-values ('rebuild', '{index:"none",distance:"cos"}');
+values ('rebuild', '{index:"flat",distance:"cos"}');

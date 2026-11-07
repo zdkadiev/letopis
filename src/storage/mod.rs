@@ -6,6 +6,7 @@ mod query;
 mod schema;
 mod transaction;
 mod vector;
+mod vector_index;
 
 pub(crate) use cache::CacheStorage;
 pub(crate) use connection::{

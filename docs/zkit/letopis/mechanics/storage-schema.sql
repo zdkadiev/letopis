@@ -72,7 +72,7 @@ create table files(
 -- create virtual table vec.vector_index using vec1(vector);  -- rowid = vector_keys.row_id
 -- create table vec.query_error(id integer primary key check(id=1), at integer not null, error text not null);  -- D-62, cleared on success
 -- create table vec.embed_failures(search_hash text primary key, attempts integer not null check(attempts>=1), error text);
--- insert into vec.vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
+-- insert into vec.vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
 -- Work: nodes.search_hash without vec.vector_keys row and not exhausted in embed_failures.
 -- Publish: one vec transaction checks meta.config_identity, INSERT OR IGNORE key+vector,
 -- DELETE the embed_failures row. Config reset: BEGIN IMMEDIATE, re-check identity, recreate.

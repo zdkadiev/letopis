@@ -26,7 +26,7 @@ const NATIVE_DIMENSION_MAX: usize = 4096;
 const RESET_INDEX: &str = r#"
     drop table vector_index;
     create virtual table vector_index using vec1(vector);
-    insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
+    insert into vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
 "#;
 
 /// Select the vector database on a write connection or a cache read connection.
@@ -642,7 +642,11 @@ pub(super) fn vector_keys_get_by_search_hash(
         .transpose()
 }
 
-fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
+/// Decode native-endian f32 values without accepting empty, truncated or nonfinite payloads.
+///
+/// # Errors
+/// Returns an internal storage error for invalid stored vector bytes.
+pub(super) fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
     if bytes.is_empty() || !bytes.len().is_multiple_of(4) {
         return Err(StorageError::new(
             StorageErrorKind::InternalError,
