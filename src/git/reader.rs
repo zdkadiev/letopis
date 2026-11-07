@@ -2,6 +2,7 @@ use super::{
     constants::{BLOB_KIND, HASH_CHUNK_BYTES, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
     error::SafeIo,
     hashing::ObjectHasher,
+    validation::tree_bytes_validate,
 };
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use gix::{
@@ -13,8 +14,9 @@ use gix::{
         store::{Handle, init::Options},
     },
 };
-use std::{fmt, io, rc::Rc};
+use std::{collections::BTreeSet, fmt, io, rc::Rc};
 
+const MAX_VALIDATED_TREES: usize = 4096;
 const MAX_REUSABLE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Keep only the current verified tree body; blob payloads are discarded after hashing.
@@ -29,6 +31,7 @@ pub(super) struct ObjectReader {
     objects: Handle<Rc<Store>>,
     oid_len: usize,
     buffer: Vec<u8>,
+    validated_trees: BTreeSet<String>,
     #[cfg(test)]
     object_reads: usize,
 }
@@ -39,6 +42,7 @@ impl fmt::Debug for ObjectReader {
             .debug_struct("ObjectReader")
             .field("oid_len", &self.oid_len)
             .field("buffer_capacity", &self.buffer.capacity())
+            .field("validated_trees", &self.validated_trees.len())
             .finish_non_exhaustive()
     }
 }
@@ -78,6 +82,7 @@ impl ObjectReader {
             objects: Rc::new(store).to_handle(),
             oid_len,
             buffer: Vec::new(),
+            validated_trees: BTreeSet::new(),
             #[cfg(test)]
             object_reads: 0,
         })
@@ -129,6 +134,29 @@ impl ObjectReader {
     #[cfg(test)]
     pub(super) fn object_get_read_count(&self) -> usize {
         self.object_reads
+    }
+
+    /// Read fresh verified tree bytes, reusing only successful structural validation.
+    /// The bounded memo retains identities, never payloads, for this reader's lifetime.
+    ///
+    /// # Errors
+    /// Uses caller-selected missing/type errors; decoding, identity and structure failures are internal.
+    pub(super) fn tree_bytes_get_by_oid(
+        &mut self,
+        oid: &str,
+        missing: SnapshotErrorKind,
+        wrong_type: SnapshotErrorKind,
+    ) -> Result<Vec<u8>, SnapshotError> {
+        let bytes = self.object_bytes_get_by_oid(oid, TREE_KIND, missing, wrong_type)?;
+        // Consult metadata only after verifying current bytes, so replacement or
+        // disappearance cannot hide behind an earlier structural success.
+        if !self.validated_trees.contains(oid) {
+            tree_bytes_validate(&bytes, self.oid_len)?;
+            if self.validated_trees.len() < MAX_VALIDATED_TREES {
+                self.validated_trees.insert(oid.to_owned());
+            }
+        }
+        Ok(bytes)
     }
 
     /// Returns verified bytes for an addressed object; no payload survives in a cache.

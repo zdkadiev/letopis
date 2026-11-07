@@ -1,0 +1,601 @@
+{
+  "schema_version": 1,
+  "scope": "native issue-65 continuation; historical evidence unchanged; index excludes itself",
+  "artifacts": [
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/check-result.json",
+      "bytes": 35,
+      "sha256": "3d51bece19e09734be9fcdf324c887180ad625596383dd8b81763930ba0812d7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/check-stacks.json",
+      "bytes": 155119,
+      "sha256": "1900a1a3eed0440d204d497fb4cb3f2eba3aa0c737dec47dc35ef4e3f5ca4839"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/check.json.gz",
+      "bytes": 366663,
+      "sha256": "2ddac034a047776ea09f25b9d4b019809e194737b3ad79deab0f50695a7b8f9f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/check.json.syms.json",
+      "bytes": 160868,
+      "sha256": "241a4ce134db6cd3b293d9f79b80b8972d9671b2c33119e61ccdb674214f82fb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/check.log",
+      "bytes": 18,
+      "sha256": "e221ac2c1b99b2c8ae90e06326b629e88635d46003b64873de21dfe9a7903646"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/samply-version.txt",
+      "bytes": 14,
+      "sha256": "d0718b06965fcb4a5aca0f1a22bec6129aeb1888ed5e657f21983d7820e47700"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/status-result.json",
+      "bytes": 104,
+      "sha256": "6835567c10a1ad9223014bfd76f40c451152f4601bc116afd427d290e6ba161a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/status-stacks.json",
+      "bytes": 124335,
+      "sha256": "4ac9d77b6077f88addd47d64796e3d57cba8e14c1862e17ec3ee8eaa418346cb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/status.json.gz",
+      "bytes": 368429,
+      "sha256": "5db3795b30b11916861b01c24a9bd5c25a56e05e5f73e14f28554b7dfe9933eb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/status.json.syms.json",
+      "bytes": 125691,
+      "sha256": "3f1e4abc4ebee551df12790f85dce2d11ea5ebf4e1fc66c1d73c32e8d05e5caa"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/status.log",
+      "bytes": 18,
+      "sha256": "e221ac2c1b99b2c8ae90e06326b629e88635d46003b64873de21dfe9a7903646"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after/validation.json",
+      "bytes": 882,
+      "sha256": "bcd8cb5b30f0d579e0f609a2be77540b23b4a7ea1478ba60acb4fbe3502f68db"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/after-build.json",
+      "bytes": 10819,
+      "sha256": "d888ce5e84240cb33c36d034d80331786d849039f683ee5e34fd5aefbd29c6de"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/check-result.json",
+      "bytes": 35,
+      "sha256": "3d51bece19e09734be9fcdf324c887180ad625596383dd8b81763930ba0812d7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/check-stacks.json",
+      "bytes": 147928,
+      "sha256": "f2d4228ff80e03a8a209427b7c80fef3f2963e4c17f094cebc4b2e9a2e910023"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/check.json.gz",
+      "bytes": 398772,
+      "sha256": "4e38a13e90441d49f4a3bcc91926c28c05401f40c25925fd2e984670c0c10969"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/check.json.syms.json",
+      "bytes": 149071,
+      "sha256": "0d0a0ed15e04d82e72c263fa7e014fde7c03a32f158e95baae6126ee7d1de46e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/check.log",
+      "bytes": 22,
+      "sha256": "26b00a71d9cde46f051f58daaebad030ac4af902aea4baa3a30bb3b807d7bfa8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/samply-version.txt",
+      "bytes": 14,
+      "sha256": "d0718b06965fcb4a5aca0f1a22bec6129aeb1888ed5e657f21983d7820e47700"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/status-result.json",
+      "bytes": 104,
+      "sha256": "6835567c10a1ad9223014bfd76f40c451152f4601bc116afd427d290e6ba161a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/status-stacks.json",
+      "bytes": 129258,
+      "sha256": "9fd171d323f89f2d5ee808c40c369b8eb9bd0d0c6ed64453d8d3c42fd040d24e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/status.json.gz",
+      "bytes": 368761,
+      "sha256": "5304f9e77f2b3cea5c86226f54f5faf7cba25972531533a7ce2c0759f9f953ac"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/status.json.syms.json",
+      "bytes": 127876,
+      "sha256": "6b77935def4c0e302e65df5956aa4ef9e2b425b04b6b3c5462f4bfc405b682af"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/status.log",
+      "bytes": 18,
+      "sha256": "e221ac2c1b99b2c8ae90e06326b629e88635d46003b64873de21dfe9a7903646"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before/validation.json",
+      "bytes": 882,
+      "sha256": "9e401ea5632abcc7aae9a1031473ef1c65aefd2815415f7b32f7aa7015c3dffd"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/before-build.json",
+      "bytes": 10848,
+      "sha256": "beb6a5d7b21c4740162a1a6f4190893e24d7b45dbf9ad37eb1c9405032ea8f31"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/cache-invalid-structure.log",
+      "bytes": 1155,
+      "sha256": "9a453f63be56d3983fc4475cd69171f0842230207470a7ea49dba0c996840cf3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/checkpoint-drain.py",
+      "bytes": 2222,
+      "sha256": "05982c196cafab3656c8dd819e7123c4861f266bdf07f4e621dfb5d4756c4b25"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/code-review.md",
+      "bytes": 4312,
+      "sha256": "73f738be0892d367d52f078b3a9fe15ad1f21e18b9c03fde1651212b2dfe9ea5"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/compare.py",
+      "bytes": 2690,
+      "sha256": "39648f4e3907ae28471c1167258aaa4e2ca754837c137d77f693fcdf54ad5ab0"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/comparison-manifest.json",
+      "bytes": 442585,
+      "sha256": "a407820439fd42e8b57fffbfa463d619a6cf0fbceb8f07072d25cd2e4a240660"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/comparison-samples.jsonl",
+      "bytes": 16600,
+      "sha256": "6d16b0cc497ffadfc87cf456925b65c1130b084d13a707e751262d9a9f2e0309"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/comparison-summary.json",
+      "bytes": 641,
+      "sha256": "f66fef0aef2b11593fbdf0138ccffffa6e0c9c07f9fd9b305bbf3325b0b72fd4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/comparison.log",
+      "bytes": 2721,
+      "sha256": "cabce110b7b1ec7816f6c73210b41c729e6f9be744bc747850f8ad8b3d9fcd4d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/coverage.sql",
+      "bytes": 1376,
+      "sha256": "e52f429886a3b90d5cf5cf9799f89345ee9f00bd4c68a0644663a907b910b4e3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/data-review.md",
+      "bytes": 4987,
+      "sha256": "f883a3273a2ae4c27f31c312b200fe6c819994fac1ecc84643943830b08f5118"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/final-consistency.json",
+      "bytes": 804,
+      "sha256": "a3900d051a472d805a52db68a89c2a007185012c302243387c75a7306b9c3cbf"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/final-verify.log",
+      "bytes": 232470,
+      "sha256": "38bced0d0960edcdaf3c1a601384e7d1ba7786eac80248640b40c6bb44df498b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/finalize-report.py",
+      "bytes": 8330,
+      "sha256": "1d15b70bdd69fcdb5dc29d75e2d7b448b93b91e84dc4a44b08db14c6945d7684"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/finish-ollama.py",
+      "bytes": 2837,
+      "sha256": "ef94c4d8ac6d8c54840deae8df284ff9722cfc18e28e648a9e124e7fd1a59715"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/follow-ups.md",
+      "bytes": 5142,
+      "sha256": "085c497960eb1cb4cab99d785fb44bd4a54759cc120c4dcaad4a81ab1304326c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/full-data-review.md",
+      "bytes": 6825,
+      "sha256": "feb1a103d77165600a34913f40c9883305546476d118c38b72f9655073d6daa8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/full-ollama-reads.py",
+      "bytes": 3944,
+      "sha256": "487db4f6143a599cc25cf99c6cd5555e4c1905139df6cf9dfe8c2fc795abbb47"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/git-tests.log",
+      "bytes": 5863,
+      "sha256": "5b6d8906e30d3e053606afb4132e6a5c5a4079b889e597a9e649457941eac244"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/green.log",
+      "bytes": 1543,
+      "sha256": "be0b006dc3a1b5d11f179c747efb3bfc8fd8a99bdddff9990cd4f56aeca89fb6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/host.json",
+      "bytes": 443,
+      "sha256": "21c729f3726339ef4f4db83b5c8379bedaec08f373b9929085737f7cf4b6f52f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/hybrid.py",
+      "bytes": 2486,
+      "sha256": "e66e17a520914243ce3051965d17bfbe5a476a1a655ea1f916e294ab26934cb8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ignore-content-identity.log",
+      "bytes": 1094,
+      "sha256": "46d8314b8a58c496c1d35f217bb98171cb61456341ceb140f1c1b6ba784f8ba7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/mutate.py",
+      "bytes": 2656,
+      "sha256": "075343c4c15eafc1acbab242d9b8c9c5577e26acc187130ccac3e40016099100"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/mutations.json",
+      "bytes": 833,
+      "sha256": "172639e2034a60fc781697a036a348452ec633c636422dadd9137928cad78e6c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/mutations.log",
+      "bytes": 715,
+      "sha256": "103779db77a7f83d4143feb434ec49fdcd5bececa2ef719f44202cd956496d78"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/native-oracle-build.json",
+      "bytes": 757,
+      "sha256": "f54218a0f0cbfada02c5f69ba71772e02cd68cbabf3baa187788db1e1e5332f7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/native-summary.json",
+      "bytes": 5818,
+      "sha256": "c1bd50caf57df977ed60e953163168966a4661f38ae30d53b741f73144498a1e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/checkpoint.log",
+      "bytes": 694,
+      "sha256": "313e81c7e1a099912706c6c0505f8de8ba11775d489ebded146993b596bf8753"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/complete-coverage.json",
+      "bytes": 119,
+      "sha256": "d2e645c442630bf22ff1af854664a4925ad61c9dd7687f8756bc6f0fafc10e74"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/completion.json",
+      "bytes": 231,
+      "sha256": "2483a2d6d3bffaed7164d92fc79e6923b7c1350ed760c890c2166e58af13c690"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/controlled-checkpoint.json",
+      "bytes": 822,
+      "sha256": "7bfb38be6a3206477c6e3ebe46ffda1a75a4db47e9399033562898ab0c682485"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/coverage-checkpoint.json",
+      "bytes": 264,
+      "sha256": "0a48bab46da1580eebafaaa2e7ed4902338ae65f12729e01e6bc627057d0934e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/coverage.json",
+      "bytes": 34,
+      "sha256": "2e87eecb008a28c5591110d4fd5528c7d630baef030816e8d30b636126dbabfb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/drain-window.log",
+      "bytes": 146,
+      "sha256": "c1ac2db53e4e41b18eaa0b8037ef381d0c97e069cf0561a601fbdad8f7215584"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/drain-window.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/drain.json",
+      "bytes": 982,
+      "sha256": "ba533ea887f0ed0896ebc7fe7b7dacee9b0dd0c4e062a26036503403c015dd1a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/during-drain-hybrid-0.json",
+      "bytes": 2682,
+      "sha256": "b5755287fb508469e45caca3c620ff98f67a5f470b70a126f873b56cd691080c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/during-drain-hybrid-1.json",
+      "bytes": 2685,
+      "sha256": "fa9ddf2f5836c0ea399b45952203c590f5e8c466488f339efb36c0eeec606ff2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/during-drain-hybrid-2.json",
+      "bytes": 2692,
+      "sha256": "513397ec032c9a73390f3c8ec34dff81196b89b3bbcc734df993d5f8479804d9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/during-drain-hybrid.log",
+      "bytes": 775,
+      "sha256": "2043e3e96c818c08c2a7705b9f2d39550c6e7c52370d95b6ff23de7960c130a0"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/during-drain-membership-validation.json",
+      "bytes": 660,
+      "sha256": "4ea39c27706688c6df0fba73c0884c6a3b74a65fb9dc871fcb8d322fb5a8c72f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/final-reads.log",
+      "bytes": 371,
+      "sha256": "6122a1b94707889bce5aa7abb23036db550bfe8a2632176f310bdca715147e8b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-channel-evidence.json",
+      "bytes": 890,
+      "sha256": "e9b02500457f3b83cd727d4a41ef15fac20743ecf3dff6e29bcb90aacdf5d8c9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-check.json",
+      "bytes": 1192,
+      "sha256": "b32bab4d7eba4a6c25bcbea14cc1b9ae6569f797e298145ac8d83d5b575d0ce4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-hybrid-0.json",
+      "bytes": 2511,
+      "sha256": "a0da7b12e7433306e3ce1179b2eabdb12ed823dbffbcd1f39715f90388fdbdbf"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-hybrid-1.json",
+      "bytes": 2498,
+      "sha256": "b49afffa39f91f9236f817454cf2952ba9b1402e78120a113d68e88b39dba297"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-hybrid-2.json",
+      "bytes": 2506,
+      "sha256": "75f5d3ef6d2df19df36485dff603eb5f3b13ec24166180f52680d9ba54004432"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-hybrid-summary.json",
+      "bytes": 166,
+      "sha256": "276a06e26813c41253337136be7a7682e38d7b66c46647305489fa5aab90987c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-native-search.json.gz",
+      "bytes": 1195606,
+      "sha256": "43b80285dfa449aa75fe34d885d1ddcb435163bc10b9d392e67cb92e03c26895"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-native-search.json.syms.json",
+      "bytes": 295151,
+      "sha256": "86848cb5ea86812192e2169002a23b5923397ec763aee20d5149022292fbec1d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-native-stacks.json",
+      "bytes": 190874,
+      "sha256": "59219d01a1d5b05cee1dc07908354e1d5f328d8b3e2c7af42bb71311d3efefd6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-native-validation.json",
+      "bytes": 365,
+      "sha256": "9e5c52f662622ef8534c9081b09dad913a5c4e064c9eb7a0b3555344d53cd36c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-profile-receipt.json",
+      "bytes": 2359,
+      "sha256": "00ede2bc123613b2630fae2e06d8da5d4d5c3270e29c609c274d37dc496968fb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-reads-manifest.json",
+      "bytes": 11053,
+      "sha256": "cd57976697d6c44ece57448f0240615ba12119c64dea878b95d4bbee9245b51a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/full-status.json",
+      "bytes": 1349,
+      "sha256": "ded1f68b24f3fcb6fdb4d2c1901be9a5f1de713235cd9bc9b557a7f4786d82cd"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/initial-runner.log",
+      "bytes": 340,
+      "sha256": "ca612b97131086fff619ca8b45aeb11fdf1c498f93532f5eb91952a4ab90dc4b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/lexical-oracle.json",
+      "bytes": 216,
+      "sha256": "46f405aa486375b7a2a44c42d9893185563128090c3402593505a452a08f2196"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/manifest.json",
+      "bytes": 11477,
+      "sha256": "d3f54e3711aff2fdbd02502c4febfb687488669482b62cbb11afb9e9e05405e1"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/model-process-snapshot.txt",
+      "bytes": 116,
+      "sha256": "2008ba7a948249692e216d7d650c7511b05e5367199d0b611e007af0a7836c01"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/model-residency.json",
+      "bytes": 437,
+      "sha256": "d898a8a2bb6840ef45479f8ae47e66b687bbd4dd9fde865df5a75cdb36429788"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/native-checkpoint.json",
+      "bytes": 84,
+      "sha256": "b354bec290ef87d8fa6638b673012aeca82c64d01026da5ae6f932cd462a63c8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/native-complete-coverage.json",
+      "bytes": 262,
+      "sha256": "ff4baa675602d52ae9ae09e2c8b8b8acffb19986de5d69738d1093f363a26ce6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/probe-coverage.json",
+      "bytes": 31,
+      "sha256": "b725f5a8f44bc0baf30749232cef3cf090ff83fbe08f12967afe7f9c26ed71b1"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/probe-product-drain.json",
+      "bytes": 1085,
+      "sha256": "a20f7fbe978204011aded54c5ddda54c0773fa4f094dee3ec657e5fbcdabf1b4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/probe-product-status.json",
+      "bytes": 1325,
+      "sha256": "17480ba073cc8bd074e58e4c9d1acd9bcb6c60e8ca6d06404d6ca0158df7b211"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/progress.jsonl",
+      "bytes": 2399,
+      "sha256": "c0751e83ad75bf229f53d2d68469b5bf30122431e4c0fea17c898fc738cafa90"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/resume-drain.json",
+      "bytes": 1033,
+      "sha256": "ab522b6334c48c6ef3579973a69b26f3bdca7541e60243369a59c848af7f80da"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/resume-manifest.json",
+      "bytes": 598,
+      "sha256": "55c534c698c416ec127c20b0925e298f0d4fcb491b20beb21e3be324d4f5fdb0"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/resume-wall-sample.txt",
+      "bytes": 109502,
+      "sha256": "8392050e5784f47e1a8fb9beaee00b181d8f40a18c00208c6536e2167babea0f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/resume-wall-sampler.log",
+      "bytes": 257,
+      "sha256": "78988f8e8f9172a9ea295d6ef22d7a4cfa015597db7f6201f8b9a2b1bf802387"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/resume-wall-summary.json",
+      "bytes": 453,
+      "sha256": "bcaaa905994aaa03ac9dc69867a57e34a97dc61c37b2e6605735e25767df679d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/resume.log",
+      "bytes": 152,
+      "sha256": "1fd06b65150cc87d27d6ad486e68375c9b159927304f64a6e9ae55b9b96f8325"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/search-during-drain-result.json",
+      "bytes": 653,
+      "sha256": "073aa067ac9d46e57aa460c123ac5625ab80c76b5fb655302eeb1ea532646d73"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/search-during-drain-stacks.json",
+      "bytes": 185284,
+      "sha256": "be399a73f291b6a94a3aeabb0b7df88da74dbf8df3d20582eaccee9149ecfd69"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/search-during-drain.json.gz",
+      "bytes": 394935,
+      "sha256": "6fae1d261e78cfe64489e283a4f2f1ba7e20a880af4f64b2811aa828041c5398"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/search-during-drain.json.syms.json",
+      "bytes": 211833,
+      "sha256": "17fb5fadb94541de33f8492764ff9d87d057779bcc70269ff990439a8149ff1d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama/search-during-drain.log",
+      "bytes": 18,
+      "sha256": "e221ac2c1b99b2c8ae90e06326b629e88635d46003b64873de21dfe9a7903646"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/ollama-100k.py",
+      "bytes": 2381,
+      "sha256": "38059d259785aa6838f90a112e76e7bd43385030615c52cbc777fab1305ef4b6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/omit-full-audit-structure.log",
+      "bytes": 1099,
+      "sha256": "8ea8b210f84842dc171ee77dd8ee6993acea40f95cfcf57e224edcb72da6e8e7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/omit-memo.log",
+      "bytes": 1039,
+      "sha256": "7977afd72782fa5ebfde32c1d1a8bdc4277392b740f7143fee69dd200cc830be"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/python-pinned-tests.log",
+      "bytes": 10758,
+      "sha256": "0408f69b48202497c7f41bd36afaf7d034f439246411eeb9734ff7612c2ccf63"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/python-tests.log",
+      "bytes": 12786,
+      "sha256": "31c5d35a4f1bc271abcc637c050cfdf2ad34820052e249629ad9e305b352b464"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/red.log",
+      "bytes": 6443,
+      "sha256": "1eaa3396cd952c4d330906358b708ce59977b5a95a17fbbdbbfa07f3bb9e7245"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/report.md",
+      "bytes": 15953,
+      "sha256": "c6cb14024943a25f5eda3d3961740e4f82db5e2987b83f04c0a2584effba9c88"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/restored-git-tests.log",
+      "bytes": 5864,
+      "sha256": "5d6045795cbc048d4ce1bffa7c7e964ef61367354d0505e1fbbe72ce837db7e4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/resume-ollama.py",
+      "bytes": 2511,
+      "sha256": "981819e49dd59aebb58ed9bc0008e3d876849aeba088d46b5c790eb1007fb645"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/run-samply.zsh",
+      "bytes": 3112,
+      "sha256": "c852494929aea81b96444ab6fbe7f4dc76eb3558afe3e13d8e4758919c87a6a7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/samply-after-install-version.txt",
+      "bytes": 14,
+      "sha256": "d0718b06965fcb4a5aca0f1a22bec6129aeb1888ed5e657f21983d7820e47700"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/samply-after-install.sha256",
+      "bytes": 100,
+      "sha256": "1e60c361de7c9b94ab748e0ca536a7916a033a944bf156bac36b9faf397902b7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/samply-before-install.sha256",
+      "bytes": 100,
+      "sha256": "2a4b458627619667e93f63cb571344db74c90b7137d492a2d20f58c366a6c347"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/samply-install.log",
+      "bytes": 14051,
+      "sha256": "dea7a0d964a7967d16e19e42fa73c335ed7b6b7a613914778c66bc9ab288fb00"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/unbounded-memo.log",
+      "bytes": 1112,
+      "sha256": "7510789fa31567ebfa867a3af259afca42ba44c4cebe4b84882a306aa9b0a916"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/native-followup/verification.json",
+      "bytes": 390,
+      "sha256": "bd36e5dcc8c2951b9d1c1b41a8891874d8f4745a5632ce12aaee4b2584b77fe5"
+    }
+  ]
+}

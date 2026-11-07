@@ -1,0 +1,3 @@
+Error: task_for_pid for target task failed with error code 5.
+Please run 'samply setup' in order to grant appropriate entitlements
+to the binary.

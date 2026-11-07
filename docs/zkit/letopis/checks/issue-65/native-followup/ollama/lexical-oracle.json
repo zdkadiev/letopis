@@ -1,0 +1,8 @@
+{
+  "sqlite": "3.54.1",
+  "method": "independent SQLite FTS query against published text_index; bound literal expression",
+  "matches": {
+    "\"zirconiumsemanticprobe65\"": 0,
+    "\"case\" AND \"000000\"": 1
+  }
+}

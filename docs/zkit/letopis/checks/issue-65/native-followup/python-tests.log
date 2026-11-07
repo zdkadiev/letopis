@@ -1,0 +1,78 @@
+...{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.30941579095087945, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.029082332970574498, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.025827000150457025, "validation": {"valid": false, "reason": "required Git counter failed"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.02387358294799924, "validation": {"valid": false, "reason": "required Git counter failed"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.02424816694110632, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.023745958926156163, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.024078542133793235, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.029670624993741512, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+......{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "timeout", "duration_seconds": 120, "validation": {"valid": true}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 1, "validation": {"valid": true}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 1, "validation": {"valid": true}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 1, "validation": {"valid": true}}
+.{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 1, "validation": {"valid": false, "reason": "wrong output"}}
+.{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.19084766693413258, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.036402874859049916, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.026191166834905744, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.05781570798717439, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.03165958379395306, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.02523604198358953, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.025483042001724243, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 2, "outcome": "success", "duration_seconds": 0.0244414578191936, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+.{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.1896629580296576, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.03230720781721175, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+.{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.19199500000104308, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.02805458288639784, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+...{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.20708908280357718, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.026814207900315523, "validation": {"valid": true, "observed": {"ids": ["knowledge/part-0000.md#node-000000"], "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "conditioning", "pair": -2, "outcome": "success", "duration_seconds": 0.024196250131353736, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "conditioning", "pair": -2, "outcome": "success", "duration_seconds": 0.02454150002449751, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "conditioning", "pair": -1, "outcome": "success", "duration_seconds": 0.02408637502230704, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "conditioning", "pair": -1, "outcome": "success", "duration_seconds": 0.024138999870046973, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.023961624829098582, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 0, "outcome": "success", "duration_seconds": 0.024043374927714467, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "after", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.024119250010699034, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+{"side": "before", "name": "check", "phase": "measured", "pair": 1, "outcome": "success", "duration_seconds": 0.030708374921232462, "validation": {"valid": true, "observed": {"errors": 0, "projection_counts": {"knowledge": 60, "source": 60, "edges": 300}}}}
+.{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.3235874997917563, "validation": {"valid": false, "reason": "ValueError"}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "success", "duration_seconds": 0.03925445885397494, "validation": {"valid": false, "reason": "ValueError"}}
+...{"side": "before", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "timeout", "duration_seconds": 0.008220667019486427, "validation": {"valid": false, "reason": "process or capture failure"}}
+{"side": "after", "name": "search", "phase": "first_publication", "pair": 0, "outcome": "timeout", "duration_seconds": 0.007637958042323589, "validation": {"valid": false, "reason": "process or capture failure"}}
+...s.ssss..............s........................ss{"scenario": "search", "phase": "conditioning", "index": 0, "seconds": 0.1, "valid": false}
+.........EE...
+======================================================================
+ERROR: test_rejects_changed_product_source_before_measurement (test_scenarios.ScenarioTests.test_rejects_changed_product_source_before_measurement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_scenarios.py", line 162, in test_rejects_changed_product_source_before_measurement
+    pin = dict(make_pin(binary, b"pinned"), inputs={"src/main.rs": "original"})
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_scenarios.py", line 171, in make_pin
+    "inputs": read_product_inputs(ROOT), "product_commit": run_git(ROOT, "rev-parse", "HEAD").decode().strip(),
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/scenarios.py", line 206, in read_product_inputs
+    raise ValueError("product build inputs are dirty")
+ValueError: product build inputs are dirty
+
+======================================================================
+ERROR: test_rejects_symlink_and_modified_binary (test_scenarios.ScenarioTests.test_rejects_symlink_and_modified_binary)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_scenarios.py", line 148, in test_rejects_symlink_and_modified_binary
+    pin = make_pin(binary, b"original")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/test_scenarios.py", line 171, in make_pin
+    "inputs": read_product_inputs(ROOT), "product_commit": run_git(ROOT, "rev-parse", "HEAD").decode().strip(),
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/scenarios.py", line 206, in read_product_inputs
+    raise ValueError("product build inputs are dirty")
+ValueError: product build inputs are dirty
+
+----------------------------------------------------------------------
+Ran 84 tests in 13.425s
+
+FAILED (errors=2, skipped=8)

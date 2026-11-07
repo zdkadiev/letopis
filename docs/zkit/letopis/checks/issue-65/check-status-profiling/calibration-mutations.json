@@ -1,0 +1,12 @@
+[
+  {
+    "mutation": "clock",
+    "exit_code": 101,
+    "output": "\nrunning 1 test\ntest tests::separates_sleep_from_cpu_and_records_nested_counts ... FAILED\n\nfailures:\n\n---- tests::separates_sleep_from_cpu_and_records_nested_counts stdout ----\n\nthread 'tests::separates_sleep_from_cpu_and_records_nested_counts' (524544545) panicked at /Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-check-status/source/src/diagnostic_cpu.rs:77:37:\nassertion failed: get_cpu_ns().unwrap() > before\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    tests::separates_sleep_from_cpu_and_records_nested_counts\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s\n\n"
+  },
+  {
+    "mutation": "items",
+    "exit_code": 101,
+    "output": "\nrunning 1 test\ntest tests::separates_sleep_from_cpu_and_records_nested_counts ... FAILED\n\nfailures:\n\n---- tests::separates_sleep_from_cpu_and_records_nested_counts stdout ----\n\nthread 'tests::separates_sleep_from_cpu_and_records_nested_counts' (524544654) panicked at /Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-check-status/source/src/diagnostic_cpu.rs:80:9:\nassertion `left == right` failed\n  left: (1, 0, 11)\n right: (1, 7, 11)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    tests::separates_sleep_from_cpu_and_records_nested_counts\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s\n\n"
+  }
+]

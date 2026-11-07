@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.81s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 1 test
+test git::objects::tests::tree_reads_reuse_structure_only_within_the_owned_reader ... FAILED
+
+failures:
+
+---- git::objects::tests::tree_reads_reuse_structure_only_within_the_owned_reader stdout ----
+
+thread 'git::objects::tests::tree_reads_reuse_structure_only_within_the_owned_reader' (526083160) panicked at src/git/objects.rs:281:13:
+assertion `left == right` failed
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::objects::tests::tree_reads_reuse_structure_only_within_the_owned_reader
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 609 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `--lib`

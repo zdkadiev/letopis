@@ -1,0 +1,20 @@
+{
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "sqlite": "3.54.1 2026-10-16 14:45:20 555e07ef33f69a0957d24d8e555b702464a131d6f1607f4c3c1e4551e8e6ca76 (64-bit)",
+  "source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "extension_sha256": "55f6998b76bccd89261578c2abe359e7dbf468dcb9a9e17d820351f0f2c6828e",
+  "command": [
+    "clang",
+    "-O3",
+    "-DNDEBUG",
+    "-fPIC",
+    "-dynamiclib",
+    "-undefined",
+    "dynamic_lookup",
+    "-I/opt/homebrew/opt/sqlite/include",
+    "vendor/vec1/vec1.c",
+    "-o",
+    ".artifacts/issue-65/2026-11-06-native-followup/oracle-vec1.dylib"
+  ],
+  "access": "read-only SQLite connection and read-only attachment; single-statement consistent coverage snapshot"
+}

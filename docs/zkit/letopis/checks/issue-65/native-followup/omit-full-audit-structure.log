@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.62s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 1 test
+test git::objects::tests::full_audits_validate_tree_structure_despite_addressed_read_memoization ... FAILED
+
+failures:
+
+---- git::objects::tests::full_audits_validate_tree_structure_despite_addressed_read_memoization stdout ----
+
+thread 'git::objects::tests::full_audits_validate_tree_structure_despite_addressed_read_memoization' (526128237) panicked at src/git/objects.rs:365:13:
+assertion `left == right` failed
+  left: 0
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::objects::tests::full_audits_validate_tree_structure_despite_addressed_read_memoization
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 609 filtered out; finished in 0.17s
+
+error: test failed, to rerun pass `--lib`

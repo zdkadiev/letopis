@@ -1,0 +1,26 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.65s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 5 tests
+test git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration ... FAILED
+test git::objects::tests::tree_reads_reuse_structure_only_within_the_owned_reader ... ok
+test git::objects::tests::invalid_tree_bodies_are_validated_on_every_demand ... ok
+test git::objects::tests::full_audits_validate_tree_structure_despite_addressed_read_memoization ... ok
+test git::objects::tests::tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects ... ok
+
+failures:
+
+---- git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration stdout ----
+
+thread 'git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration' (526005877) panicked at src/git/objects.rs:314:71:
+called `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: "Permission denied" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 605 filtered out; finished in 11.61s
+
+error: test failed, to rerun pass `--lib`

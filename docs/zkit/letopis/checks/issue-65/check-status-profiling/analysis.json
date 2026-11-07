@@ -1,0 +1,366 @@
+{
+  "commands": {
+    "check": {
+      "ordinary": {
+        "n": 3,
+        "wall_median": 42.138995750108734,
+        "wait4_cpu_median": 40.131501
+      },
+      "instrumented": {
+        "n": 3,
+        "wall_median": 42.67567062494345,
+        "wait4_cpu_median": 40.725201
+      },
+      "observed_wrapper_overhead_percent": 1.2735824983046262,
+      "scopes": {
+        "src/service/check.rs::check": {
+          "calls": 1,
+          "wall_ns": 42649827167,
+          "cpu_ns": 40703881667,
+          "self_cpu_ns": 315947291,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/utils.rs::collect_check_problems": {
+          "calls": 1,
+          "wall_ns": 42118028000,
+          "cpu_ns": 40311595167,
+          "self_cpu_ns": 4041,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/utils.rs::find_source_problems": {
+          "calls": 1,
+          "wall_ns": 41461942500,
+          "cpu_ns": 39644762875,
+          "self_cpu_ns": 157948389,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/utils.rs::get_source_bindings": {
+          "calls": 1,
+          "wall_ns": 484098916,
+          "cpu_ns": 448992250,
+          "self_cpu_ns": 448992250,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/provenance.rs::observe_sources_batch": {
+          "calls": 391,
+          "wall_ns": 40816210926,
+          "cpu_ns": 39057391202,
+          "self_cpu_ns": 111216336,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/provenance.rs::get_snapshot_hash": {
+          "calls": 100000,
+          "wall_ns": 31671086822,
+          "cpu_ns": 30560751044,
+          "self_cpu_ns": 161186303,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/objects.rs::blob_get_by_tree_oid_and_path": {
+          "calls": 100000,
+          "wall_ns": 31376533025,
+          "cpu_ns": 30306055495,
+          "self_cpu_ns": 140307144,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/objects.rs::tree_validate_by_oid": {
+          "calls": 100393,
+          "wall_ns": 2015185426,
+          "cpu_ns": 1943958550,
+          "self_cpu_ns": 30929502,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/objects.rs::tree_get_by_oid": {
+          "calls": 300393,
+          "wall_ns": 27102219324,
+          "cpu_ns": 26504296670,
+          "self_cpu_ns": 211488368,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/reader.rs::object_verify_by_oid": {
+          "calls": 401395,
+          "wall_ns": 20706363900,
+          "cpu_ns": 19663062350,
+          "self_cpu_ns": 217247574,
+          "items": 0,
+          "bytes": 4812855396
+        },
+        "src/git/reader.rs::raw_object_decode": {
+          "calls": 401395,
+          "wall_ns": 14628780157,
+          "cpu_ns": 13644054802,
+          "self_cpu_ns": 13644054802,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/reader.rs::object_content_hash": {
+          "calls": 401395,
+          "wall_ns": 5932156538,
+          "cpu_ns": 5784710781,
+          "self_cpu_ns": 5784710781,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/validation.rs::tree_bytes_validate": {
+          "calls": 300395,
+          "wall_ns": 9904693218,
+          "cpu_ns": 9732633621,
+          "self_cpu_ns": 9732633621,
+          "items": 100201394,
+          "bytes": 4206855396
+        },
+        "src/git/objects.rs::tree_entry_get_by_name": {
+          "calls": 200000,
+          "wall_ns": 625624044,
+          "cpu_ns": 600450463,
+          "self_cpu_ns": 600450463,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/domain/source.rs::select_bytes": {
+          "calls": 200000,
+          "wall_ns": 214819388,
+          "cpu_ns": 188988141,
+          "self_cpu_ns": 188988141,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/provenance.rs::get_current_hash": {
+          "calls": 100000,
+          "wall_ns": 9010251730,
+          "cpu_ns": 8375857642,
+          "self_cpu_ns": 86804111,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/filesystem/file.rs::file_get_by_path": {
+          "calls": 100000,
+          "wall_ns": 8825727984,
+          "cpu_ns": 8194196421,
+          "self_cpu_ns": 8194196421,
+          "items": 0,
+          "bytes": 600000000
+        },
+        "src/service/graph_diagnostics.rs::find_problems": {
+          "calls": 1,
+          "wall_ns": 656080917,
+          "cpu_ns": 639652709,
+          "self_cpu_ns": 639652709,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/refs.rs::tree_pin_by_oid": {
+          "calls": 1,
+          "wall_ns": 212898416,
+          "cpu_ns": 65521958,
+          "self_cpu_ns": 522959,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/refs.rs::tree_verify_closure_by_oid": {
+          "calls": 1,
+          "wall_ns": 199665250,
+          "cpu_ns": 64833709,
+          "self_cpu_ns": 1347508,
+          "items": 0,
+          "bytes": 0
+        }
+      }
+    },
+    "status": {
+      "ordinary": {
+        "n": 3,
+        "wall_median": 40.98724124999717,
+        "wait4_cpu_median": 39.337191
+      },
+      "instrumented": {
+        "n": 3,
+        "wall_median": 42.05729783303104,
+        "wait4_cpu_median": 40.193082000000004
+      },
+      "observed_wrapper_overhead_percent": 2.6107065281783193,
+      "scopes": {
+        "src/service/status.rs::get_status": {
+          "calls": 1,
+          "wall_ns": 42037376042,
+          "cpu_ns": 40185324750,
+          "self_cpu_ns": 507917,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/status.rs::get_published": {
+          "calls": 1,
+          "wall_ns": 47458,
+          "cpu_ns": 47375,
+          "self_cpu_ns": 46875,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/status.rs::get_embedding_status": {
+          "calls": 1,
+          "wall_ns": 708,
+          "cpu_ns": 583,
+          "self_cpu_ns": 583,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/utils.rs::collect_check_problems": {
+          "calls": 1,
+          "wall_ns": 42035558375,
+          "cpu_ns": 40184735291,
+          "self_cpu_ns": 7584,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/utils.rs::find_source_problems": {
+          "calls": 1,
+          "wall_ns": 41332760125,
+          "cpu_ns": 39504597958,
+          "self_cpu_ns": 157228116,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/utils.rs::get_source_bindings": {
+          "calls": 1,
+          "wall_ns": 452697458,
+          "cpu_ns": 451182583,
+          "self_cpu_ns": 451182583,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/provenance.rs::observe_sources_batch": {
+          "calls": 391,
+          "wall_ns": 40691231208,
+          "cpu_ns": 38912387509,
+          "self_cpu_ns": 111339507,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/provenance.rs::get_snapshot_hash": {
+          "calls": 100000,
+          "wall_ns": 31650132395,
+          "cpu_ns": 30498647079,
+          "self_cpu_ns": 158108064,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/objects.rs::blob_get_by_tree_oid_and_path": {
+          "calls": 100000,
+          "wall_ns": 31384723326,
+          "cpu_ns": 30247566749,
+          "self_cpu_ns": 136062319,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/objects.rs::tree_validate_by_oid": {
+          "calls": 100391,
+          "wall_ns": 1998950737,
+          "cpu_ns": 1921136681,
+          "self_cpu_ns": 30730237,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/objects.rs::tree_get_by_oid": {
+          "calls": 300391,
+          "wall_ns": 26976797653,
+          "cpu_ns": 26485954701,
+          "self_cpu_ns": 212479550,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/reader.rs::object_verify_by_oid": {
+          "calls": 400391,
+          "wall_ns": 20499692774,
+          "cpu_ns": 19489954487,
+          "self_cpu_ns": 223141633,
+          "items": 0,
+          "bytes": 4806813294
+        },
+        "src/git/reader.rs::raw_object_decode": {
+          "calls": 400391,
+          "wall_ns": 14392602524,
+          "cpu_ns": 13493811103,
+          "self_cpu_ns": 13493811103,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/reader.rs::object_content_hash": {
+          "calls": 400391,
+          "wall_ns": 6003191526,
+          "cpu_ns": 5788659446,
+          "self_cpu_ns": 5788659446,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/git/validation.rs::tree_bytes_validate": {
+          "calls": 300391,
+          "wall_ns": 9907829147,
+          "cpu_ns": 9774777081,
+          "self_cpu_ns": 9774777081,
+          "items": 100200391,
+          "bytes": 4206813294
+        },
+        "src/git/objects.rs::tree_entry_get_by_name": {
+          "calls": 200000,
+          "wall_ns": 634432110,
+          "cpu_ns": 604451107,
+          "self_cpu_ns": 604451107,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/domain/source.rs::select_bytes": {
+          "calls": 200000,
+          "wall_ns": 212541668,
+          "cpu_ns": 189730351,
+          "self_cpu_ns": 189730351,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/service/provenance.rs::get_current_hash": {
+          "calls": 100000,
+          "wall_ns": 8933737545,
+          "cpu_ns": 8294087882,
+          "self_cpu_ns": 85425752,
+          "items": 0,
+          "bytes": 0
+        },
+        "src/filesystem/file.rs::file_get_by_path": {
+          "calls": 100000,
+          "wall_ns": 8752513283,
+          "cpu_ns": 8112960702,
+          "self_cpu_ns": 8112960702,
+          "items": 0,
+          "bytes": 600000000
+        },
+        "src/service/graph_diagnostics.rs::find_problems": {
+          "calls": 1,
+          "wall_ns": 709076625,
+          "cpu_ns": 674683500,
+          "self_cpu_ns": 674683500,
+          "items": 0,
+          "bytes": 0
+        }
+      }
+    }
+  },
+  "cache_opportunity": {
+    "knowledge": 100000,
+    "bindings": 100000,
+    "distinct_exact_source_uris": 100000,
+    "distinct_historical_files": 1000,
+    "batches": 391,
+    "batch_size": 256,
+    "historical_file_reads_if_each_successful_file_reused_per_batch": 1375,
+    "max_files_per_batch": 4,
+    "max_payload_bytes_per_batch": 24000,
+    "scope": "Read-count estimate from actual current URI ordering, not an implemented speedup; success cache, finite byte/entry budget required"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "kind": "controlled censored segment, not successful drain completion",
+  "pid": 55679,
+  "expected_command": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-build/product/letopis embed --drain",
+  "parent": 55571,
+  "stopped_state": "Ts",
+  "utc": "2026-11-06T10:59:12Z",
+  "monotonic": 1561199.275777583,
+  "termination": "SIGKILL only after stopped-state observation and zero committed attempt reservations",
+  "database_writes_by_controller": false,
+  "observations": [
+    {
+      "attempt": 0,
+      "vectors": 51023,
+      "reserved": 1,
+      "recorded_errors": 0
+    },
+    {
+      "attempt": 1,
+      "vectors": 51023,
+      "reserved": 1,
+      "recorded_errors": 0
+    },
+    {
+      "attempt": 2,
+      "vectors": 51024,
+      "reserved": 0,
+      "recorded_errors": 0
+    }
+  ]
+}

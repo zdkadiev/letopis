@@ -1,0 +1,4511 @@
+{
+  "observed_cpu_delta": 35257081,
+  "cpu_delta_unit": "\u00b5s",
+  "inclusive_costs_overlap": true,
+  "wall_percentages": "unavailable: stacks are not blocked-time accounting",
+  "process_ids": [
+    "95289"
+  ],
+  "functions": [
+    {
+      "function": "std::rt::lang_start::{{closure}}",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::rt::lang_start_internal::{closure#0}",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::commands::run_request::{{closure}}",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync as core::ops::function::FnOnce<()>>::call_once",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::run_process_cli_with",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::rt::lang_start_internal",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::commands::run_status",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::run_process_cli",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "start",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::panicking::catch_unwind::<i32, &dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync>",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::panicking::catch_unwind::do_call::<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync, i32>",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::panic::catch_unwind::<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync, i32>",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "core::ops::function::FnOnce::call_once",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::panicking::catch_unwind::<isize, std::rt::lang_start_internal::{closure#0}>",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::commands::run_request",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::panic::catch_unwind::<std::rt::lang_start_internal::{closure#0}, isize>",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::execute_request::{{closure}}",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "std::panicking::catch_unwind::do_call::<std::rt::lang_start_internal::{closure#0}, isize>",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::execute_request",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "core::result::Result<T,E>::and_then",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "main",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "letopis::with_status_service",
+      "inclusive_cpu_delta": 35257081,
+      "stack_observations": 37262
+    },
+    {
+      "function": "<letopis::service::status::StatusService<C> as letopis::service::StatusReader>::get_status",
+      "inclusive_cpu_delta": 35247069,
+      "stack_observations": 37257
+    },
+    {
+      "function": "letopis::service::status::StatusService<C>::get_config_policy",
+      "inclusive_cpu_delta": 35247069,
+      "stack_observations": 37257
+    },
+    {
+      "function": "letopis::service::status::StatusService<C>::get_config_bytes",
+      "inclusive_cpu_delta": 35247069,
+      "stack_observations": 37257
+    },
+    {
+      "function": "std::panic::catch_unwind",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "<letopis::service::status::StatusService<C> as letopis::service::StatusReader>::get_status::{{closure}}",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "letopis::service::utils::CheckObservations::collect_check_problems",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "std::panicking::catch_unwind",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "std::panicking::catch_unwind::do_call",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "letopis::storage::transaction::run_with_behavior",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::CacheDatabase>::with_status_read_tx::{{closure}}",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "<core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once",
+      "inclusive_cpu_delta": 35244431,
+      "stack_observations": 37255
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::collect",
+      "inclusive_cpu_delta": 34009505,
+      "stack_observations": 35623
+    },
+    {
+      "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter",
+      "inclusive_cpu_delta": 33988526,
+      "stack_observations": 35603
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::try_fold",
+      "inclusive_cpu_delta": 33985573,
+      "stack_observations": 35600
+    },
+    {
+      "function": "<alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter",
+      "inclusive_cpu_delta": 33983136,
+      "stack_observations": 35597
+    },
+    {
+      "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+      "inclusive_cpu_delta": 33974532,
+      "stack_observations": 35588
+    },
+    {
+      "function": "alloc::collections::btree::search::<impl alloc::collections::btree::node::NodeRef<BorrowType,K,V,Type>>::search_node",
+      "inclusive_cpu_delta": 33929246,
+      "stack_observations": 35542
+    },
+    {
+      "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::get",
+      "inclusive_cpu_delta": 33929246,
+      "stack_observations": 35542
+    },
+    {
+      "function": "alloc::collections::btree::search::<impl alloc::collections::btree::node::NodeRef<BorrowType,K,V,Type>>::find_key_index",
+      "inclusive_cpu_delta": 33929246,
+      "stack_observations": 35542
+    },
+    {
+      "function": "alloc::collections::btree::search::<impl alloc::collections::btree::node::NodeRef<BorrowType,K,V,alloc::collections::btree::node::marker::LeafOrInternal>>::search_tree",
+      "inclusive_cpu_delta": 33929246,
+      "stack_observations": 35542
+    },
+    {
+      "function": "<core::result::Result<V,E> as core::iter::traits::collect::FromIterator<core::result::Result<A,E>>>::from_iter",
+      "inclusive_cpu_delta": 33922782,
+      "stack_observations": 35535
+    },
+    {
+      "function": "<letopis::service::provenance::ProvenanceService<F> as letopis::service::SourceProvenance>::observe_sources_batch",
+      "inclusive_cpu_delta": 33922782,
+      "stack_observations": 35535
+    },
+    {
+      "function": "<core::result::Result<V,E> as core::iter::traits::collect::FromIterator<core::result::Result<A,E>>>::from_iter::{{closure}}",
+      "inclusive_cpu_delta": 33919835,
+      "stack_observations": 35532
+    },
+    {
+      "function": "<core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::try_fold",
+      "inclusive_cpu_delta": 33919835,
+      "stack_observations": 35532
+    },
+    {
+      "function": "core::iter::adapters::try_process",
+      "inclusive_cpu_delta": 33919835,
+      "stack_observations": 35532
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::try_for_each",
+      "inclusive_cpu_delta": 33919835,
+      "stack_observations": 35532
+    },
+    {
+      "function": "<core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 33919835,
+      "stack_observations": 35532
+    },
+    {
+      "function": "<letopis::domain::value::TreeOid as core::cmp::Ord>::cmp",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "<letopis::service::provenance::ProvenanceService<F> as letopis::service::SourceProvenance>::observe_sources_batch::{{closure}}",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A> as core::cmp::Ord>::cmp",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "alloc::collections::btree::set::BTreeSet<T,A>::contains",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "<A as core::slice::cmp::SliceOrd>::compare",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "letopis::service::provenance::observations::HistoricalObservations<F>::observe_sources",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "core::slice::cmp::<impl core::cmp::Ord for [T]>::cmp",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "core::iter::adapters::map::map_try_fold::{{closure}}",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "core::option::Option<T>::map",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::contains_key",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "letopis::service::provenance::observations::HistoricalObservations<F>::observe_sources::{{closure}}",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "<alloc::string::String as core::cmp::Ord>::cmp",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "letopis::service::provenance::observations::HistoricalObservations<F>::verify_root",
+      "inclusive_cpu_delta": 33918832,
+      "stack_observations": 35531
+    },
+    {
+      "function": "letopis::service::provenance::ProvenanceService<F>::get_snapshot_hash",
+      "inclusive_cpu_delta": 23507837,
+      "stack_observations": 24635
+    },
+    {
+      "function": "letopis::git::objects::blob_get_by_tree_oid_and_path",
+      "inclusive_cpu_delta": 23286801,
+      "stack_observations": 24403
+    },
+    {
+      "function": "letopis::git::objects::tree_validate_by_oid",
+      "inclusive_cpu_delta": 23286801,
+      "stack_observations": 24403
+    },
+    {
+      "function": "letopis::git::reader::ObjectReader::object_bytes_get_by_oid",
+      "inclusive_cpu_delta": 22623384,
+      "stack_observations": 23685
+    },
+    {
+      "function": "letopis::git::reader::ObjectReader::object_verify_by_oid",
+      "inclusive_cpu_delta": 22568207,
+      "stack_observations": 23624
+    },
+    {
+      "function": "<core::cell::BorrowRefMut>::new",
+      "inclusive_cpu_delta": 18750526,
+      "stack_observations": 19575
+    },
+    {
+      "function": "letopis::git::objects::tree_get_by_oid",
+      "inclusive_cpu_delta": 18750526,
+      "stack_observations": 19575
+    },
+    {
+      "function": "core::cell::RefCell<T>::borrow_mut",
+      "inclusive_cpu_delta": 18750526,
+      "stack_observations": 19575
+    },
+    {
+      "function": "core::cell::RefCell<T>::try_borrow_mut",
+      "inclusive_cpu_delta": 18750526,
+      "stack_observations": 19575
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+      "inclusive_cpu_delta": 16312387,
+      "stack_observations": 17088
+    },
+    {
+      "function": "gix_odb::store_impls::dynamic::find::<impl gix_odb::store_impls::dynamic::Handle<S>>::try_find_cached_inner",
+      "inclusive_cpu_delta": 16307564,
+      "stack_observations": 17083
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::with_capacity_in",
+      "inclusive_cpu_delta": 16304592,
+      "stack_observations": 17079
+    },
+    {
+      "function": "alloc::raw_vec::RawVec<T,A>::with_capacity_in",
+      "inclusive_cpu_delta": 16304592,
+      "stack_observations": 17079
+    },
+    {
+      "function": "alloc::slice::<impl [T]>::to_vec_in",
+      "inclusive_cpu_delta": 16304592,
+      "stack_observations": 17079
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::with_capacity_in",
+      "inclusive_cpu_delta": 16304592,
+      "stack_observations": 17079
+    },
+    {
+      "function": "<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec",
+      "inclusive_cpu_delta": 16304592,
+      "stack_observations": 17079
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A> as core::clone::Clone>::clone",
+      "inclusive_cpu_delta": 16303590,
+      "stack_observations": 17078
+    },
+    {
+      "function": "<std::sys::os_str::bytes::Buf as core::clone::Clone>::clone",
+      "inclusive_cpu_delta": 16303590,
+      "stack_observations": 17078
+    },
+    {
+      "function": "<std::ffi::os_str::OsString as core::clone::Clone>::clone",
+      "inclusive_cpu_delta": 16303590,
+      "stack_observations": 17078
+    },
+    {
+      "function": "<std::path::PathBuf as core::clone::Clone>::clone",
+      "inclusive_cpu_delta": 16303590,
+      "stack_observations": 17078
+    },
+    {
+      "function": "gix_odb::store_impls::loose::find::<impl gix_odb::store_impls::loose::Store>::try_find",
+      "inclusive_cpu_delta": 15218518,
+      "stack_observations": 15914
+    },
+    {
+      "function": "gix_odb::store_impls::loose::find::<impl gix_odb::store_impls::loose::Store>::find_inner",
+      "inclusive_cpu_delta": 15218518,
+      "stack_observations": 15914
+    },
+    {
+      "function": "open",
+      "inclusive_cpu_delta": 11634940,
+      "stack_observations": 12109
+    },
+    {
+      "function": "__open",
+      "inclusive_cpu_delta": 11627135,
+      "stack_observations": 12102
+    },
+    {
+      "function": "letopis::service::provenance::ProvenanceService<F>::get_current_hash",
+      "inclusive_cpu_delta": 10338499,
+      "stack_observations": 10819
+    },
+    {
+      "function": "<letopis::filesystem::local::LocalFileSystem as letopis::service::FileReader>::file_get_by_path",
+      "inclusive_cpu_delta": 10338499,
+      "stack_observations": 10819
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_by_path",
+      "inclusive_cpu_delta": 10225349,
+      "stack_observations": 10700
+    },
+    {
+      "function": "gix_zlib::decompress::<impl gix_zlib::Decompress>::decompress",
+      "inclusive_cpu_delta": 7389126,
+      "stack_observations": 7736
+    },
+    {
+      "function": "zlib_rs::inflate::inflate",
+      "inclusive_cpu_delta": 7385417,
+      "stack_observations": 7732
+    },
+    {
+      "function": "zlib_rs::stable::Inflate::decompress_uninit",
+      "inclusive_cpu_delta": 7385417,
+      "stack_observations": 7732
+    },
+    {
+      "function": "<&std::ffi::os_str::OsStr as rustix::path::arg::Arg>::into_with_c_str",
+      "inclusive_cpu_delta": 7086206,
+      "stack_observations": 7377
+    },
+    {
+      "function": "<&[u8] as rustix::path::arg::Arg>::into_with_c_str",
+      "inclusive_cpu_delta": 7086206,
+      "stack_observations": 7377
+    },
+    {
+      "function": "rustix::path::arg::with_c_str",
+      "inclusive_cpu_delta": 7086206,
+      "stack_observations": 7377
+    },
+    {
+      "function": "gix_odb::store_impls::loose::find::<impl gix_odb::store_impls::loose::Store>::map_loose_object",
+      "inclusive_cpu_delta": 7037291,
+      "stack_observations": 7356
+    },
+    {
+      "function": "gix_odb::store_impls::loose::find::mmap::read_only",
+      "inclusive_cpu_delta": 7036175,
+      "stack_observations": 7354
+    },
+    {
+      "function": "core::ptr::write",
+      "inclusive_cpu_delta": 6895703,
+      "stack_observations": 7350
+    },
+    {
+      "function": "<&std::path::PathBuf as rustix::path::arg::Arg>::into_with_c_str",
+      "inclusive_cpu_delta": 6658366,
+      "stack_observations": 6936
+    },
+    {
+      "function": "letopis::filesystem::path::directory_verify_root",
+      "inclusive_cpu_delta": 6658366,
+      "stack_observations": 6936
+    },
+    {
+      "function": "rustix::fs::abs::open",
+      "inclusive_cpu_delta": 6658366,
+      "stack_observations": 6936
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::extend_with",
+      "inclusive_cpu_delta": 6636340,
+      "stack_observations": 6958
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::resize",
+      "inclusive_cpu_delta": 6635372,
+      "stack_observations": 6957
+    },
+    {
+      "function": "gix_zlib::inflate::<impl gix_zlib::Inflate>::rest",
+      "inclusive_cpu_delta": 6635372,
+      "stack_observations": 6957
+    },
+    {
+      "function": "gix_zlib::stream::inflate::read",
+      "inclusive_cpu_delta": 6608086,
+      "stack_observations": 6929
+    },
+    {
+      "function": "core::ptr::copy_nonoverlapping",
+      "inclusive_cpu_delta": 6605213,
+      "stack_observations": 6904
+    },
+    {
+      "function": "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 6563381,
+      "stack_observations": 6877
+    },
+    {
+      "function": "zlib_rs::inflate::inflate_fast_help",
+      "inclusive_cpu_delta": 6149757,
+      "stack_observations": 6449
+    },
+    {
+      "function": "rustix::backend::fs::syscalls::open",
+      "inclusive_cpu_delta": 6112916,
+      "stack_observations": 6369
+    },
+    {
+      "function": "core::slice::<impl [T]>::copy_from_slice",
+      "inclusive_cpu_delta": 6095713,
+      "stack_observations": 6374
+    },
+    {
+      "function": "core::slice::copy_from_slice_impl",
+      "inclusive_cpu_delta": 6095713,
+      "stack_observations": 6374
+    },
+    {
+      "function": "sha1_checked::compress::compress",
+      "inclusive_cpu_delta": 6085891,
+      "stack_observations": 6364
+    },
+    {
+      "function": "letopis::git::hashing::ObjectHasher::update",
+      "inclusive_cpu_delta": 6036406,
+      "stack_observations": 6309
+    },
+    {
+      "function": "block_buffer::BlockBuffer<BlockSize,Kind>::digest_blocks",
+      "inclusive_cpu_delta": 6036406,
+      "stack_observations": 6309
+    },
+    {
+      "function": "<sha1_checked::Sha1 as digest::Update>::update",
+      "inclusive_cpu_delta": 6036406,
+      "stack_observations": 6309
+    },
+    {
+      "function": "<D as digest::digest::Digest>::update",
+      "inclusive_cpu_delta": 6036406,
+      "stack_observations": 6309
+    },
+    {
+      "function": "<sha1_checked::Sha1 as digest::Update>::update::{{closure}}",
+      "inclusive_cpu_delta": 6032260,
+      "stack_observations": 6305
+    },
+    {
+      "function": "core::ptr::copy_nonoverlapping::<u8>",
+      "inclusive_cpu_delta": 5661703,
+      "stack_observations": 5892
+    },
+    {
+      "function": "<std::sys::fs::unix::File>::open",
+      "inclusive_cpu_delta": 5557332,
+      "stack_observations": 5779
+    },
+    {
+      "function": "<std::fs::OpenOptions>::_open",
+      "inclusive_cpu_delta": 5557332,
+      "stack_observations": 5779
+    },
+    {
+      "function": "std::sys::helpers::small_c_string::run_with_cstr::<std::sys::fs::unix::File>",
+      "inclusive_cpu_delta": 5557332,
+      "stack_observations": 5779
+    },
+    {
+      "function": "std::sys::helpers::small_c_string::run_path_with_cstr::<std::sys::fs::unix::File>",
+      "inclusive_cpu_delta": 5557332,
+      "stack_observations": 5779
+    },
+    {
+      "function": "std::sys::helpers::small_c_string::run_with_cstr_stack::<std::sys::fs::unix::File>",
+      "inclusive_cpu_delta": 5557332,
+      "stack_observations": 5779
+    },
+    {
+      "function": "<std::sys::fs::unix::File>::open_c",
+      "inclusive_cpu_delta": 5549652,
+      "stack_observations": 5771
+    },
+    {
+      "function": "sha1_checked::compress::compression_states",
+      "inclusive_cpu_delta": 3971210,
+      "stack_observations": 4142
+    },
+    {
+      "function": "letopis::filesystem::path::FileParent::directory_get_by_components_and_observation",
+      "inclusive_cpu_delta": 3569846,
+      "stack_observations": 3730
+    },
+    {
+      "function": "rustix::backend::fs::syscalls::openat",
+      "inclusive_cpu_delta": 2211892,
+      "stack_observations": 2314
+    },
+    {
+      "function": "openat",
+      "inclusive_cpu_delta": 2209926,
+      "stack_observations": 2312
+    },
+    {
+      "function": "__openat",
+      "inclusive_cpu_delta": 2209306,
+      "stack_observations": 2310
+    },
+    {
+      "function": "memmap2::os::MmapInner::new",
+      "inclusive_cpu_delta": 1186344,
+      "stack_observations": 1267
+    },
+    {
+      "function": "memmap2::os::MmapInner::map_copy_read_only",
+      "inclusive_cpu_delta": 1186344,
+      "stack_observations": 1267
+    },
+    {
+      "function": "mmap",
+      "inclusive_cpu_delta": 1184338,
+      "stack_observations": 1265
+    },
+    {
+      "function": "__mmap",
+      "inclusive_cpu_delta": 1183283,
+      "stack_observations": 1264
+    },
+    {
+      "function": "gix_odb::store_impls::loose::find::<impl gix_odb::store_impls::loose::Store>::contains",
+      "inclusive_cpu_delta": 1085072,
+      "stack_observations": 1164
+    },
+    {
+      "function": "<std::path::Path>::is_file",
+      "inclusive_cpu_delta": 1028179,
+      "stack_observations": 1102
+    },
+    {
+      "function": "stat",
+      "inclusive_cpu_delta": 1020459,
+      "stack_observations": 1094
+    },
+    {
+      "function": "rustix::backend::fs::syscalls::statat",
+      "inclusive_cpu_delta": 871299,
+      "stack_observations": 942
+    },
+    {
+      "function": "fstatat",
+      "inclusive_cpu_delta": 868170,
+      "stack_observations": 939
+    },
+    {
+      "function": "rusqlite::row::Rows::next",
+      "inclusive_cpu_delta": 850060,
+      "stack_observations": 1120
+    },
+    {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::StorageRead>::edges_get_by_source_id",
+      "inclusive_cpu_delta": 847304,
+      "stack_observations": 1109
+    },
+    {
+      "function": "letopis::storage::cache::get_edges_by_source_id",
+      "inclusive_cpu_delta": 847304,
+      "stack_observations": 1109
+    },
+    {
+      "function": "gix_zlib::inflate::<impl gix_zlib::Inflate>::prefix",
+      "inclusive_cpu_delta": 783952,
+      "stack_observations": 811
+    },
+    {
+      "function": "zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch",
+      "inclusive_cpu_delta": 780619,
+      "stack_observations": 815
+    },
+    {
+      "function": "letopis::storage::transaction::run_read",
+      "inclusive_cpu_delta": 710027,
+      "stack_observations": 1079
+    },
+    {
+      "function": "letopis::storage::transaction::run_joined",
+      "inclusive_cpu_delta": 710027,
+      "stack_observations": 1079
+    },
+    {
+      "function": "<letopis::service::graph_diagnostics::GraphDiagnosticsService<C> as letopis::service::GraphDiagnostics>::find_problems",
+      "inclusive_cpu_delta": 710027,
+      "stack_observations": 1079
+    },
+    {
+      "function": "<letopis::service::graph_diagnostics::GraphDiagnosticsService<C> as letopis::service::GraphDiagnostics>::find_problems::{{closure}}",
+      "inclusive_cpu_delta": 710027,
+      "stack_observations": 1079
+    },
+    {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::CacheDatabase>::with_read_tx::{{closure}}",
+      "inclusive_cpu_delta": 710027,
+      "stack_observations": 1079
+    },
+    {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::CacheDatabase>::with_read_tx",
+      "inclusive_cpu_delta": 710027,
+      "stack_observations": 1079
+    },
+    {
+      "function": "fstat",
+      "inclusive_cpu_delta": 561580,
+      "stack_observations": 586
+    },
+    {
+      "function": "<rusqlite::row::Rows as fallible_streaming_iterator::FallibleStreamingIterator>::advance",
+      "inclusive_cpu_delta": 551665,
+      "stack_observations": 904
+    },
+    {
+      "function": "sqlite3_step",
+      "inclusive_cpu_delta": 546160,
+      "stack_observations": 899
+    },
+    {
+      "function": "sqlite3VdbeExec",
+      "inclusive_cpu_delta": 543555,
+      "stack_observations": 896
+    },
+    {
+      "function": "letopis::git::tree::tree_entry_get",
+      "inclusive_cpu_delta": 507120,
+      "stack_observations": 546
+    },
+    {
+      "function": "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::position",
+      "inclusive_cpu_delta": 507120,
+      "stack_observations": 546
+    },
+    {
+      "function": "__munmap",
+      "inclusive_cpu_delta": 488505,
+      "stack_observations": 510
+    },
+    {
+      "function": "zlib_rs::inflate::inftrees::inflate_table",
+      "inclusive_cpu_delta": 483651,
+      "stack_observations": 503
+    },
+    {
+      "function": "letopis::filesystem::path::file_get_entry_once",
+      "inclusive_cpu_delta": 462757,
+      "stack_observations": 521
+    },
+    {
+      "function": "rustix::fs::at::statat",
+      "inclusive_cpu_delta": 426956,
+      "stack_observations": 440
+    },
+    {
+      "function": "letopis::filesystem::path::file_verify_entry",
+      "inclusive_cpu_delta": 426956,
+      "stack_observations": 440
+    },
+    {
+      "function": "close",
+      "inclusive_cpu_delta": 417558,
+      "stack_observations": 440
+    },
+    {
+      "function": "rustix::backend::fs::syscalls::fstat",
+      "inclusive_cpu_delta": 407194,
+      "stack_observations": 424
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::push",
+      "inclusive_cpu_delta": 259363,
+      "stack_observations": 392
+    },
+    {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::StorageRead>::nodes_get",
+      "inclusive_cpu_delta": 259363,
+      "stack_observations": 392
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::push_mut",
+      "inclusive_cpu_delta": 259363,
+      "stack_observations": 392
+    },
+    {
+      "function": "letopis::domain::identity::KnowledgeId::parse",
+      "inclusive_cpu_delta": 249552,
+      "stack_observations": 270
+    },
+    {
+      "function": "<std::fs::File as std::io::Read>::read_to_end",
+      "inclusive_cpu_delta": 210525,
+      "stack_observations": 218
+    },
+    {
+      "function": "<&std::fs::File as std::io::Read>::read_to_end",
+      "inclusive_cpu_delta": 210525,
+      "stack_observations": 218
+    },
+    {
+      "function": "_platform_memmove",
+      "inclusive_cpu_delta": 203362,
+      "stack_observations": 224
+    },
+    {
+      "function": "pread",
+      "inclusive_cpu_delta": 173936,
+      "stack_observations": 408
+    },
+    {
+      "function": "seekAndRead",
+      "inclusive_cpu_delta": 173936,
+      "stack_observations": 408
+    },
+    {
+      "function": "unixRead",
+      "inclusive_cpu_delta": 173936,
+      "stack_observations": 408
+    },
+    {
+      "function": "_platform_memcmp",
+      "inclusive_cpu_delta": 172459,
+      "stack_observations": 191
+    },
+    {
+      "function": "letopis::storage::cache::decode_node",
+      "inclusive_cpu_delta": 156649,
+      "stack_observations": 195
+    },
+    {
+      "function": "letopis::filesystem::path::FileParent::directory_verify_links",
+      "inclusive_cpu_delta": 155912,
+      "stack_observations": 161
+    },
+    {
+      "function": "moveToChild",
+      "inclusive_cpu_delta": 152965,
+      "stack_observations": 390
+    },
+    {
+      "function": "getPageNormal",
+      "inclusive_cpu_delta": 152965,
+      "stack_observations": 390
+    },
+    {
+      "function": "getAndInitPage",
+      "inclusive_cpu_delta": 152965,
+      "stack_observations": 390
+    },
+    {
+      "function": "sqlite3PcacheFetch",
+      "inclusive_cpu_delta": 152965,
+      "stack_observations": 390
+    },
+    {
+      "function": "sqlite3PagerGet",
+      "inclusive_cpu_delta": 152965,
+      "stack_observations": 390
+    },
+    {
+      "function": "letopis::domain::identity::RepoPath::parse",
+      "inclusive_cpu_delta": 152905,
+      "stack_observations": 165
+    },
+    {
+      "function": "readDbPage",
+      "inclusive_cpu_delta": 149440,
+      "stack_observations": 384
+    },
+    {
+      "function": "moveToLeftmost",
+      "inclusive_cpu_delta": 148378,
+      "stack_observations": 381
+    },
+    {
+      "function": "sqlite3BtreeNext",
+      "inclusive_cpu_delta": 148378,
+      "stack_observations": 381
+    },
+    {
+      "function": "zlib_rs::stable::Inflate::new",
+      "inclusive_cpu_delta": 147665,
+      "stack_observations": 156
+    },
+    {
+      "function": "std::io::default_read_to_end::<&std::fs::File>",
+      "inclusive_cpu_delta": 146521,
+      "stack_observations": 149
+    },
+    {
+      "function": "zlib_rs::inflate::init",
+      "inclusive_cpu_delta": 145723,
+      "stack_observations": 154
+    },
+    {
+      "function": "read",
+      "inclusive_cpu_delta": 144523,
+      "stack_observations": 147
+    },
+    {
+      "function": "sha1_checked::compress::recompression_step",
+      "inclusive_cpu_delta": 143359,
+      "stack_observations": 152
+    },
+    {
+      "function": "<std::fs::File>::metadata",
+      "inclusive_cpu_delta": 137598,
+      "stack_observations": 143
+    },
+    {
+      "function": "memmap2::os::file_len",
+      "inclusive_cpu_delta": 137598,
+      "stack_observations": 143
+    },
+    {
+      "function": "zlib_rs::adler32::neon::adler32_neon_internal",
+      "inclusive_cpu_delta": 128232,
+      "stack_observations": 133
+    },
+    {
+      "function": "zlib_rs::adler32::neon::adler32_neon",
+      "inclusive_cpu_delta": 128232,
+      "stack_observations": 133
+    },
+    {
+      "function": "zlib_rs::adler32::neon::handle_tail",
+      "inclusive_cpu_delta": 128232,
+      "stack_observations": 133
+    },
+    {
+      "function": "vdbeSorterListToPMA",
+      "inclusive_cpu_delta": 126833,
+      "stack_observations": 198
+    },
+    {
+      "function": "vdbeSorterFlushPMA",
+      "inclusive_cpu_delta": 126833,
+      "stack_observations": 198
+    },
+    {
+      "function": "sqlite3VdbeSorterWrite",
+      "inclusive_cpu_delta": 126303,
+      "stack_observations": 198
+    },
+    {
+      "function": "_platform_memset",
+      "inclusive_cpu_delta": 117599,
+      "stack_observations": 122
+    },
+    {
+      "function": "pwrite",
+      "inclusive_cpu_delta": 114505,
+      "stack_observations": 167
+    },
+    {
+      "function": "seekAndWriteFd",
+      "inclusive_cpu_delta": 114505,
+      "stack_observations": 167
+    },
+    {
+      "function": "unixWrite",
+      "inclusive_cpu_delta": 113683,
+      "stack_observations": 166
+    },
+    {
+      "function": "seekAndWrite",
+      "inclusive_cpu_delta": 113683,
+      "stack_observations": 166
+    },
+    {
+      "function": "letopis::git::repository::alternates_require_absent",
+      "inclusive_cpu_delta": 113246,
+      "stack_observations": 122
+    },
+    {
+      "function": "std::fs::symlink_metadata",
+      "inclusive_cpu_delta": 113246,
+      "stack_observations": 122
+    },
+    {
+      "function": "letopis::git::repository::GitRepository::objects_require_self_contained",
+      "inclusive_cpu_delta": 113246,
+      "stack_observations": 122
+    },
+    {
+      "function": "rusqlite::row::Row::get",
+      "inclusive_cpu_delta": 112735,
+      "stack_observations": 126
+    },
+    {
+      "function": "letopis::git::hashing::ObjectHasher::finish",
+      "inclusive_cpu_delta": 112011,
+      "stack_observations": 119
+    },
+    {
+      "function": "vdbeMergeEngineStep",
+      "inclusive_cpu_delta": 111465,
+      "stack_observations": 116
+    },
+    {
+      "function": "sqlite3BtreeTableMoveto",
+      "inclusive_cpu_delta": 109006,
+      "stack_observations": 205
+    },
+    {
+      "function": "std::sys::helpers::small_c_string::run_path_with_cstr::<std::sys::fs::unix::FileAttr>",
+      "inclusive_cpu_delta": 104371,
+      "stack_observations": 113
+    },
+    {
+      "function": "std::sys::helpers::small_c_string::run_with_cstr_stack::<std::sys::fs::unix::FileAttr>",
+      "inclusive_cpu_delta": 104371,
+      "stack_observations": 113
+    },
+    {
+      "function": "std::sys::fs::symlink_metadata",
+      "inclusive_cpu_delta": 104371,
+      "stack_observations": 113
+    },
+    {
+      "function": "std::sys::helpers::small_c_string::run_with_cstr::<std::sys::fs::unix::FileAttr>",
+      "inclusive_cpu_delta": 104371,
+      "stack_observations": 113
+    },
+    {
+      "function": "<letopis::git::repository::GitRepository as letopis::service::GitSnapshots>::blob_get_by_tree_oid_and_path",
+      "inclusive_cpu_delta": 103566,
+      "stack_observations": 112
+    },
+    {
+      "function": "lstat",
+      "inclusive_cpu_delta": 99962,
+      "stack_observations": 108
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+      "inclusive_cpu_delta": 98581,
+      "stack_observations": 106
+    },
+    {
+      "function": "0x3af13",
+      "inclusive_cpu_delta": 91097,
+      "stack_observations": 98
+    },
+    {
+      "function": "letopis::domain::source::SourceUri::parse",
+      "inclusive_cpu_delta": 90585,
+      "stack_observations": 97
+    },
+    {
+      "function": "letopis::git::hashing::ObjectHasher::new",
+      "inclusive_cpu_delta": 86771,
+      "stack_observations": 88
+    },
+    {
+      "function": "<alloc::collections::btree::set::BTreeSet<T> as core::iter::traits::collect::FromIterator<T>>::from_iter",
+      "inclusive_cpu_delta": 84852,
+      "stack_observations": 87
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::extend_from_slice",
+      "inclusive_cpu_delta": 82544,
+      "stack_observations": 90
+    },
+    {
+      "function": "<alloc::string::String>::push_str",
+      "inclusive_cpu_delta": 82544,
+      "stack_observations": 90
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<&T,core::slice::iter::Iter<T>>>::spec_extend",
+      "inclusive_cpu_delta": 82544,
+      "stack_observations": 90
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::append_elements",
+      "inclusive_cpu_delta": 82544,
+      "stack_observations": 90
+    },
+    {
+      "function": "0x3a6f7",
+      "inclusive_cpu_delta": 82084,
+      "stack_observations": 89
+    },
+    {
+      "function": "mach_absolute_time",
+      "inclusive_cpu_delta": 81990,
+      "stack_observations": 86
+    },
+    {
+      "function": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>",
+      "inclusive_cpu_delta": 81710,
+      "stack_observations": 84
+    },
+    {
+      "function": "gix_odb::store_impls::loose::hash_path",
+      "inclusive_cpu_delta": 79020,
+      "stack_observations": 79
+    },
+    {
+      "function": "<std::path::PathBuf>::_push",
+      "inclusive_cpu_delta": 78723,
+      "stack_observations": 78
+    },
+    {
+      "function": "<std::ffi::os_str::OsString as core::ops::deref::Deref>::deref",
+      "inclusive_cpu_delta": 78723,
+      "stack_observations": 78
+    },
+    {
+      "function": "<std::ffi::os_str::OsString as core::ops::index::Index<core::ops::range::RangeFull>>::index",
+      "inclusive_cpu_delta": 78723,
+      "stack_observations": 78
+    },
+    {
+      "function": "<std::sys::os_str::bytes::Buf>::as_slice",
+      "inclusive_cpu_delta": 78723,
+      "stack_observations": 78
+    },
+    {
+      "function": "<alloc::vec::Vec<u8>>::as_slice",
+      "inclusive_cpu_delta": 78723,
+      "stack_observations": 78
+    },
+    {
+      "function": "<alloc::raw_vec::RawVecInner>::finish_grow",
+      "inclusive_cpu_delta": 78316,
+      "stack_observations": 81
+    },
+    {
+      "function": "letopis::domain::validation::find_graph_problems",
+      "inclusive_cpu_delta": 78119,
+      "stack_observations": 79
+    },
+    {
+      "function": "letopis::domain::validation::find_dangling_targets",
+      "inclusive_cpu_delta": 78119,
+      "stack_observations": 79
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle",
+      "inclusive_cpu_delta": 77515,
+      "stack_observations": 84
+    },
+    {
+      "function": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match",
+      "inclusive_cpu_delta": 76603,
+      "stack_observations": 86
+    },
+    {
+      "function": "core::fmt::write",
+      "inclusive_cpu_delta": 75656,
+      "stack_observations": 78
+    },
+    {
+      "function": "letopis::domain::identity::KnowledgeId::new",
+      "inclusive_cpu_delta": 73759,
+      "stack_observations": 81
+    },
+    {
+      "function": "<core::fmt::Arguments>::estimated_capacity",
+      "inclusive_cpu_delta": 66993,
+      "stack_observations": 69
+    },
+    {
+      "function": "alloc::fmt::format::format_inner",
+      "inclusive_cpu_delta": 66993,
+      "stack_observations": 69
+    },
+    {
+      "function": "<core::ptr::non_null::NonNull<u8>>::add",
+      "inclusive_cpu_delta": 66993,
+      "stack_observations": 69
+    },
+    {
+      "function": "vdbePmaReaderNext",
+      "inclusive_cpu_delta": 64962,
+      "stack_observations": 69
+    },
+    {
+      "function": "sha1_checked::Sha1::try_finalize",
+      "inclusive_cpu_delta": 62323,
+      "stack_observations": 68
+    },
+    {
+      "function": "sha1_checked::compress::finalize",
+      "inclusive_cpu_delta": 59307,
+      "stack_observations": 65
+    },
+    {
+      "function": "sha1_checked::Sha1::finalize_inner",
+      "inclusive_cpu_delta": 59307,
+      "stack_observations": 65
+    },
+    {
+      "function": "std::fs::buffer_capacity_required",
+      "inclusive_cpu_delta": 59146,
+      "stack_observations": 62
+    },
+    {
+      "function": "sqlite3VdbeFinishMoveto",
+      "inclusive_cpu_delta": 59046,
+      "stack_observations": 139
+    },
+    {
+      "function": "vdbeIncrPopulate",
+      "inclusive_cpu_delta": 59026,
+      "stack_observations": 63
+    },
+    {
+      "function": "<core::iter::adapters::filter_map::FilterMap<I,F> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 58277,
+      "stack_observations": 60
+    },
+    {
+      "function": "__rustc::__rdl_alloc",
+      "inclusive_cpu_delta": 57699,
+      "stack_observations": 62
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::find_map",
+      "inclusive_cpu_delta": 54697,
+      "stack_observations": 56
+    },
+    {
+      "function": "<alloc::collections::btree::map::Keys<K,V> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 54697,
+      "stack_observations": 56
+    },
+    {
+      "function": "<alloc::collections::btree::set::Iter<T> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 54697,
+      "stack_observations": 56
+    },
+    {
+      "function": "0x2b277",
+      "inclusive_cpu_delta": 52693,
+      "stack_observations": 56
+    },
+    {
+      "function": "core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut",
+      "inclusive_cpu_delta": 52253,
+      "stack_observations": 56
+    },
+    {
+      "function": "core::ptr::drop_in_place<letopis::filesystem::path::FileParent>",
+      "inclusive_cpu_delta": 52075,
+      "stack_observations": 53
+    },
+    {
+      "function": "alloc::str::join_generic_copy",
+      "inclusive_cpu_delta": 48807,
+      "stack_observations": 53
+    },
+    {
+      "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+      "inclusive_cpu_delta": 47825,
+      "stack_observations": 40
+    },
+    {
+      "function": "<alloc::collections::btree::map::IntoIter<K,V,A> as core::ops::drop::Drop>::drop",
+      "inclusive_cpu_delta": 47825,
+      "stack_observations": 40
+    },
+    {
+      "function": "core::mem::drop",
+      "inclusive_cpu_delta": 47825,
+      "stack_observations": 40
+    },
+    {
+      "function": "letopis::domain::sha256::Sha256::digest",
+      "inclusive_cpu_delta": 46787,
+      "stack_observations": 51
+    },
+    {
+      "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Dying,K,V,NodeType>,alloc::collections::btree::node::marker::KV>::drop_key_val",
+      "inclusive_cpu_delta": 46739,
+      "stack_observations": 39
+    },
+    {
+      "function": "0x3afdf",
+      "inclusive_cpu_delta": 45658,
+      "stack_observations": 50
+    },
+    {
+      "function": "vdbeSorterCompareText",
+      "inclusive_cpu_delta": 45077,
+      "stack_observations": 59
+    },
+    {
+      "function": "0x2a457",
+      "inclusive_cpu_delta": 44668,
+      "stack_observations": 49
+    },
+    {
+      "function": "<alloc::string::String as core::fmt::Write>::write_str",
+      "inclusive_cpu_delta": 44430,
+      "stack_observations": 46
+    },
+    {
+      "function": "sha2::sha256::compress256",
+      "inclusive_cpu_delta": 42686,
+      "stack_observations": 47
+    },
+    {
+      "function": "0x3a8f7",
+      "inclusive_cpu_delta": 42673,
+      "stack_observations": 47
+    },
+    {
+      "function": "0x594e8c",
+      "inclusive_cpu_delta": 41982,
+      "stack_observations": 43
+    },
+    {
+      "function": "0x135f3",
+      "inclusive_cpu_delta": 38677,
+      "stack_observations": 43
+    },
+    {
+      "function": "vdbePmaReadBlob",
+      "inclusive_cpu_delta": 35875,
+      "stack_observations": 36
+    },
+    {
+      "function": "rusqlite::statement::Statement::value_ref",
+      "inclusive_cpu_delta": 34508,
+      "stack_observations": 39
+    },
+    {
+      "function": "rusqlite::raw_statement::RawStatement::column_type",
+      "inclusive_cpu_delta": 34508,
+      "stack_observations": 39
+    },
+    {
+      "function": "0x15a9b",
+      "inclusive_cpu_delta": 33560,
+      "stack_observations": 35
+    },
+    {
+      "function": "core::ptr::drop_in_place<letopis::domain::graph::Edge>",
+      "inclusive_cpu_delta": 33251,
+      "stack_observations": 32
+    },
+    {
+      "function": "<alloc::alloc::Global as core::alloc::Allocator>::allocate",
+      "inclusive_cpu_delta": 33220,
+      "stack_observations": 34
+    },
+    {
+      "function": "<alloc::alloc::Global>::alloc_impl",
+      "inclusive_cpu_delta": 33220,
+      "stack_observations": 34
+    },
+    {
+      "function": "<alloc::alloc::Global>::alloc_impl_runtime",
+      "inclusive_cpu_delta": 33220,
+      "stack_observations": 34
+    },
+    {
+      "function": "alloc::alloc::alloc",
+      "inclusive_cpu_delta": 33220,
+      "stack_observations": 34
+    },
+    {
+      "function": "core::mem::maybe_uninit::MaybeUninit<T>::assume_init_drop",
+      "inclusive_cpu_delta": 32615,
+      "stack_observations": 30
+    },
+    {
+      "function": "mach_vm_reclaim_try_cancel",
+      "inclusive_cpu_delta": 32489,
+      "stack_observations": 33
+    },
+    {
+      "function": "<*const u8>::addr",
+      "inclusive_cpu_delta": 32110,
+      "stack_observations": 36
+    },
+    {
+      "function": "core::slice::memchr::memchr_aligned",
+      "inclusive_cpu_delta": 32110,
+      "stack_observations": 36
+    },
+    {
+      "function": "core::ptr::align_offset::<u8>",
+      "inclusive_cpu_delta": 32110,
+      "stack_observations": 36
+    },
+    {
+      "function": "core::slice::memchr::memchr_aligned::runtime",
+      "inclusive_cpu_delta": 32110,
+      "stack_observations": 36
+    },
+    {
+      "function": "<*const u8>::align_offset",
+      "inclusive_cpu_delta": 32110,
+      "stack_observations": 36
+    },
+    {
+      "function": "__bzero",
+      "inclusive_cpu_delta": 31501,
+      "stack_observations": 33
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::collections::btree::map::IntoIter<letopis::domain::graph::Edge,alloc::collections::btree::set_val::SetValZST>>",
+      "inclusive_cpu_delta": 29668,
+      "stack_observations": 27
+    },
+    {
+      "function": "0x2a15c",
+      "inclusive_cpu_delta": 29459,
+      "stack_observations": 31
+    },
+    {
+      "function": "<std::sys::fd::unix::FileDesc>::read",
+      "inclusive_cpu_delta": 28043,
+      "stack_observations": 29
+    },
+    {
+      "function": "<&std::fs::File as std::io::Read>::read",
+      "inclusive_cpu_delta": 28043,
+      "stack_observations": 29
+    },
+    {
+      "function": "std::io::default_read_to_end::small_probe_read::<&std::fs::File>",
+      "inclusive_cpu_delta": 28043,
+      "stack_observations": 29
+    },
+    {
+      "function": "<std::sys::fs::unix::File>::read",
+      "inclusive_cpu_delta": 28043,
+      "stack_observations": 29
+    },
+    {
+      "function": "letopis::domain::identity::Anchor::parse",
+      "inclusive_cpu_delta": 27756,
+      "stack_observations": 30
+    },
+    {
+      "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+      "inclusive_cpu_delta": 26660,
+      "stack_observations": 28
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::grow_one",
+      "inclusive_cpu_delta": 26660,
+      "stack_observations": 28
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::grow_amortized",
+      "inclusive_cpu_delta": 26660,
+      "stack_observations": 28
+    },
+    {
+      "function": "0x2b52f",
+      "inclusive_cpu_delta": 26644,
+      "stack_observations": 29
+    },
+    {
+      "function": "0x13c2f",
+      "inclusive_cpu_delta": 26340,
+      "stack_observations": 29
+    },
+    {
+      "function": "vdbeSorterSort",
+      "inclusive_cpu_delta": 26147,
+      "stack_observations": 44
+    },
+    {
+      "function": "<core::ffi::c_str::CStr>::from_bytes_with_nul",
+      "inclusive_cpu_delta": 24792,
+      "stack_observations": 26
+    },
+    {
+      "function": "core::slice::memchr::memchr",
+      "inclusive_cpu_delta": 24792,
+      "stack_observations": 26
+    },
+    {
+      "function": "<std::os::unix::net::stream::UnixStream>::try_clone",
+      "inclusive_cpu_delta": 24597,
+      "stack_observations": 27
+    },
+    {
+      "function": "<std::os::fd::owned::BorrowedFd>::try_clone_to_owned",
+      "inclusive_cpu_delta": 24597,
+      "stack_observations": 27
+    },
+    {
+      "function": "<std::sys::net::connection::socket::unix::Socket>::duplicate",
+      "inclusive_cpu_delta": 24597,
+      "stack_observations": 27
+    },
+    {
+      "function": "<std::sys::fd::unix::FileDesc>::duplicate",
+      "inclusive_cpu_delta": 24597,
+      "stack_observations": 27
+    },
+    {
+      "function": "<std::os::fd::owned::OwnedFd>::try_clone",
+      "inclusive_cpu_delta": 24597,
+      "stack_observations": 27
+    },
+    {
+      "function": "0x2af0b",
+      "inclusive_cpu_delta": 23797,
+      "stack_observations": 25
+    },
+    {
+      "function": "fcntl",
+      "inclusive_cpu_delta": 23787,
+      "stack_observations": 26
+    },
+    {
+      "function": "core::str::converts::from_utf8",
+      "inclusive_cpu_delta": 23444,
+      "stack_observations": 24
+    },
+    {
+      "function": "core::str::validations::run_utf8_validation",
+      "inclusive_cpu_delta": 23444,
+      "stack_observations": 24
+    },
+    {
+      "function": "0x15147",
+      "inclusive_cpu_delta": 22974,
+      "stack_observations": 25
+    },
+    {
+      "function": "__fcntl",
+      "inclusive_cpu_delta": 22778,
+      "stack_observations": 25
+    },
+    {
+      "function": "alloc::collections::btree::node::LeafNode<K,V>::new",
+      "inclusive_cpu_delta": 22313,
+      "stack_observations": 22
+    },
+    {
+      "function": "alloc::boxed::Box<T,A>::new_uninit_in",
+      "inclusive_cpu_delta": 22313,
+      "stack_observations": 22
+    },
+    {
+      "function": "alloc::boxed::Box<T,A>::try_new_uninit_in",
+      "inclusive_cpu_delta": 22313,
+      "stack_observations": 22
+    },
+    {
+      "function": "__lseek",
+      "inclusive_cpu_delta": 22232,
+      "stack_observations": 23
+    },
+    {
+      "function": "<alloc::alloc::Global>::deallocate_impl",
+      "inclusive_cpu_delta": 21612,
+      "stack_observations": 22
+    },
+    {
+      "function": "<alloc::alloc::Global as core::alloc::Allocator>::deallocate",
+      "inclusive_cpu_delta": 21612,
+      "stack_observations": 22
+    },
+    {
+      "function": "<alloc::raw_vec::RawVec<T,A> as core::ops::drop::Drop>::drop",
+      "inclusive_cpu_delta": 21612,
+      "stack_observations": 22
+    },
+    {
+      "function": "<alloc::alloc::Global>::deallocate_impl_runtime",
+      "inclusive_cpu_delta": 21612,
+      "stack_observations": 22
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::deallocate",
+      "inclusive_cpu_delta": 21612,
+      "stack_observations": 22
+    },
+    {
+      "function": "alloc::alloc::dealloc",
+      "inclusive_cpu_delta": 21612,
+      "stack_observations": 22
+    },
+    {
+      "function": "mach_vm_reclaim_try_enter",
+      "inclusive_cpu_delta": 20152,
+      "stack_observations": 21
+    },
+    {
+      "function": "0x12967",
+      "inclusive_cpu_delta": 20152,
+      "stack_observations": 21
+    },
+    {
+      "function": "rusqlite::raw_statement::RawStatement::column_count",
+      "inclusive_cpu_delta": 19990,
+      "stack_observations": 27
+    },
+    {
+      "function": "rusqlite::column::<impl rusqlite::statement::Statement>::column_count",
+      "inclusive_cpu_delta": 19990,
+      "stack_observations": 27
+    },
+    {
+      "function": "<usize as rusqlite::row::RowIndex>::idx",
+      "inclusive_cpu_delta": 19990,
+      "stack_observations": 27
+    },
+    {
+      "function": "alloc::collections::btree::set::BTreeSet<T,A>::from_sorted_iter",
+      "inclusive_cpu_delta": 19748,
+      "stack_observations": 20
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::raw_vec::RawVec<u8>>",
+      "inclusive_cpu_delta": 19602,
+      "stack_observations": 20
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::vec::Vec<u8>>",
+      "inclusive_cpu_delta": 19602,
+      "stack_observations": 20
+    },
+    {
+      "function": "<u64 as core::fmt::Display>::fmt",
+      "inclusive_cpu_delta": 18530,
+      "stack_observations": 19
+    },
+    {
+      "function": "0x14bfb",
+      "inclusive_cpu_delta": 18478,
+      "stack_observations": 19
+    },
+    {
+      "function": "0x1449b",
+      "inclusive_cpu_delta": 18478,
+      "stack_observations": 19
+    },
+    {
+      "function": "0x143bb",
+      "inclusive_cpu_delta": 18091,
+      "stack_observations": 19
+    },
+    {
+      "function": "0x12def",
+      "inclusive_cpu_delta": 17533,
+      "stack_observations": 18
+    },
+    {
+      "function": "<&T as core::fmt::LowerHex>::fmt",
+      "inclusive_cpu_delta": 17091,
+      "stack_observations": 17
+    },
+    {
+      "function": "0x2aeab",
+      "inclusive_cpu_delta": 16905,
+      "stack_observations": 18
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::string::String>",
+      "inclusive_cpu_delta": 16526,
+      "stack_observations": 17
+    },
+    {
+      "function": "0x149cb",
+      "inclusive_cpu_delta": 15975,
+      "stack_observations": 16
+    },
+    {
+      "function": "core::str::<impl str>::split_once",
+      "inclusive_cpu_delta": 15612,
+      "stack_observations": 16
+    },
+    {
+      "function": "0x2a1cc",
+      "inclusive_cpu_delta": 14992,
+      "stack_observations": 16
+    },
+    {
+      "function": "0x163af",
+      "inclusive_cpu_delta": 14766,
+      "stack_observations": 15
+    },
+    {
+      "function": "alloc::collections::btree::append::<impl alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Owned,K,V,alloc::collections::btree::node::marker::LeafOrInternal>>::bulk_push",
+      "inclusive_cpu_delta": 14598,
+      "stack_observations": 14
+    },
+    {
+      "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::bulk_build_from_sorted_iter",
+      "inclusive_cpu_delta": 14598,
+      "stack_observations": 14
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::collections::btree::map::IntoIter<letopis::domain::identity::KnowledgeId,alloc::collections::btree::set::BTreeSet<letopis::domain::source::SourceUri>>>",
+      "inclusive_cpu_delta": 14124,
+      "stack_observations": 9
+    },
+    {
+      "function": "0x2aef3",
+      "inclusive_cpu_delta": 13580,
+      "stack_observations": 14
+    },
+    {
+      "function": "core::ptr::drop_in_place<letopis::domain::identity::KnowledgeId>",
+      "inclusive_cpu_delta": 13579,
+      "stack_observations": 14
+    },
+    {
+      "function": "letopis::service::utils::CheckObservations::find_source_problems::{{closure}}",
+      "inclusive_cpu_delta": 13276,
+      "stack_observations": 14
+    },
+    {
+      "function": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+      "inclusive_cpu_delta": 12939,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x12fab",
+      "inclusive_cpu_delta": 12816,
+      "stack_observations": 13
+    },
+    {
+      "function": "<gix_hash::object_id::ObjectId as core::fmt::Display>::fmt",
+      "inclusive_cpu_delta": 12468,
+      "stack_observations": 13
+    },
+    {
+      "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::KV>::split",
+      "inclusive_cpu_delta": 12461,
+      "stack_observations": 13
+    },
+    {
+      "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert",
+      "inclusive_cpu_delta": 12461,
+      "stack_observations": 13
+    },
+    {
+      "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",
+      "inclusive_cpu_delta": 12461,
+      "stack_observations": 13
+    },
+    {
+      "function": "sqlite3VdbeRecordUnpack",
+      "inclusive_cpu_delta": 12312,
+      "stack_observations": 13
+    },
+    {
+      "function": "<core::str::iter::Bytes as core::iter::traits::iterator::Iterator>::all",
+      "inclusive_cpu_delta": 12044,
+      "stack_observations": 13
+    },
+    {
+      "function": "<core::iter::adapters::copied::Copied<I> as core::iter::traits::iterator::Iterator>::try_fold",
+      "inclusive_cpu_delta": 12044,
+      "stack_observations": 13
+    },
+    {
+      "function": "letopis::domain::sha256::Sha256::parse",
+      "inclusive_cpu_delta": 12044,
+      "stack_observations": 13
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::all",
+      "inclusive_cpu_delta": 12044,
+      "stack_observations": 13
+    },
+    {
+      "function": "<core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 11957,
+      "stack_observations": 13
+    },
+    {
+      "function": "0x3ae4b",
+      "inclusive_cpu_delta": 11936,
+      "stack_observations": 12
+    },
+    {
+      "function": "alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>::push",
+      "inclusive_cpu_delta": 11884,
+      "stack_observations": 12
+    },
+    {
+      "function": "core::mem::maybe_uninit::MaybeUninit<T>::write",
+      "inclusive_cpu_delta": 11884,
+      "stack_observations": 12
+    },
+    {
+      "function": "alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>::push_with_handle",
+      "inclusive_cpu_delta": 11884,
+      "stack_observations": 12
+    },
+    {
+      "function": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+      "inclusive_cpu_delta": 11801,
+      "stack_observations": 12
+    },
+    {
+      "function": "letopis::filesystem::path::path_get_file_components",
+      "inclusive_cpu_delta": 11074,
+      "stack_observations": 12
+    },
+    {
+      "function": "sqlite3VdbeSerialGet",
+      "inclusive_cpu_delta": 10818,
+      "stack_observations": 13
+    },
+    {
+      "function": "sqlite3_column_text",
+      "inclusive_cpu_delta": 10480,
+      "stack_observations": 12
+    },
+    {
+      "function": "0x3acd0",
+      "inclusive_cpu_delta": 10441,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::extend_trusted",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Immut,K,V,Type>::keys",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "core::iter::adapters::map::map_fold::{{closure}}",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::for_each",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold",
+      "inclusive_cpu_delta": 10414,
+      "stack_observations": 11
+    },
+    {
+      "function": "0x2a958",
+      "inclusive_cpu_delta": 10296,
+      "stack_observations": 11
+    },
+    {
+      "function": "0x2b4fc",
+      "inclusive_cpu_delta": 10103,
+      "stack_observations": 10
+    },
+    {
+      "function": "0x31994",
+      "inclusive_cpu_delta": 9970,
+      "stack_observations": 9
+    },
+    {
+      "function": "<alloc::raw_vec::RawVecInner>::try_allocate_in",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<alloc::raw_vec::RawVecInner>::with_capacity_in",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<alloc::vec::Vec<u8> as core::clone::Clone>::clone",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<alloc::raw_vec::RawVec<u8>>::with_capacity_in",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<[u8]>::to_vec_in::<alloc::alloc::Global>",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<alloc::string::String as core::clone::Clone>::clone",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<alloc::vec::Vec<u8>>::with_capacity_in",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "<u8 as <[_]>::to_vec_in::ConvertVec>::to_vec::<alloc::alloc::Global>",
+      "inclusive_cpu_delta": 9905,
+      "stack_observations": 11
+    },
+    {
+      "function": "alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Owned,K,V,alloc::collections::btree::node::marker::Leaf>::new_leaf",
+      "inclusive_cpu_delta": 9852,
+      "stack_observations": 9
+    },
+    {
+      "function": "<gix_hash::borrowed::HexDisplay as core::fmt::Display>::fmt",
+      "inclusive_cpu_delta": 9727,
+      "stack_observations": 10
+    },
+    {
+      "function": "gix_hash::borrowed::oid::hex_to_buf",
+      "inclusive_cpu_delta": 9727,
+      "stack_observations": 10
+    },
+    {
+      "function": "<letopis::git::repository::GitRepository as letopis::service::SnapshotVerifier>::tree_verify_by_oid",
+      "inclusive_cpu_delta": 9680,
+      "stack_observations": 10
+    },
+    {
+      "function": "0x2b738",
+      "inclusive_cpu_delta": 8926,
+      "stack_observations": 9
+    },
+    {
+      "function": "sqlite3_column_type",
+      "inclusive_cpu_delta": 8892,
+      "stack_observations": 9
+    },
+    {
+      "function": "alloc::vec::in_place_collect::<impl alloc::vec::spec_from_iter::SpecFromIter<T,I> for alloc::vec::Vec<T>>::from_iter",
+      "inclusive_cpu_delta": 8604,
+      "stack_observations": 9
+    },
+    {
+      "function": "letopis::domain::source::has_remote_scheme",
+      "inclusive_cpu_delta": 8530,
+      "stack_observations": 9
+    },
+    {
+      "function": "<char as core::str::pattern::Pattern>::into_searcher",
+      "inclusive_cpu_delta": 8530,
+      "stack_observations": 9
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_time_ns",
+      "inclusive_cpu_delta": 8172,
+      "stack_observations": 10
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_by_path::{{closure}}",
+      "inclusive_cpu_delta": 8172,
+      "stack_observations": 10
+    },
+    {
+      "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::insert",
+      "inclusive_cpu_delta": 8138,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::collections::btree::map::entry::VacantEntry<K,V,A>::insert_entry",
+      "inclusive_cpu_delta": 8138,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::collections::btree::map::entry::VacantEntry<K,V,A>::insert",
+      "inclusive_cpu_delta": 8138,
+      "stack_observations": 8
+    },
+    {
+      "function": "<letopis::domain::identity::KnowledgeId as core::cmp::PartialOrd>::partial_cmp",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::as_slice",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A> as core::ops::deref::Deref>::deref",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::slice::sort::shared::find_existing_run",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A1> as core::cmp::PartialOrd<alloc::vec::Vec<T,A2>>>::partial_cmp",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::raw_vec::RawVec<T,A>::ptr",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::slice::sort::stable::drift::sort",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::slice::sort::stable::driftsort_main",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::non_null",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "<alloc::string::String as core::cmp::PartialOrd>::partial_cmp",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::ops::function::FnMut::call_mut",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::cmp::PartialOrd::lt",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::vec::Vec<T,A>::as_ptr",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::slice::sort::stable::drift::create_run",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "<letopis::domain::graph::Edge as core::cmp::PartialOrd>::partial_cmp",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::raw_vec::RawVecInner<A>::ptr",
+      "inclusive_cpu_delta": 7864,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x3ac7",
+      "inclusive_cpu_delta": 7863,
+      "stack_observations": 8
+    },
+    {
+      "function": "gix_object::decode::loose_header",
+      "inclusive_cpu_delta": 7838,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x2b134",
+      "inclusive_cpu_delta": 7671,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x33e37",
+      "inclusive_cpu_delta": 7670,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x4287c",
+      "inclusive_cpu_delta": 7619,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x2b118",
+      "inclusive_cpu_delta": 7605,
+      "stack_observations": 8
+    },
+    {
+      "function": "<alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold",
+      "inclusive_cpu_delta": 7604,
+      "stack_observations": 8
+    },
+    {
+      "function": "<I as alloc::vec::in_place_collect::SpecInPlaceCollect<T,I>>::collect_in_place",
+      "inclusive_cpu_delta": 7604,
+      "stack_observations": 8
+    },
+    {
+      "function": "alloc::vec::in_place_collect::from_iter_in_place",
+      "inclusive_cpu_delta": 7604,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::ptr::read",
+      "inclusive_cpu_delta": 7604,
+      "stack_observations": 8
+    },
+    {
+      "function": "<core::iter::adapters::filter_map::FilterMap<I,F> as core::iter::traits::iterator::Iterator>::try_fold",
+      "inclusive_cpu_delta": 7604,
+      "stack_observations": 8
+    },
+    {
+      "function": "core::ptr::non_null::NonNull<T>::read",
+      "inclusive_cpu_delta": 7604,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x594ca0",
+      "inclusive_cpu_delta": 7546,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x2b388",
+      "inclusive_cpu_delta": 7502,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x2b190",
+      "inclusive_cpu_delta": 7389,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x36170",
+      "inclusive_cpu_delta": 7189,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x3acf4",
+      "inclusive_cpu_delta": 7168,
+      "stack_observations": 8
+    },
+    {
+      "function": "<&str as core::str::pattern::Pattern>::into_searcher",
+      "inclusive_cpu_delta": 7082,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x3a0c8",
+      "inclusive_cpu_delta": 7082,
+      "stack_observations": 7
+    },
+    {
+      "function": "gix_ref::store_impl::file::find::<impl gix_ref::store_impl::file::Store>::ref_contents",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_ref::store_impl::file::find::<impl gix_ref::store_impl::file::Store>::find_inner",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_discover::upwards::function::SearchPath::probe_repository",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_discover::is::git",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::git::repository::GitRepository::open_with_cleanup",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_ref::store_impl::file::find::<impl gix_ref::store_impl::file::Store>::find_existing_inner",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "std::fs::File::open",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::open_repository_with_cleanup",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_discover::upwards::function::discover_opts_with_trust",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_ref::store_impl::file::find::<impl gix_ref::store_impl::file::Store>::find_one_with_verified_input",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_discover::upwards::function::discover_opts",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_discover::is::git_with_metadata",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_ref::store_impl::file::find::<impl gix_ref::store_impl::file::Store>::find_loose",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "std::fs::OpenOptions::open",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix::discover::<impl gix::types::ThreadSafeRepository>::discover_opts",
+      "inclusive_cpu_delta": 6970,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3a134",
+      "inclusive_cpu_delta": 6943,
+      "stack_observations": 8
+    },
+    {
+      "function": "getCellInfo",
+      "inclusive_cpu_delta": 6911,
+      "stack_observations": 8
+    },
+    {
+      "function": "sha1_checked::Sha1::new",
+      "inclusive_cpu_delta": 6738,
+      "stack_observations": 7
+    },
+    {
+      "function": "<sha1_checked::Sha1 as core::default::Default>::default",
+      "inclusive_cpu_delta": 6738,
+      "stack_observations": 7
+    },
+    {
+      "function": "sha1_checked::Builder::build",
+      "inclusive_cpu_delta": 6738,
+      "stack_observations": 7
+    },
+    {
+      "function": "<block_buffer::BlockBuffer<BlockSize,Kind> as core::default::Default>::default",
+      "inclusive_cpu_delta": 6738,
+      "stack_observations": 7
+    },
+    {
+      "function": "<std::sys::pal::unix::time::Timespec>::now",
+      "inclusive_cpu_delta": 6708,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x594c9c",
+      "inclusive_cpu_delta": 6587,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x594e98",
+      "inclusive_cpu_delta": 6577,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x2b36c",
+      "inclusive_cpu_delta": 6573,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x3ab7",
+      "inclusive_cpu_delta": 6384,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x2b1f4",
+      "inclusive_cpu_delta": 6300,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x2b258",
+      "inclusive_cpu_delta": 6282,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x2a230",
+      "inclusive_cpu_delta": 6206,
+      "stack_observations": 6
+    },
+    {
+      "function": "<core::str::pattern::StrSearcher>::new",
+      "inclusive_cpu_delta": 6094,
+      "stack_observations": 6
+    },
+    {
+      "function": "<core::str::pattern::TwoWaySearcher>::maximal_suffix",
+      "inclusive_cpu_delta": 6094,
+      "stack_observations": 6
+    },
+    {
+      "function": "<core::str::pattern::TwoWaySearcher>::new",
+      "inclusive_cpu_delta": 6094,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x3a10c",
+      "inclusive_cpu_delta": 6069,
+      "stack_observations": 6
+    },
+    {
+      "function": "vdbePmaReaderIncrMergeInit",
+      "inclusive_cpu_delta": 6048,
+      "stack_observations": 9
+    },
+    {
+      "function": "<alloc::collections::btree::dedup_sorted_iter::DedupSortedIter<K,V,I> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 5953,
+      "stack_observations": 6
+    },
+    {
+      "function": "vdbePmaReadVarint",
+      "inclusive_cpu_delta": 5877,
+      "stack_observations": 6
+    },
+    {
+      "function": "sqlite3VdbeRecordCompareWithSkip",
+      "inclusive_cpu_delta": 5711,
+      "stack_observations": 8
+    },
+    {
+      "function": "0x31638",
+      "inclusive_cpu_delta": 5622,
+      "stack_observations": 6
+    },
+    {
+      "function": "sqlite3PagerUnrefNotNull",
+      "inclusive_cpu_delta": 5447,
+      "stack_observations": 9
+    },
+    {
+      "function": "releasePageNotNull",
+      "inclusive_cpu_delta": 5447,
+      "stack_observations": 9
+    },
+    {
+      "function": "gix_hash::object_id::decode::<impl gix_hash::object_id::ObjectId>::from_hex",
+      "inclusive_cpu_delta": 5444,
+      "stack_observations": 5
+    },
+    {
+      "function": "sqlite3_column_bytes",
+      "inclusive_cpu_delta": 5385,
+      "stack_observations": 6
+    },
+    {
+      "function": "sqlite3GetVarint",
+      "inclusive_cpu_delta": 5315,
+      "stack_observations": 6
+    },
+    {
+      "function": "alloc::collections::btree::navigate::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<BorrowType,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>>::next_kv",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "alloc::collections::btree::node::NodeRef<BorrowType,K,V,Type>::len",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "alloc::collections::btree::mem::replace",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "alloc::collections::btree::navigate::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Immut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>>::next_unchecked::{{closure}}",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "alloc::collections::btree::navigate::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Immut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>>::next_unchecked",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "alloc::collections::btree::navigate::LazyLeafRange<alloc::collections::btree::node::marker::Immut,K,V>::next_unchecked",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<BorrowType,K,V,NodeType>,alloc::collections::btree::node::marker::Edge>::right_kv",
+      "inclusive_cpu_delta": 5306,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x594e20",
+      "inclusive_cpu_delta": 5282,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x2b1dc",
+      "inclusive_cpu_delta": 5149,
+      "stack_observations": 5
+    },
+    {
+      "function": "<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",
+      "inclusive_cpu_delta": 5086,
+      "stack_observations": 5
+    },
+    {
+      "function": "letopis::filesystem::path::file_require_unchanged",
+      "inclusive_cpu_delta": 4853,
+      "stack_observations": 5
+    },
+    {
+      "function": "letopis::filesystem::path::file_require_identity",
+      "inclusive_cpu_delta": 4853,
+      "stack_observations": 5
+    },
+    {
+      "function": "0x2a9f8",
+      "inclusive_cpu_delta": 4728,
+      "stack_observations": 5
+    },
+    {
+      "function": "0x2a9d4",
+      "inclusive_cpu_delta": 4718,
+      "stack_observations": 5
+    },
+    {
+      "function": "zlib_rs::inflate::writer::Writer::extend_from_window_runtime_dispatch",
+      "inclusive_cpu_delta": 4692,
+      "stack_observations": 5
+    },
+    {
+      "function": "0xee23",
+      "inclusive_cpu_delta": 4618,
+      "stack_observations": 5
+    },
+    {
+      "function": "sqlite3_column_count",
+      "inclusive_cpu_delta": 4612,
+      "stack_observations": 7
+    },
+    {
+      "function": "0x2b12c",
+      "inclusive_cpu_delta": 4592,
+      "stack_observations": 6
+    },
+    {
+      "function": "_platform_strlen",
+      "inclusive_cpu_delta": 4563,
+      "stack_observations": 5
+    },
+    {
+      "function": "faster_hex::decode::hex_check_neon_with_case",
+      "inclusive_cpu_delta": 4327,
+      "stack_observations": 4
+    },
+    {
+      "function": "faster_hex::decode::hex_check_with_case",
+      "inclusive_cpu_delta": 4327,
+      "stack_observations": 4
+    },
+    {
+      "function": "faster_hex::decode::hex_decode_with_case",
+      "inclusive_cpu_delta": 4327,
+      "stack_observations": 4
+    },
+    {
+      "function": "core::core_arch::arm_shared::neon::generated::vorrq_u8",
+      "inclusive_cpu_delta": 4327,
+      "stack_observations": 4
+    },
+    {
+      "function": "faster_hex::decode::hex_decode",
+      "inclusive_cpu_delta": 4327,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x2aef4",
+      "inclusive_cpu_delta": 4133,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x2b244",
+      "inclusive_cpu_delta": 4052,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x3ad64",
+      "inclusive_cpu_delta": 4026,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x42870",
+      "inclusive_cpu_delta": 3985,
+      "stack_observations": 4
+    },
+    {
+      "function": "core::slice::cmp::<impl core::cmp::PartialEq<[U]> for [T]>::eq",
+      "inclusive_cpu_delta": 3967,
+      "stack_observations": 4
+    },
+    {
+      "function": "<A as core::slice::cmp::SlicePartialEq<B>>::equal_same_length",
+      "inclusive_cpu_delta": 3967,
+      "stack_observations": 4
+    },
+    {
+      "function": "<std::sys::fd::unix::FileDesc as std::os::fd::owned::AsFd>::as_fd",
+      "inclusive_cpu_delta": 3959,
+      "stack_observations": 4
+    },
+    {
+      "function": "<std::os::fd::owned::OwnedFd as std::os::fd::owned::AsFd>::as_fd",
+      "inclusive_cpu_delta": 3959,
+      "stack_observations": 4
+    },
+    {
+      "function": "<std::os::fd::owned::OwnedFd as std::os::fd::raw::AsRawFd>::as_raw_fd",
+      "inclusive_cpu_delta": 3959,
+      "stack_observations": 4
+    },
+    {
+      "function": "zlib_rs::inflate::window::Window::extend",
+      "inclusive_cpu_delta": 3937,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x300a8",
+      "inclusive_cpu_delta": 3842,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x13b5c",
+      "inclusive_cpu_delta": 3790,
+      "stack_observations": 5
+    },
+    {
+      "function": "0x6dbf",
+      "inclusive_cpu_delta": 3692,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x36098",
+      "inclusive_cpu_delta": 3602,
+      "stack_observations": 4
+    },
+    {
+      "function": "<core::iter::adapters::take::Take<I> as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 3580,
+      "stack_observations": 4
+    },
+    {
+      "function": "<&mut I as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 3580,
+      "stack_observations": 4
+    },
+    {
+      "function": "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::find_map",
+      "inclusive_cpu_delta": 3580,
+      "stack_observations": 4
+    },
+    {
+      "function": "sqlite3VdbeIdxRowid",
+      "inclusive_cpu_delta": 3473,
+      "stack_observations": 4
+    },
+    {
+      "function": "sqlite3BtreePayloadSize",
+      "inclusive_cpu_delta": 3473,
+      "stack_observations": 4
+    },
+    {
+      "function": "sqlite3_mutex_enter",
+      "inclusive_cpu_delta": 3422,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x594b7c",
+      "inclusive_cpu_delta": 3332,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x3a0bc",
+      "inclusive_cpu_delta": 3224,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x3a740",
+      "inclusive_cpu_delta": 3129,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x2a970",
+      "inclusive_cpu_delta": 3113,
+      "stack_observations": 4
+    },
+    {
+      "function": "core::ptr::drop_in_place<std::ffi::os_str::OsString>",
+      "inclusive_cpu_delta": 3076,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<std::sys::os_str::bytes::Buf>",
+      "inclusive_cpu_delta": 3076,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::vec::Vec<std::ffi::os_str::OsString>>",
+      "inclusive_cpu_delta": 3076,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<[std::ffi::os_str::OsString]>",
+      "inclusive_cpu_delta": 3076,
+      "stack_observations": 3
+    },
+    {
+      "function": "faster_hex::encode::hex_encode",
+      "inclusive_cpu_delta": 3065,
+      "stack_observations": 4
+    },
+    {
+      "function": "sqlite3BtreeIndexMoveto",
+      "inclusive_cpu_delta": 3037,
+      "stack_observations": 3
+    },
+    {
+      "function": "<str as core::cmp::PartialEq>::eq",
+      "inclusive_cpu_delta": 2967,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::cmp::impls::<impl core::cmp::PartialEq<&B> for &A>::eq",
+      "inclusive_cpu_delta": 2967,
+      "stack_observations": 3
+    },
+    {
+      "function": "letopis::domain::graph::Edge::new",
+      "inclusive_cpu_delta": 2967,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x2b148",
+      "inclusive_cpu_delta": 2962,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<letopis::domain::value::TreeOid>",
+      "inclusive_cpu_delta": 2947,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::collections::btree::map::IntoIter<(letopis::domain::value::TreeOid,letopis::domain::source::SourceUri),core::option::Option<letopis::domain::sha256::Sha256>>>",
+      "inclusive_cpu_delta": 2947,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<(letopis::domain::value::TreeOid,letopis::domain::source::SourceUri)>",
+      "inclusive_cpu_delta": 2947,
+      "stack_observations": 3
+    },
+    {
+      "function": "<isize as core::convert::TryFrom<u64>>::try_from",
+      "inclusive_cpu_delta": 2943,
+      "stack_observations": 3
+    },
+    {
+      "function": "memmap2::MmapOptions::validate_len",
+      "inclusive_cpu_delta": 2943,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x3af48",
+      "inclusive_cpu_delta": 2922,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x2b198",
+      "inclusive_cpu_delta": 2912,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x2b718",
+      "inclusive_cpu_delta": 2903,
+      "stack_observations": 3
+    },
+    {
+      "function": "<core::fmt::Formatter>::pad_integral",
+      "inclusive_cpu_delta": 2838,
+      "stack_observations": 3
+    },
+    {
+      "function": "btreeNext",
+      "inclusive_cpu_delta": 2804,
+      "stack_observations": 6
+    },
+    {
+      "function": "moveToParent",
+      "inclusive_cpu_delta": 2804,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x3ad1c",
+      "inclusive_cpu_delta": 2798,
+      "stack_observations": 3
+    },
+    {
+      "function": "letopis::service::provenance::build_observation",
+      "inclusive_cpu_delta": 2729,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x317e3",
+      "inclusive_cpu_delta": 2712,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x32497",
+      "inclusive_cpu_delta": 2662,
+      "stack_observations": 3
+    },
+    {
+      "function": "moveToRoot",
+      "inclusive_cpu_delta": 2643,
+      "stack_observations": 3
+    },
+    {
+      "function": "binCollFunc",
+      "inclusive_cpu_delta": 2636,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x151c3",
+      "inclusive_cpu_delta": 2619,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x3c40",
+      "inclusive_cpu_delta": 2539,
+      "stack_observations": 4
+    },
+    {
+      "function": "pcache1FetchWithMutex",
+      "inclusive_cpu_delta": 2533,
+      "stack_observations": 5
+    },
+    {
+      "function": "pcache1Fetch",
+      "inclusive_cpu_delta": 2533,
+      "stack_observations": 5
+    },
+    {
+      "function": "btreeParseCellPtr",
+      "inclusive_cpu_delta": 2528,
+      "stack_observations": 3
+    },
+    {
+      "function": "unixOpen",
+      "inclusive_cpu_delta": 2399,
+      "stack_observations": 6
+    },
+    {
+      "function": "sqlite3OsOpen",
+      "inclusive_cpu_delta": 2399,
+      "stack_observations": 6
+    },
+    {
+      "function": "0x2abdc",
+      "inclusive_cpu_delta": 2355,
+      "stack_observations": 3
+    },
+    {
+      "function": "<gix_hash::object_id::ObjectId as core::convert::TryFrom<&[u8]>>::try_from",
+      "inclusive_cpu_delta": 2269,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b014",
+      "inclusive_cpu_delta": 2266,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<letopis::service::types::StoredNode>",
+      "inclusive_cpu_delta": 2236,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x2b3a8",
+      "inclusive_cpu_delta": 2173,
+      "stack_observations": 2
+    },
+    {
+      "function": "btreeParseCellPtrIndex",
+      "inclusive_cpu_delta": 2169,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x3a6e0",
+      "inclusive_cpu_delta": 2144,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x3ae20",
+      "inclusive_cpu_delta": 2127,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x36e0",
+      "inclusive_cpu_delta": 2068,
+      "stack_observations": 2
+    },
+    {
+      "function": "__rustc::__rdl_realloc",
+      "inclusive_cpu_delta": 2065,
+      "stack_observations": 2
+    },
+    {
+      "function": "<std::alloc::System as core::alloc::global::GlobalAlloc>::realloc",
+      "inclusive_cpu_delta": 2065,
+      "stack_observations": 2
+    },
+    {
+      "function": "__rustc::__rust_alloc",
+      "inclusive_cpu_delta": 2061,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x594e1c",
+      "inclusive_cpu_delta": 2059,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x3a0e8",
+      "inclusive_cpu_delta": 2037,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b5f0",
+      "inclusive_cpu_delta": 2029,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b27c",
+      "inclusive_cpu_delta": 2027,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x357e8",
+      "inclusive_cpu_delta": 2015,
+      "stack_observations": 2
+    },
+    {
+      "function": "<core::result::Result<T,E> as gix_error::exn::ext::ResultExt>::or_raise_typed",
+      "inclusive_cpu_delta": 2011,
+      "stack_observations": 3
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::vec::Vec<alloc::vec::Vec<usize>>>",
+      "inclusive_cpu_delta": 2010,
+      "stack_observations": 2
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::vec::Vec<usize>>",
+      "inclusive_cpu_delta": 2010,
+      "stack_observations": 2
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::raw_vec::RawVec<usize>>",
+      "inclusive_cpu_delta": 2010,
+      "stack_observations": 2
+    },
+    {
+      "function": "core::ptr::drop_in_place<letopis::domain::validation::IncludesGraph>",
+      "inclusive_cpu_delta": 2010,
+      "stack_observations": 2
+    },
+    {
+      "function": "core::ptr::drop_in_place<[alloc::vec::Vec<usize>]>",
+      "inclusive_cpu_delta": 2010,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2a1e4",
+      "inclusive_cpu_delta": 1997,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b708",
+      "inclusive_cpu_delta": 1994,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2a1ac",
+      "inclusive_cpu_delta": 1991,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b34",
+      "inclusive_cpu_delta": 1986,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2ae7c",
+      "inclusive_cpu_delta": 1985,
+      "stack_observations": 2
+    },
+    {
+      "function": "__rustc::__rdl_dealloc",
+      "inclusive_cpu_delta": 1984,
+      "stack_observations": 2
+    },
+    {
+      "function": "<std::alloc::System as core::alloc::global::GlobalAlloc>::dealloc",
+      "inclusive_cpu_delta": 1984,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x4289c",
+      "inclusive_cpu_delta": 1984,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x33780",
+      "inclusive_cpu_delta": 1983,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x13424",
+      "inclusive_cpu_delta": 1975,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x13c3c",
+      "inclusive_cpu_delta": 1973,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2a99c",
+      "inclusive_cpu_delta": 1971,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2ad74",
+      "inclusive_cpu_delta": 1956,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b220",
+      "inclusive_cpu_delta": 1954,
+      "stack_observations": 2
+    },
+    {
+      "function": "0xed24",
+      "inclusive_cpu_delta": 1952,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x3aeb",
+      "inclusive_cpu_delta": 1932,
+      "stack_observations": 4
+    },
+    {
+      "function": "<core::fmt::Formatter>::pad",
+      "inclusive_cpu_delta": 1928,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x3a734",
+      "inclusive_cpu_delta": 1926,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2adc",
+      "inclusive_cpu_delta": 1923,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b3a4",
+      "inclusive_cpu_delta": 1916,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x792bc",
+      "inclusive_cpu_delta": 1900,
+      "stack_observations": 2
+    },
+    {
+      "function": "0xce8",
+      "inclusive_cpu_delta": 1886,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x16b8",
+      "inclusive_cpu_delta": 1837,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b3c4",
+      "inclusive_cpu_delta": 1830,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x3c5c",
+      "inclusive_cpu_delta": 1821,
+      "stack_observations": 2
+    },
+    {
+      "function": "mach_vm_map",
+      "inclusive_cpu_delta": 1820,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x156cb",
+      "inclusive_cpu_delta": 1820,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2ae1f",
+      "inclusive_cpu_delta": 1820,
+      "stack_observations": 2
+    },
+    {
+      "function": "_kernelrpc_mach_vm_map_trap",
+      "inclusive_cpu_delta": 1820,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x1d5a3",
+      "inclusive_cpu_delta": 1820,
+      "stack_observations": 2
+    },
+    {
+      "function": "__commpage_gettimeofday_internal",
+      "inclusive_cpu_delta": 1792,
+      "stack_observations": 2
+    },
+    {
+      "function": "letopis::filesystem::path::FileParent::directory_get_by_components",
+      "inclusive_cpu_delta": 1754,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::filesystem::lock::lock_get_owner_by_path",
+      "inclusive_cpu_delta": 1754,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a990",
+      "inclusive_cpu_delta": 1751,
+      "stack_observations": 2
+    },
+    {
+      "function": "alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Owned,K,V,alloc::collections::btree::node::marker::LeafOrInternal>::new",
+      "inclusive_cpu_delta": 1714,
+      "stack_observations": 1
+    },
+    {
+      "function": "<alloc::collections::btree::map::BTreeMap<K,V> as core::iter::traits::collect::FromIterator<(K,V)>>::from_iter",
+      "inclusive_cpu_delta": 1714,
+      "stack_observations": 1
+    },
+    {
+      "function": "nolockClose",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3VdbeSorterClose",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3OsClose",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3VdbeFreeCursorNN",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "closeUnixFile",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3VdbeSorterReset",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "vdbeSortSubtaskCleanup",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3VdbeHalt",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "closeCursorsInFrame",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "closeAllCursors",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "robust_close",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3OsCloseFree",
+      "inclusive_cpu_delta": 1689,
+      "stack_observations": 7
+    },
+    {
+      "function": "sqlite3PcacheRelease",
+      "inclusive_cpu_delta": 1633,
+      "stack_observations": 2
+    },
+    {
+      "function": "lockBtree",
+      "inclusive_cpu_delta": 1616,
+      "stack_observations": 2
+    },
+    {
+      "function": "btreeBeginTrans",
+      "inclusive_cpu_delta": 1616,
+      "stack_observations": 2
+    },
+    {
+      "function": "sqlite3OsOpenMalloc",
+      "inclusive_cpu_delta": 1605,
+      "stack_observations": 5
+    },
+    {
+      "function": "letopis::with_verified_database_paths",
+      "inclusive_cpu_delta": 1575,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x15a6c",
+      "inclusive_cpu_delta": 1520,
+      "stack_observations": 2
+    },
+    {
+      "function": "rusqlite::statement::Statement::query_row",
+      "inclusive_cpu_delta": 1467,
+      "stack_observations": 2
+    },
+    {
+      "function": "rusqlite::row::Rows::get_expected_row",
+      "inclusive_cpu_delta": 1467,
+      "stack_observations": 2
+    },
+    {
+      "function": "letopis::storage::schema::validate_cache",
+      "inclusive_cpu_delta": 1467,
+      "stack_observations": 2
+    },
+    {
+      "function": "rusqlite::Connection::query_row",
+      "inclusive_cpu_delta": 1467,
+      "stack_observations": 2
+    },
+    {
+      "function": "letopis::storage::schema::has_schema_in",
+      "inclusive_cpu_delta": 1467,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x33538",
+      "inclusive_cpu_delta": 1467,
+      "stack_observations": 1
+    },
+    {
+      "function": "pthread_mutex_lock",
+      "inclusive_cpu_delta": 1414,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x1425c",
+      "inclusive_cpu_delta": 1360,
+      "stack_observations": 2
+    },
+    {
+      "function": "vdbeSorterOpenTempFile",
+      "inclusive_cpu_delta": 1356,
+      "stack_observations": 4
+    },
+    {
+      "function": "posixOpen",
+      "inclusive_cpu_delta": 1330,
+      "stack_observations": 4
+    },
+    {
+      "function": "robust_open",
+      "inclusive_cpu_delta": 1330,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x14970",
+      "inclusive_cpu_delta": 1329,
+      "stack_observations": 2
+    },
+    {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::StorageRead>::files_get",
+      "inclusive_cpu_delta": 1289,
+      "stack_observations": 9
+    },
+    {
+      "function": "0x2b72c",
+      "inclusive_cpu_delta": 1227,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_zlib::decompress::<impl core::default::Default for gix_zlib::Decompress>::default",
+      "inclusive_cpu_delta": 1226,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_zlib::decompress::<impl gix_zlib::Decompress>::new",
+      "inclusive_cpu_delta": 1226,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3aef8",
+      "inclusive_cpu_delta": 1218,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x1631c",
+      "inclusive_cpu_delta": 1209,
+      "stack_observations": 1
+    },
+    {
+      "function": "alloc::collections::btree::map::entry::Entry<K,V,A>::or_default",
+      "inclusive_cpu_delta": 1198,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aaa0",
+      "inclusive_cpu_delta": 1198,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594ee0",
+      "inclusive_cpu_delta": 1150,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3003c",
+      "inclusive_cpu_delta": 1132,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x1427c",
+      "inclusive_cpu_delta": 1118,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x335fc",
+      "inclusive_cpu_delta": 1115,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3ad50",
+      "inclusive_cpu_delta": 1110,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b268",
+      "inclusive_cpu_delta": 1103,
+      "stack_observations": 3
+    },
+    {
+      "function": "0x30728",
+      "inclusive_cpu_delta": 1103,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x33570",
+      "inclusive_cpu_delta": 1087,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3570c",
+      "inclusive_cpu_delta": 1086,
+      "stack_observations": 1
+    },
+    {
+      "function": "core::ptr::drop_in_place<alloc::collections::btree::map::IntoIter<letopis::service::types::ProvenanceIssue,alloc::collections::btree::set_val::SetValZST>>",
+      "inclusive_cpu_delta": 1086,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x42cb0",
+      "inclusive_cpu_delta": 1071,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x2b3bc",
+      "inclusive_cpu_delta": 1065,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x349ac",
+      "inclusive_cpu_delta": 1061,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a3a4",
+      "inclusive_cpu_delta": 1053,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b64c",
+      "inclusive_cpu_delta": 1033,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2af28",
+      "inclusive_cpu_delta": 1032,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b394",
+      "inclusive_cpu_delta": 1032,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x595114",
+      "inclusive_cpu_delta": 1029,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x30154",
+      "inclusive_cpu_delta": 1021,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b348",
+      "inclusive_cpu_delta": 1019,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aa10",
+      "inclusive_cpu_delta": 1019,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x33738",
+      "inclusive_cpu_delta": 1017,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x300e0",
+      "inclusive_cpu_delta": 1017,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3aee8",
+      "inclusive_cpu_delta": 1016,
+      "stack_observations": 1
+    },
+    {
+      "function": "<&T as core::fmt::Display>::fmt",
+      "inclusive_cpu_delta": 1016,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3a840",
+      "inclusive_cpu_delta": 1015,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a9c",
+      "inclusive_cpu_delta": 1014,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594b38",
+      "inclusive_cpu_delta": 1008,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b34c",
+      "inclusive_cpu_delta": 1007,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aa34",
+      "inclusive_cpu_delta": 1007,
+      "stack_observations": 1
+    },
+    {
+      "function": "gix_object::kind::<impl gix_object::Kind>::from_bytes",
+      "inclusive_cpu_delta": 1007,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b6d8",
+      "inclusive_cpu_delta": 1007,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x14140",
+      "inclusive_cpu_delta": 1003,
+      "stack_observations": 1
+    },
+    {
+      "function": "<alloc::string::String as core::convert::From<&str>>::from",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "<T as core::convert::Into<U>>::into",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "alloc::slice::<impl [T]>::to_vec",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "alloc::slice::<impl alloc::borrow::ToOwned for [T]>::to_owned",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::domain::value::BlobOid::parse",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "<str as alloc::borrow::ToOwned>::to_owned",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x35748",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a968",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594cd0",
+      "inclusive_cpu_delta": 1002,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3033c",
+      "inclusive_cpu_delta": 1001,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x35690",
+      "inclusive_cpu_delta": 1001,
+      "stack_observations": 1
+    },
+    {
+      "function": "<core::slice::iter::Iter<u8> as core::iter::traits::iterator::Iterator>::position::<<std::path::Components>::parse_next_component::{closure#0}>",
+      "inclusive_cpu_delta": 1001,
+      "stack_observations": 1
+    },
+    {
+      "function": "<std::path::Components as core::iter::traits::iterator::Iterator>::next",
+      "inclusive_cpu_delta": 1001,
+      "stack_observations": 1
+    },
+    {
+      "function": "<std::path::Components>::parse_next_component",
+      "inclusive_cpu_delta": 1001,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13a20",
+      "inclusive_cpu_delta": 1001,
+      "stack_observations": 1
+    },
+    {
+      "function": "core::cmp::PartialEq::ne",
+      "inclusive_cpu_delta": 1000,
+      "stack_observations": 1
+    },
+    {
+      "function": "<alloc::string::String as core::cmp::PartialEq>::eq",
+      "inclusive_cpu_delta": 1000,
+      "stack_observations": 1
+    },
+    {
+      "function": "alloc::vec::partial_eq::<impl core::cmp::PartialEq<alloc::vec::Vec<U,A2>> for alloc::vec::Vec<T,A1>>::eq",
+      "inclusive_cpu_delta": 1000,
+      "stack_observations": 1
+    },
+    {
+      "function": "<letopis::domain::value::TreeOid as core::cmp::PartialEq>::eq",
+      "inclusive_cpu_delta": 1000,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b368",
+      "inclusive_cpu_delta": 1000,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3ac8",
+      "inclusive_cpu_delta": 1000,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3afac",
+      "inclusive_cpu_delta": 999,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2888",
+      "inclusive_cpu_delta": 998,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x3a6f4",
+      "inclusive_cpu_delta": 998,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x35600",
+      "inclusive_cpu_delta": 997,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x334d8",
+      "inclusive_cpu_delta": 997,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2ff94",
+      "inclusive_cpu_delta": 996,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2accc",
+      "inclusive_cpu_delta": 995,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b710",
+      "inclusive_cpu_delta": 994,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x35768",
+      "inclusive_cpu_delta": 994,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3ad3c",
+      "inclusive_cpu_delta": 993,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13590",
+      "inclusive_cpu_delta": 993,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a950",
+      "inclusive_cpu_delta": 993,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x144a8",
+      "inclusive_cpu_delta": 993,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aeb4",
+      "inclusive_cpu_delta": 993,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3PcacheFetchFinish",
+      "inclusive_cpu_delta": 992,
+      "stack_observations": 1
+    },
+    {
+      "function": "pcacheFetchFinishWithInit",
+      "inclusive_cpu_delta": 992,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594cc4",
+      "inclusive_cpu_delta": 992,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x133fc",
+      "inclusive_cpu_delta": 992,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x30274",
+      "inclusive_cpu_delta": 992,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3ae48",
+      "inclusive_cpu_delta": 991,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2ad94",
+      "inclusive_cpu_delta": 991,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x1437c",
+      "inclusive_cpu_delta": 991,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3ad74",
+      "inclusive_cpu_delta": 990,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b1f8",
+      "inclusive_cpu_delta": 990,
+      "stack_observations": 1
+    },
+    {
+      "function": "pthread_mutex_unlock",
+      "inclusive_cpu_delta": 990,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x304e0",
+      "inclusive_cpu_delta": 990,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aa04",
+      "inclusive_cpu_delta": 990,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b130",
+      "inclusive_cpu_delta": 989,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b4d8",
+      "inclusive_cpu_delta": 989,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13af0",
+      "inclusive_cpu_delta": 988,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x135fc",
+      "inclusive_cpu_delta": 988,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594b80",
+      "inclusive_cpu_delta": 986,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3a800",
+      "inclusive_cpu_delta": 986,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3a804",
+      "inclusive_cpu_delta": 984,
+      "stack_observations": 1
+    },
+    {
+      "function": "<core::fmt::Formatter>::pad_integral::write_prefix",
+      "inclusive_cpu_delta": 983,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2afc",
+      "inclusive_cpu_delta": 983,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x33cb0",
+      "inclusive_cpu_delta": 983,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2ad1c",
+      "inclusive_cpu_delta": 981,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3550c",
+      "inclusive_cpu_delta": 980,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x35578",
+      "inclusive_cpu_delta": 980,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b20",
+      "inclusive_cpu_delta": 979,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2af8",
+      "inclusive_cpu_delta": 978,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x12f7c",
+      "inclusive_cpu_delta": 978,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b724",
+      "inclusive_cpu_delta": 977,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3ae4c",
+      "inclusive_cpu_delta": 976,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2ad78",
+      "inclusive_cpu_delta": 975,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x30720",
+      "inclusive_cpu_delta": 975,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x356f0",
+      "inclusive_cpu_delta": 974,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x33554",
+      "inclusive_cpu_delta": 974,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594f18",
+      "inclusive_cpu_delta": 974,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a1f0",
+      "inclusive_cpu_delta": 973,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x12f30",
+      "inclusive_cpu_delta": 972,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13a48",
+      "inclusive_cpu_delta": 969,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x15330",
+      "inclusive_cpu_delta": 969,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13ea3",
+      "inclusive_cpu_delta": 969,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3a118",
+      "inclusive_cpu_delta": 968,
+      "stack_observations": 1
+    },
+    {
+      "function": "<T as alloc::vec::spec_from_elem::SpecFromElem>::from_elem",
+      "inclusive_cpu_delta": 968,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x357e0",
+      "inclusive_cpu_delta": 966,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3347c",
+      "inclusive_cpu_delta": 966,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x38dc",
+      "inclusive_cpu_delta": 966,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b3cc",
+      "inclusive_cpu_delta": 966,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a9a4",
+      "inclusive_cpu_delta": 965,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b3e4",
+      "inclusive_cpu_delta": 963,
+      "stack_observations": 1
+    },
+    {
+      "function": "zlib_rs::stable::Inflate::decompress",
+      "inclusive_cpu_delta": 957,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a2c0",
+      "inclusive_cpu_delta": 954,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aca8",
+      "inclusive_cpu_delta": 953,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x595144",
+      "inclusive_cpu_delta": 953,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x32988",
+      "inclusive_cpu_delta": 952,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x32023",
+      "inclusive_cpu_delta": 952,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x30338",
+      "inclusive_cpu_delta": 951,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13430",
+      "inclusive_cpu_delta": 948,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x12dfc",
+      "inclusive_cpu_delta": 945,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x1340c",
+      "inclusive_cpu_delta": 944,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x35630",
+      "inclusive_cpu_delta": 941,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3c3c",
+      "inclusive_cpu_delta": 938,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x33b40",
+      "inclusive_cpu_delta": 938,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13b04",
+      "inclusive_cpu_delta": 933,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x30074",
+      "inclusive_cpu_delta": 928,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x1434c",
+      "inclusive_cpu_delta": 926,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x6d88",
+      "inclusive_cpu_delta": 926,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13ae0",
+      "inclusive_cpu_delta": 923,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x135c4",
+      "inclusive_cpu_delta": 911,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x38e8",
+      "inclusive_cpu_delta": 911,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b730",
+      "inclusive_cpu_delta": 906,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x31633",
+      "inclusive_cpu_delta": 902,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13748",
+      "inclusive_cpu_delta": 902,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2aa94",
+      "inclusive_cpu_delta": 897,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x36184",
+      "inclusive_cpu_delta": 894,
+      "stack_observations": 1
+    },
+    {
+      "function": "pcache1Unpin",
+      "inclusive_cpu_delta": 889,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2afc0",
+      "inclusive_cpu_delta": 886,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_bytes_by_path",
+      "inclusive_cpu_delta": 884,
+      "stack_observations": 1
+    },
+    {
+      "function": "rustix::fs::at::openat",
+      "inclusive_cpu_delta": 884,
+      "stack_observations": 1
+    },
+    {
+      "function": "rustix::fs::at::openat::{{closure}}",
+      "inclusive_cpu_delta": 884,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_content_by_path",
+      "inclusive_cpu_delta": 884,
+      "stack_observations": 1
+    },
+    {
+      "function": "<&std::ffi::os_str::OsString as rustix::path::arg::Arg>::into_with_c_str",
+      "inclusive_cpu_delta": 884,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b138",
+      "inclusive_cpu_delta": 872,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594b34",
+      "inclusive_cpu_delta": 864,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x7144",
+      "inclusive_cpu_delta": 857,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594edc",
+      "inclusive_cpu_delta": 856,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x33fa0",
+      "inclusive_cpu_delta": 854,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x594e94",
+      "inclusive_cpu_delta": 847,
+      "stack_observations": 1
+    },
+    {
+      "function": "cerror_nocancel",
+      "inclusive_cpu_delta": 845,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x14340",
+      "inclusive_cpu_delta": 844,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3026c",
+      "inclusive_cpu_delta": 839,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2ac58",
+      "inclusive_cpu_delta": 837,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3364c",
+      "inclusive_cpu_delta": 832,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3BtreeBeginTrans",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3OsShmMap",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3PagerSharedLock",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "rusqlite::Connection::execute",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "walTryBeginRead",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "rusqlite::statement::Statement::execute_with_bound_parameters",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "pagerBeginReadTransaction",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3WalBeginReadTransaction",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "unixShmMap",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "rusqlite::raw_statement::RawStatement::step",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "walIndexPageRealloc",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "walIndexReadHdr",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3Init",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "walBeginReadTransaction",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "attachFunc",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::attach_observed_vectors::{{closure}}",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::attach_observed_vectors",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::storage::connection::attach_read_only_vectors",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "walIndexPage",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3InitOne",
+      "inclusive_cpu_delta": 822,
+      "stack_observations": 1
+    },
+    {
+      "function": "__unlink",
+      "inclusive_cpu_delta": 820,
+      "stack_observations": 1
+    },
+    {
+      "function": "unlink",
+      "inclusive_cpu_delta": 820,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3a6b4",
+      "inclusive_cpu_delta": 816,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2af3c",
+      "inclusive_cpu_delta": 813,
+      "stack_observations": 1
+    },
+    {
+      "function": "__rustc::__rust_dealloc",
+      "inclusive_cpu_delta": 810,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x334f0",
+      "inclusive_cpu_delta": 803,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3PagerOpenWal",
+      "inclusive_cpu_delta": 794,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3WalOpen",
+      "inclusive_cpu_delta": 794,
+      "stack_observations": 1
+    },
+    {
+      "function": "pagerOpenWal",
+      "inclusive_cpu_delta": 794,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x13c40",
+      "inclusive_cpu_delta": 791,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a164",
+      "inclusive_cpu_delta": 787,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x148fc",
+      "inclusive_cpu_delta": 787,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x31698",
+      "inclusive_cpu_delta": 767,
+      "stack_observations": 1
+    },
+    {
+      "function": "<letopis::filesystem::local::LocalFileSystem as letopis::service::FileReader>::file_get_identity_by_path",
+      "inclusive_cpu_delta": 753,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_observation_by_path",
+      "inclusive_cpu_delta": 753,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::get_observed_database",
+      "inclusive_cpu_delta": 753,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::filesystem::file::file_get_identity_by_path",
+      "inclusive_cpu_delta": 753,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::wait_for_stable_storage_paths",
+      "inclusive_cpu_delta": 753,
+      "stack_observations": 1
+    },
+    {
+      "function": "letopis::with_verified_database_paths::{{closure}}",
+      "inclusive_cpu_delta": 753,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x15108",
+      "inclusive_cpu_delta": 747,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a1c8",
+      "inclusive_cpu_delta": 727,
+      "stack_observations": 1
+    },
+    {
+      "function": "mach_msg2_internal",
+      "inclusive_cpu_delta": 726,
+      "stack_observations": 4
+    },
+    {
+      "function": "mach_vm_reclaim_ring_resize",
+      "inclusive_cpu_delta": 726,
+      "stack_observations": 4
+    },
+    {
+      "function": "mach_vm_deferred_reclamation_buffer_resize",
+      "inclusive_cpu_delta": 726,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x129db",
+      "inclusive_cpu_delta": 726,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x33097",
+      "inclusive_cpu_delta": 726,
+      "stack_observations": 4
+    },
+    {
+      "function": "mach_msg2_trap",
+      "inclusive_cpu_delta": 726,
+      "stack_observations": 4
+    },
+    {
+      "function": "0x15a60",
+      "inclusive_cpu_delta": 710,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a238",
+      "inclusive_cpu_delta": 687,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3Parser",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "yy_reduce",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3_str_vappendf",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "rusqlite::Connection::execute_batch",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3Prepare",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "rusqlite::inner_connection::InnerConnection::prepare",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3CreateIndex",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3NestedParse",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3VMPrintf",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3LockAndPrepare",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "sqlite3RunParser",
+      "inclusive_cpu_delta": 673,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2ffb0",
+      "inclusive_cpu_delta": 612,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2b1ec",
+      "inclusive_cpu_delta": 610,
+      "stack_observations": 1
+    },
+    {
+      "function": "<std::time::SystemTime>::duration_since",
+      "inclusive_cpu_delta": 596,
+      "stack_observations": 1
+    },
+    {
+      "function": "<std::sys::pal::unix::time::Timespec>::sub_timespec",
+      "inclusive_cpu_delta": 596,
+      "stack_observations": 1
+    },
+    {
+      "function": "<std::sys::time::unix::SystemTime>::sub_time",
+      "inclusive_cpu_delta": 596,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x30110",
+      "inclusive_cpu_delta": 587,
+      "stack_observations": 1
+    },
+    {
+      "function": "vdbePmaWriterFinish",
+      "inclusive_cpu_delta": 457,
+      "stack_observations": 2
+    },
+    {
+      "function": "sqlite3OsWrite",
+      "inclusive_cpu_delta": 457,
+      "stack_observations": 2
+    },
+    {
+      "function": "0x31664",
+      "inclusive_cpu_delta": 438,
+      "stack_observations": 1
+    },
+    {
+      "function": "walFindFrame",
+      "inclusive_cpu_delta": 416,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2abc0",
+      "inclusive_cpu_delta": 354,
+      "stack_observations": 1
+    },
+    {
+      "function": "access",
+      "inclusive_cpu_delta": 249,
+      "stack_observations": 1
+    },
+    {
+      "function": "unixGetTempname",
+      "inclusive_cpu_delta": 249,
+      "stack_observations": 1
+    },
+    {
+      "function": "0xed9c",
+      "inclusive_cpu_delta": 138,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x2a57c",
+      "inclusive_cpu_delta": 56,
+      "stack_observations": 1
+    },
+    {
+      "function": "0x3710",
+      "inclusive_cpu_delta": 55,
+      "stack_observations": 2
+    }
+  ]
+}

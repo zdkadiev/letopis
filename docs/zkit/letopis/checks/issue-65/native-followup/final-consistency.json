@@ -1,0 +1,23 @@
+{
+  "captured_utc": "2026-11-06T12:41:02Z",
+  "source_inputs_verified": 106,
+  "pinned_binary_verified": true,
+  "corpus_input_hashes_verified": 4334,
+  "local_markdown_links_checked": 58,
+  "missing_links": [],
+  "historical_artifacts_verified": {
+    "current": 122,
+    "2026-11-06-100k": 26,
+    "check-status-profiling": 17
+  },
+  "rust_verification": "make verify V=1 passed; source bytes unchanged since that run",
+  "full_ollama_oracles": {
+    "full_mixed_queries": 3,
+    "mixed_query_oracle": "one FTS match plus four vector-only known knowledge URIs",
+    "native_full_query_profile_valid": true,
+    "new_release_check_status_valid": true,
+    "outcome": "complete",
+    "vectors": 100000
+  },
+  "integration": "root main preserved uncommitted; measurement commits only in isolated clone"
+}

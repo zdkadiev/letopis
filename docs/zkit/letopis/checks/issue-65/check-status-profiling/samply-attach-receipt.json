@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "/Users/zdkadiev/.cargo/bin/samply",
+    "record",
+    "--save-only",
+    "--rate",
+    "1000",
+    "--duration",
+    "2",
+    "--pid",
+    "70082",
+    "--output",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-check-status/samply-direct/attach-profile.json.gz"
+  ],
+  "target_owned": true,
+  "target_pid": 70082,
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "Encountered an error during profiling: Unknown(1100)\n"
+}

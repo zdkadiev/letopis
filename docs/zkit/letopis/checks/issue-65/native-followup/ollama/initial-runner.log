@@ -1,0 +1,7 @@
+Starting real 100k drain
+Drain nonzero 3268.657621708
+{'vectors': 51024, 'failures': 0}
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/ollama-100k.py", line 26, in <module>
+    assert r['outcome']=='success' and counts=={'vectors':100000,'failures':0}
+AssertionError

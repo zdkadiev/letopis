@@ -482,3 +482,12 @@ External-source access and retained historical snapshot membership are separate.
 Config/status/init/drain do not refresh discovery; all refreshing commands and
 index modes share it, with existing index scope semantics. Discovery changes do
 not reset retained embedding state. See [acceptance](checks/issue-97/report.md).
+## Tree validation reuse — issue #65 (2026-11-06)
+
+The invocation-owned raw Git reader may retain up to 4096 successful tree-body
+validation identities, without retaining their payloads. Each addressed read still
+reads/decodes and independently verifies the current exact object type and hash
+before consulting that metadata. Failed validation is never memoized; overflow
+continues normal validation. Full closure audits validate each visited tree body
+directly on every audit, independent of addressed-read reuse. Current source
+captures and provenance batch/error boundaries are unchanged.

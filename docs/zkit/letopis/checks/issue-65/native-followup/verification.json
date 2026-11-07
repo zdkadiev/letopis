@@ -1,0 +1,10 @@
+{
+  "command": "make verify V=1",
+  "exit_code": 0,
+  "log_sha256": "38bced0d0960edcdaf3c1a601384e7d1ba7786eac80248640b40c6bb44df498b",
+  "test_result_groups": 171,
+  "aggregate_test_executions": 2405,
+  "aggregate_ignored_executions": 22,
+  "scope": "includes repeated tests across debug/release and the fixed-value-lint example; not a unique-test count",
+  "product_inputs_match": true
+}

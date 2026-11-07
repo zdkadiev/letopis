@@ -1,0 +1,3 @@
+during-drain 0 89.67997650010511 {'vectors': 20523, 'failures': 1} ['knowledge/part-0218.md#node-006565', 'knowledge/part-0188.md#node-005665', 'knowledge/part-0219.md#node-006595', 'knowledge/part-0189.md#node-005685', 'knowledge/part-0485.md#node-014565']
+during-drain 1 30.765717499889433 {'vectors': 22014, 'failures': 0} ['knowledge/part-0218.md#node-006565', 'knowledge/part-0188.md#node-005665', 'knowledge/part-0219.md#node-006595', 'knowledge/part-0189.md#node-005685', 'knowledge/part-0485.md#node-014565']
+during-drain 2 31.67895833402872 {'vectors': 22531, 'failures': 1} ['knowledge/part-0218.md#node-006565', 'knowledge/part-0188.md#node-005665', 'knowledge/part-0219.md#node-006595', 'knowledge/part-0189.md#node-005685', 'knowledge/part-0485.md#node-014565']

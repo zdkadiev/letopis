@@ -1,0 +1,1 @@
+{"full_mixed_queries": 3, "mixed_query_oracle": "one FTS match plus four vector-only known knowledge URIs", "native_full_query_profile_valid": true, "new_release_check_status_valid": true, "outcome": "complete", "vectors": 100000}

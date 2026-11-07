@@ -1,0 +1,182 @@
+{
+  "inclusive_costs_overlap": true,
+  "timing_comparison": "not an ordinary before/after speedup; profiles were recorded under different shared-host activity",
+  "profiles": {
+    "before": {
+      "check": {
+        "profile": {
+          "samples": 41436,
+          "usable_stacks": 41436,
+          "threads": 2,
+          "sha256": "4e38a13e90441d49f4a3bcc91926c28c05401f40c25925fd2e984670c0c10969",
+          "bytes": 398772,
+          "libraries": [
+            "dyld",
+            "letopis",
+            "libsystem_kernel.dylib",
+            "libsystem_pthread.dylib",
+            "libsystem_c.dylib",
+            "libsystem_platform.dylib",
+            "libsystem_malloc.dylib",
+            "libsamply_mac_preload.dylib"
+          ]
+        },
+        "observed_cpu_delta": 39294275,
+        "cpu_delta_unit": "\u00b5s",
+        "scopes": {
+          "get_snapshot_hash": {
+            "inclusive_cpu_delta": 29607390,
+            "observed_cpu_percent": 75.3478464738184,
+            "observations": 30755
+          },
+          "get_current_hash": {
+            "inclusive_cpu_delta": 7927198,
+            "observed_cpu_percent": 20.17392609992168,
+            "observations": 8219
+          },
+          "tree_bytes_validate": {
+            "inclusive_cpu_delta": 9335346,
+            "observed_cpu_percent": 23.75752192908509,
+            "observations": 9974
+          },
+          "ObjectReader::object_verify_by_oid": {
+            "inclusive_cpu_delta": 19471154,
+            "observed_cpu_percent": 49.552139592854175,
+            "observations": 20191
+          }
+        }
+      },
+      "status": {
+        "profile": {
+          "samples": 38915,
+          "usable_stacks": 38915,
+          "threads": 1,
+          "sha256": "5304f9e77f2b3cea5c86226f54f5faf7cba25972531533a7ce2c0759f9f953ac",
+          "bytes": 368761,
+          "libraries": [
+            "dyld",
+            "letopis",
+            "libsystem_c.dylib",
+            "libsystem_kernel.dylib",
+            "libsystem_malloc.dylib",
+            "libsystem_platform.dylib",
+            "libsystem_pthread.dylib",
+            "libsamply_mac_preload.dylib"
+          ]
+        },
+        "observed_cpu_delta": 37624627,
+        "cpu_delta_unit": "\u00b5s",
+        "scopes": {
+          "get_snapshot_hash": {
+            "inclusive_cpu_delta": 28760406,
+            "observed_cpu_percent": 76.44037507667518,
+            "observations": 29754
+          },
+          "get_current_hash": {
+            "inclusive_cpu_delta": 7643460,
+            "observed_cpu_percent": 20.31504524948513,
+            "observations": 7911
+          },
+          "tree_bytes_validate": {
+            "inclusive_cpu_delta": 9442520,
+            "observed_cpu_percent": 25.09664746975432,
+            "observations": 9872
+          },
+          "ObjectReader::object_verify_by_oid": {
+            "inclusive_cpu_delta": 18434624,
+            "observed_cpu_percent": 48.99616413473016,
+            "observations": 18943
+          }
+        }
+      }
+    },
+    "after": {
+      "check": {
+        "profile": {
+          "samples": 36423,
+          "usable_stacks": 36423,
+          "threads": 2,
+          "sha256": "2ddac034a047776ea09f25b9d4b019809e194737b3ad79deab0f50695a7b8f9f",
+          "bytes": 366663,
+          "libraries": [
+            "dyld",
+            "letopis",
+            "libsystem_c.dylib",
+            "libsystem_kernel.dylib",
+            "libsystem_pthread.dylib",
+            "libsystem_malloc.dylib",
+            "libsystem_platform.dylib",
+            "libsamply_mac_preload.dylib"
+          ]
+        },
+        "observed_cpu_delta": 34102361,
+        "cpu_delta_unit": "\u00b5s",
+        "scopes": {
+          "get_snapshot_hash": {
+            "inclusive_cpu_delta": 22546243,
+            "observed_cpu_percent": 66.11343713122972,
+            "observations": 23655
+          },
+          "get_current_hash": {
+            "inclusive_cpu_delta": 9555603,
+            "observed_cpu_percent": 28.020356127248785,
+            "observations": 10055
+          },
+          "tree_bytes_validate": {
+            "inclusive_cpu_delta": 0,
+            "observed_cpu_percent": 0,
+            "observations": 0
+          },
+          "ObjectReader::object_verify_by_oid": {
+            "inclusive_cpu_delta": 21689845,
+            "observed_cpu_percent": 63.60217991944898,
+            "observations": 22979
+          }
+        }
+      },
+      "status": {
+        "profile": {
+          "samples": 37262,
+          "usable_stacks": 37262,
+          "threads": 1,
+          "sha256": "5db3795b30b11916861b01c24a9bd5c25a56e05e5f73e14f28554b7dfe9933eb",
+          "bytes": 368429,
+          "libraries": [
+            "dyld",
+            "letopis",
+            "libsystem_kernel.dylib",
+            "libsystem_malloc.dylib",
+            "libsystem_platform.dylib",
+            "libsystem_pthread.dylib",
+            "libsamply_mac_preload.dylib",
+            "libsystem_c.dylib"
+          ]
+        },
+        "observed_cpu_delta": 35257081,
+        "cpu_delta_unit": "\u00b5s",
+        "scopes": {
+          "get_snapshot_hash": {
+            "inclusive_cpu_delta": 23507837,
+            "observed_cpu_percent": 66.67550555305472,
+            "observations": 24635
+          },
+          "get_current_hash": {
+            "inclusive_cpu_delta": 10338499,
+            "observed_cpu_percent": 29.323184752589132,
+            "observations": 10819
+          },
+          "tree_bytes_validate": {
+            "inclusive_cpu_delta": 0,
+            "observed_cpu_percent": 0,
+            "observations": 0
+          },
+          "ObjectReader::object_verify_by_oid": {
+            "inclusive_cpu_delta": 22568207,
+            "observed_cpu_percent": 64.01042389187012,
+            "observations": 23624
+          }
+        }
+      }
+    }
+  }
+}

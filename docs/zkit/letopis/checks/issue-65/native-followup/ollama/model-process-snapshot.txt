@@ -1,0 +1,2 @@
+16177 16115  38176   0:43.32 /Applications/Ollama.app/Contents/Resources/ollama
+83639 83528   5536   0:00.09 ollama

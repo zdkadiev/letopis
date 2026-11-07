@@ -1,0 +1,36 @@
+{
+  "samply_version": "0.13.1",
+  "outcome": "blocked_no_profile_recorded",
+  "observed_error": "Encountered an error during profiling: Unknown(1100)",
+  "sdk_header": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/servers/bootstrap_defs.h:37",
+  "sdk_constant": {
+    "BOOTSTRAP_NOT_PRIVILEGED": 1100
+  },
+  "bootstrap_strerror": "Permission denied",
+  "source_chain": [
+    {
+      "url": "https://github.com/mstange/samply/blob/samply-v0.13.1/samply/src/mac/profiler.rs",
+      "blob_sha": "a007ddb0db00d16394d19d7cd5fc4583c1e04156",
+      "lines": "23-34",
+      "observation": "TaskAccepter initialization precedes launch/attach mode selection"
+    },
+    {
+      "url": "https://github.com/mstange/samply/blob/samply-v0.13.1/samply/src/mac/process_launcher.rs",
+      "blob_sha": "48aee79c540c01b0fa1d57a7264c617faba088e7",
+      "observation": "TaskAccepter creates OsIpcMultiShotServer"
+    },
+    {
+      "url": "https://github.com/mstange/samply/blob/samply-v0.13.1/samply/src/mac/mach_ipc.rs",
+      "blob_sha": "c52da38a637d1ab7b23d83e8018f723659add43e",
+      "lines": "224-250,645-648",
+      "observation": "IPC server registers bootstrap name and propagates bootstrap_register2 error"
+    }
+  ],
+  "inference": "Inherited execution sandbox denies Mach bootstrap registration before target launch or attach; symbol settings and target code changes cannot address this init error.",
+  "outside_sandbox_attempt": {
+    "outcome": "automatically_rejected",
+    "policy": "sandbox_approval: false",
+    "requested_action": "Record local Samply check profile of owned 100k synthetic fixture outside sandbox"
+  },
+  "handoff": "run-samply.zsh from a normal macOS Terminal; success remains unverified"
+}

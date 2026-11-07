@@ -1,0 +1,17 @@
+[
+  {
+    "file": ".artifacts/issue-65/2026-11-06-native-followup/ollama-100k/during-drain-hybrid-0.json",
+    "sha256": "b5755287fb508469e45caca3c620ff98f67a5f470b70a126f873b56cd691080c",
+    "known_unique_uris": 5
+  },
+  {
+    "file": ".artifacts/issue-65/2026-11-06-native-followup/ollama-100k/during-drain-hybrid-1.json",
+    "sha256": "fa9ddf2f5836c0ea399b45952203c590f5e8c466488f339efb36c0eeec606ff2",
+    "known_unique_uris": 5
+  },
+  {
+    "file": ".artifacts/issue-65/2026-11-06-native-followup/ollama-100k/during-drain-hybrid-2.json",
+    "sha256": "513397ec032c9a73390f3c8ec34dff81196b89b3bbcc734df993d5f8479804d9",
+    "known_unique_uris": 5
+  }
+]

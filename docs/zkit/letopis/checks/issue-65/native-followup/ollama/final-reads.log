@@ -1,0 +1,9 @@
+Waiting for successful complete same-config drain
+Population complete; running independent native coverage oracle
+full hybrid 0 111.85332374996506
+full hybrid 1 111.93779783393256
+full hybrid 2 111.0067955001723
+full check 32.128565415972844
+full status 33.39560079202056
+Full ordinary reads complete; recording a native mixed-query profile
+Full Ollama campaign complete
