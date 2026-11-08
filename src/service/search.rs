@@ -316,6 +316,12 @@ impl CurrentKnowledge<'_> {
 
     /// Reuse only successful parsing after hashing bytes from this binding's fresh capture.
     /// Missing, invalid, unmarked and oversized observations never leave reusable state.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` — metadata whose identity is compared with the last parsed observation.
+    /// * `path` — root-relative path whose bytes were captured.
+    /// * `bytes` — freshly captured file bytes hashed for reuse detection.
     fn is_current(&mut self, node: &KnowledgeMetadata, path: &RepoPath, bytes: &[u8]) -> bool {
         let file_hash = Sha256::digest(bytes);
         if let Some(last) = &self.last_parsed

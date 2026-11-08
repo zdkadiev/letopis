@@ -543,12 +543,12 @@ pub(super) fn vector_index_config_get_by_id(
         VectorSchema::Main => "select val from main.vector_index_config where id = ?1",
         VectorSchema::Attached => "select val from vec.vector_index_config where id = ?1",
     };
-    let value: Option<i64> = connection
+    let dimension: Option<i64> = connection
         .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
         .optional()?;
-    value
-        .map(|value| {
-            let size = usize::try_from(value).map_err(|_| {
+    dimension
+        .map(|dimension| {
+            let size = usize::try_from(dimension).map_err(|_| {
                 StorageError::new(
                     StorageErrorKind::InternalError,
                     "invalid stored vector data",
@@ -625,12 +625,12 @@ pub(super) fn vector_keys_get_by_search_hash(
                 Expr::col((VectorKeys::Table, VectorKeys::SearchHash)).eq(search_hash.to_hex()),
             ),
     )?;
-    let value = connection
+    let stored_vector = connection
         .query_row(&sql, params_from_iter(values), |r| {
             r.get::<_, Option<Vec<u8>>>(0)
         })
         .optional()?;
-    value
+    stored_vector
         .map(|bytes| {
             decode_vector(&bytes.ok_or_else(|| {
                 StorageError::new(
@@ -643,6 +643,10 @@ pub(super) fn vector_keys_get_by_search_hash(
 }
 
 /// Decode native-endian f32 values without accepting empty, truncated or nonfinite payloads.
+///
+/// # Arguments
+///
+/// * `bytes` — native-endian `f32` payload; nonempty, a multiple of four bytes and finite.
 ///
 /// # Errors
 /// Returns an internal storage error for invalid stored vector bytes.
@@ -781,12 +785,12 @@ pub(super) fn embed_failures_get_by_search_hash(
     };
     query.and_where(Expr::col(EmbedFailures::SearchHash).eq(search_hash.to_hex()));
     let (sql, values) = build_query(&query)?;
-    let value = connection
+    let stored_failure = connection
         .query_row(&sql, params_from_iter(values), |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
         })
         .optional()?;
-    value
+    stored_failure
         .map(|(attempts, error)| {
             let attempts = decode_unsigned(attempts)?;
             if attempts == 0 {
@@ -816,12 +820,12 @@ pub(super) fn query_error_get_by_id(
     };
     query.and_where(Expr::col(QueryErrorRow::Id).eq(1));
     let (sql, values) = build_query(&query)?;
-    let value = connection
+    let stored_error = connection
         .query_row(&sql, params_from_iter(values), |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
         })
         .optional()?;
-    value
+    stored_error
         .map(|(at, error)| {
             Ok(QueryError {
                 at: decode_unsigned(at)?,

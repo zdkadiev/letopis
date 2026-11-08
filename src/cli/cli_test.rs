@@ -963,8 +963,8 @@ mod traversal_tests {
     }
 
     #[test]
-    fn normalizes_starts_and_open_types_without_restricting_empty_types() {
-        // Given
+    fn normalizes_starts_and_open_types() {
+        // Given: an input with relative, duplicate and case-varied addresses and edge types.
         let mut body = build_input();
         body["element_ids"] = json!([
             "./a.md",
@@ -977,11 +977,11 @@ mod traversal_tests {
         ]);
         body["edge_types"] = json!(["custom_relation9", "includes", "custom_relation9"]);
         body["edge_limit"] = json!(2);
-        // When
+        // When: the request is parsed.
         let Request::Traverse(request) = parse(&body.to_string()).unwrap() else {
             panic!("traverse")
         };
-        // Then
+        // Then: addresses and edge types are normalized and deduplicated, and defaults are kept.
         assert_eq!(
             request
                 .element_ids
@@ -1013,17 +1013,21 @@ mod traversal_tests {
             ),
             (TraversalMode::Both, TraversalDirection::Outgoing, 1, 3)
         );
-        // Given
+    }
+
+    #[test]
+    fn absent_or_empty_edge_types_parse_without_a_limit() {
+        // Given: an input without an edge type selection or with an empty one.
         for types in [None, Some(json!([]))] {
             let mut body = build_input();
             if let Some(types) = types {
                 body["edge_types"] = types;
             }
-            // When
+            // When: the request is parsed.
             let Request::Traverse(request) = parse(&body.to_string()).unwrap() else {
                 panic!("traverse")
             };
-            // Then
+            // Then: no edge types and no edge limit remain on the request.
             assert!(request.edge_types.is_empty());
             assert!(request.edge_limit.is_none());
         }

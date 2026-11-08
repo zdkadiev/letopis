@@ -139,6 +139,12 @@ impl ObjectReader {
     /// Read fresh verified tree bytes, reusing only successful structural validation.
     /// The bounded memo retains identities, never payloads, for this reader's lifetime.
     ///
+    /// # Arguments
+    ///
+    /// * `oid` — hexadecimal object ID of the tree to read.
+    /// * `missing` — error kind reported when the object is absent.
+    /// * `wrong_type` — error kind reported when the object is not a tree.
+    ///
     /// # Errors
     /// Uses caller-selected missing/type errors; decoding, identity and structure failures are internal.
     pub(super) fn tree_bytes_get_by_oid(

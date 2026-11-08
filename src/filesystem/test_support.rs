@@ -44,6 +44,7 @@ struct OwnedProcess {
 struct CleanupGroup(Pid);
 
 impl Fixture {
+    /// Creates an isolated temporary root for one mutation fixture.
     pub fn new() -> Self {
         let root = std::env::temp_dir().join(format!(
             "letopis-fs-private-{}-{}",
@@ -54,6 +55,12 @@ impl Fixture {
         Self(root)
     }
 
+    /// Starts a child process that applies one filesystem mutation to a target path.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` — child-relative path of the file the mutation applies to.
+    /// * `action` — mutation kind the child performs before signaling completion.
     pub fn spawn_mutator(&self, target: &str, action: &str) -> Mutator {
         let mut command = Command::new(std::env::current_exe().unwrap());
         command
@@ -81,11 +88,13 @@ impl Drop for Fixture {
 }
 
 impl Mutator {
+    /// Releases the child past its start gate and waits for its completion signal.
     pub fn resume(&self) {
         fs::write(self.root.join("resume"), b"go").unwrap();
         wait_for(&self.root.join("done"));
     }
 
+    /// Waits for the child process to finish successfully within the fixture deadline.
     pub fn finish(&mut self) {
         self.child.wait_success(DEADLINE);
     }

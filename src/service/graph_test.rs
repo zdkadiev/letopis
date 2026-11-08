@@ -5,9 +5,9 @@ use super::GraphService;
 use crate::{
     domain::{Edge, EdgeTarget, EdgeType, Graph, KnowledgeId, SourceUri},
     service::{
-        CommandErrorKind, ElementAddress, GraphNeighbor, GraphNodeKey, GraphNodeRef, GraphRead,
-        GraphWalk, NeighborDirection, NeighborPageRequest, StorageResult, TraversalDirection,
-        TraversalMode, TraversalRequest,
+        CacheDatabase, CommandErrorKind, ElementAddress, GraphNeighbor, GraphNodeKey, GraphNodeRef,
+        GraphRead, GraphWalk, NeighborDirection, NeighborPageRequest, NodeMetadata, SourceMetadata,
+        StorageRead, StorageResult, TraversalDirection, TraversalMode, TraversalRequest,
     },
 };
 use std::{
@@ -18,7 +18,6 @@ use std::{
 
 #[test]
 fn graph_services_join_the_same_cache_snapshot() {
-    use crate::service::{CacheDatabase, NodeMetadata, SourceMetadata, StorageRead};
     use std::rc::Rc;
     // Given: two graph services share a cache containing one published source.
     let root = tempfile::TempDir::new().unwrap();
@@ -28,23 +27,7 @@ fn graph_services_join_the_same_cache_snapshot() {
     )
     .unwrap();
     let source = SourceUri::parse("code.rs").unwrap();
-    let write_result = storage
-        .cache_storage
-        .with_write_tx(|| {
-            let write = &storage.cache_storage;
-            write
-                .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
-                    uri: source.clone(),
-                    hash: None,
-                    created_at: 1,
-                    lines: None,
-                }))
-                .unwrap();
-
-            write.project_get_revision()
-        })
-        .map_err(TransactionError::into_inner);
-    assert_eq!(write_result.unwrap(), 1);
+    assert_eq!(publish_source(&storage, &source), 1);
     let cache = Rc::new(storage.cache_storage);
     let first = GraphService::new(Rc::clone(&cache));
     let second = GraphService::new(Rc::clone(&cache));
@@ -55,21 +38,7 @@ fn graph_services_join_the_same_cache_snapshot() {
     cache
         .with_read_tx(|| -> crate::service::StorageResult<()> {
             first.traverse(&request).unwrap();
-            let writer = crate::storage::open_test_storage(
-                &root.path().join("cache.db"),
-                &root.path().join("vectors.db"),
-            )
-            .unwrap();
-            let write_result = writer
-                .cache_storage
-                .with_write_tx(|| {
-                    let write = &writer.cache_storage;
-                    write.delete_node(&EdgeTarget::Source(source)).unwrap();
-
-                    write.project_get_revision()
-                })
-                .map_err(TransactionError::into_inner);
-            assert_eq!(write_result.unwrap(), 2);
+            assert_eq!(remove_source(root.path(), &source), 2);
             second.traverse(&request).unwrap();
             assert_eq!(cache.project_get_by_id()?, 1);
             Ok(())
@@ -649,4 +618,42 @@ fn traverse_graph(
     let mut discovery = super::Discovery::resolve_starts(read, request)?;
     discovery.walk(request)?;
     Ok(discovery.into_graph())
+}
+
+fn publish_source(storage: &crate::storage::TestDatabases, source: &SourceUri) -> u64 {
+    storage
+        .cache_storage
+        .with_write_tx(|| {
+            let write = &storage.cache_storage;
+            write
+                .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                    uri: source.clone(),
+                    hash: None,
+                    created_at: 1,
+                    lines: None,
+                }))
+                .unwrap();
+
+            write.project_get_revision()
+        })
+        .map_err(TransactionError::into_inner)
+        .unwrap()
+}
+
+fn remove_source(root: &std::path::Path, source: &SourceUri) -> u64 {
+    let storage =
+        crate::storage::open_test_storage(&root.join("cache.db"), &root.join("vectors.db"))
+            .unwrap();
+    storage
+        .cache_storage
+        .with_write_tx(|| {
+            let write = &storage.cache_storage;
+            write
+                .delete_node(&EdgeTarget::Source(source.clone()))
+                .unwrap();
+
+            write.project_get_revision()
+        })
+        .map_err(TransactionError::into_inner)
+        .unwrap()
 }

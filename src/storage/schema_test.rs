@@ -290,29 +290,7 @@ fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
     let vectors = root.path().join("vectors.db");
     let identity = Sha256::digest(b"model");
     let hash = Sha256::digest(b"text");
-    {
-        let storage = crate::storage::open_test_storage(&cache, &vectors).unwrap();
-        storage
-            .vector_storage
-            .reset_vectors(None, &identity)
-            .unwrap();
-        storage
-            .vector_storage
-            .with_write_tx(&identity, || {
-                let write = &storage.vector_storage;
-                write.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
-                write
-                    .embed_failures_upsert_by_search_hash_and_attempts(&hash, 3)
-                    .unwrap();
-                write
-                    .embed_failures_update_by_search_hash(&hash, "failure sentinel")
-                    .unwrap();
-
-                Ok::<_, StorageError>(())
-            })
-            .map(get_current)
-            .unwrap();
-    }
+    populate_vectors(&cache, &vectors, &identity, &hash);
     {
         let connection = Connection::open(&cache).unwrap();
         connection
@@ -346,6 +324,30 @@ fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
     for (name, expected) in files.iter().zip(before) {
         assert_eq!(capture_file(&root.path().join(name)), expected, "{name}");
     }
+}
+
+fn populate_vectors(cache: &Path, vectors: &Path, identity: &Sha256, hash: &Sha256) {
+    let storage = crate::storage::open_test_storage(cache, vectors).unwrap();
+    storage
+        .vector_storage
+        .reset_vectors(None, identity)
+        .unwrap();
+    storage
+        .vector_storage
+        .with_write_tx(identity, || {
+            let write = &storage.vector_storage;
+            write.store_vector(hash, &[1.0, 0.0, 0.0], 3).unwrap();
+            write
+                .embed_failures_upsert_by_search_hash_and_attempts(hash, 3)
+                .unwrap();
+            write
+                .embed_failures_update_by_search_hash(hash, "failure sentinel")
+                .unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 
 fn capture_file(path: &Path) -> (u64, Vec<u8>) {

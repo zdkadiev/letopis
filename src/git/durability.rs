@@ -171,6 +171,13 @@ impl StagedObject {
 /// Verify and sync an existing loose object without staging another compressed copy.
 /// Packed or absent objects use the ordinary publication path instead.
 ///
+/// # Arguments
+///
+/// * `repo` — repository whose object store is verified.
+/// * `kind` — Git object kind the bytes must form.
+/// * `bytes` — exact object payload to verify and sync.
+/// * `cleanup` — active write guard that must stay cancellation-safe.
+///
 /// # Errors
 /// Fails closed on cancellation, corrupt existing bytes, invalid configuration or sync failure.
 pub(super) fn object_reuse_existing(
