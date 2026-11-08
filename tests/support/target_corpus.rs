@@ -204,7 +204,7 @@ fn observe_snapshot(
 }
 
 fn verify_dimensions(config: &EmbeddingConfig, dimensions: Option<usize>) -> ObservationResult<()> {
-    if let (Some(configured), Some(observed)) = (config.get_dimensions(), dimensions)
+    if let (Some(configured), Some(observed)) = (config.get_dimensions_by_parameters(), dimensions)
         && configured.get() != observed
     {
         return Err("configured and stored vector dimensions mismatch".into());

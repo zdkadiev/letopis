@@ -23,6 +23,18 @@ def make_measurement(response) -> dict:
 
 
 class ReportTests(unittest.TestCase):
+    def test_index_requires_a_positive_published_revision(self):
+        # Given: the current full-index command and literal publication responses.
+        scenario = {"expected": {"command": "index"}}
+        # When: validating a successful rebuild and invalid revision alternatives.
+        valid = validate_result(scenario, make_measurement({"ok": True, "result": {"revision": 7}}))
+        invalid = [validate_result(scenario, make_measurement({"ok": True, "result": {"revision": value}}))
+                   for value in (0, -1, True, "7", None)]
+        # Then: only a positive integer publication can enter the timing series.
+        self.assertTrue(valid["valid"])
+        self.assertEqual(valid["observed"], {"revision": 7})
+        self.assertTrue(all(not result["valid"] for result in invalid))
+
     def test_inspect_rejects_another_valid_fragment_and_missing_location(self):
         # Given: independently frozen bytes for the first of two marked sections.
         first, second = b"## Zero {#zero}\nzero\n", b"## One {#one}\none\n"

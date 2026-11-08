@@ -1,9 +1,9 @@
-use super::utils::map_document_file;
+use super::utils::map_file_result_to_document_result;
 use super::{
-    BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileReader, ProvenanceIssue,
+    DocumentError, DocumentErrorKind, DocumentResult, FileReader, ProvenanceIssue,
     ProvenanceObservation, ProvenanceRequest, SearchFlag, SnapshotError, SnapshotErrorKind,
-    SnapshotState, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
-    VerifiedGitSnapshots,
+    SnapshotRefsUpdater, SnapshotState, SourceProvenance, SourceRevisionComparison,
+    SourceRevisionRequest, VerifiedGitSnapshots,
 };
 use crate::domain::{Sha256, SourceUri, TreeOid};
 use std::path::Path;
@@ -91,8 +91,9 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
         if request.source.get_local().is_none() {
             return Ok(SourceRevisionComparison::Unfetched);
         }
-        let historical = self.get_snapshot_hash(basis, request.source)?;
-        let requested = self.get_snapshot_hash(request.revision, request.source)?;
+        let historical = self.get_snapshot_hash_by_tree_and_source(basis, request.source)?;
+        let requested =
+            self.get_snapshot_hash_by_tree_and_source(request.revision, request.source)?;
         Ok(match (historical, requested) {
             (Some(left), Some(right)) if left == right => SourceRevisionComparison::Equal,
             (Some(_), Some(_)) => SourceRevisionComparison::Different,
@@ -101,46 +102,34 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
     }
 }
 
-impl<F> BasisRetainer for ProvenanceService<F> {
-    fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+impl<F> SnapshotRefsUpdater for ProvenanceService<F> {
+    fn snapshot_refs_update_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         for tree in snapshots {
-            if self.git.tree_verify_by_oid(tree).map_err(|error| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "source provenance Git operation failed",
-                    error,
-                )
-            })? == SnapshotState::Available
+            if self
+                .git
+                .tree_verify_by_oid(tree)
+                .map_err(map_error_to_source_provenance_document_error)?
+                == SnapshotState::Available
             {
-                self.git.tree_retain_by_oid(tree).map_err(|error| {
-                    DocumentError::new_with_cause(
-                        DocumentErrorKind::InternalError,
-                        "source provenance Git operation failed",
-                        error,
-                    )
-                })?;
+                self.git
+                    .ref_update_by_oid(tree)
+                    .map_err(map_error_to_source_provenance_document_error)?;
             }
         }
         Ok(())
     }
 
-    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+    fn snapshot_sync_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         for tree in snapshots {
-            if self.git.tree_verify_by_oid(tree).map_err(|error| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "source provenance Git operation failed",
-                    error,
-                )
-            })? == SnapshotState::Available
+            if self
+                .git
+                .tree_verify_by_oid(tree)
+                .map_err(map_error_to_source_provenance_document_error)?
+                == SnapshotState::Available
             {
-                self.git.tree_pin_by_oid(tree).map_err(|error| {
-                    DocumentError::new_with_cause(
-                        DocumentErrorKind::InternalError,
-                        "source provenance Git operation failed",
-                        error,
-                    )
-                })?;
+                self.git
+                    .tree_sync_by_oid(tree)
+                    .map_err(map_error_to_source_provenance_document_error)?;
             }
         }
         Ok(())
@@ -162,7 +151,7 @@ impl<F: FileReader> ProvenanceService<F> {
         }
     }
 
-    fn get_snapshot_hash(
+    fn get_snapshot_hash_by_tree_and_source(
         &self,
         tree: &TreeOid,
         source: &SourceUri,
@@ -181,11 +170,11 @@ impl<F: FileReader> ProvenanceService<F> {
         Ok(local.select_bytes(&bytes).map(Sha256::digest))
     }
 
-    fn get_current_hash(&self, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
+    fn get_current_hash_by_source(&self, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
         let Some(local) = source.get_local() else {
             return Ok(None);
         };
-        let captured = map_document_file(
+        let captured = map_file_result_to_document_result(
             self.filesystem
                 .file_get_by_path(Path::new(local.get_path().as_str())),
         )?;
@@ -224,7 +213,7 @@ impl<'a, F: FileReader> HistoricalObservations<'a, F> {
     ) -> DocumentResult<ProvenanceObservation> {
         let state = request
             .source_snapshot
-            .map(|tree| self.get_snapshot_state(tree))
+            .map(|tree| self.get_snapshot_state_by_tree(tree))
             .transpose()?;
         let mut observation = build_observation(request, state);
         let basis = request
@@ -234,8 +223,10 @@ impl<'a, F: FileReader> HistoricalObservations<'a, F> {
             if source.get_local().is_none() {
                 continue;
             }
-            let historical = basis.map(|tree| self.get_hash(tree, source)).transpose()?;
-            let current = self.provenance.get_current_hash(source)?;
+            let historical = basis
+                .map(|tree| self.get_historical_hash_by_tree_and_source(tree, source))
+                .transpose()?;
+            let current = self.provenance.get_current_hash_by_source(source)?;
             if current.is_none() || historical == Some(None) {
                 observation.issues.insert(ProvenanceIssue::SourceNotFound {
                     source: source.clone(),
@@ -248,7 +239,7 @@ impl<'a, F: FileReader> HistoricalObservations<'a, F> {
         Ok(observation)
     }
 
-    fn get_snapshot_state(&mut self, tree: &TreeOid) -> DocumentResult<SnapshotState> {
+    fn get_snapshot_state_by_tree(&mut self, tree: &TreeOid) -> DocumentResult<SnapshotState> {
         if self.available.contains(tree) {
             return Ok(SnapshotState::Available);
         }
@@ -256,34 +247,26 @@ impl<'a, F: FileReader> HistoricalObservations<'a, F> {
             .provenance
             .git
             .tree_verify_by_oid(tree)
-            .map_err(|error| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "source provenance Git operation failed",
-                    error,
-                )
-            })?;
+            .map_err(map_error_to_source_provenance_document_error)?;
         if state == SnapshotState::Available && self.is_capacity_available() {
             self.available.insert(tree.clone());
         }
         Ok(state)
     }
 
-    fn get_hash(&mut self, tree: &TreeOid, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
+    fn get_historical_hash_by_tree_and_source(
+        &mut self,
+        tree: &TreeOid,
+        source: &SourceUri,
+    ) -> DocumentResult<Option<Sha256>> {
         let key = (tree.clone(), source.clone());
         if let Some(hash) = self.hashes.get(&key) {
             return Ok(*hash);
         }
         let hash = self
             .provenance
-            .get_snapshot_hash(tree, source)
-            .map_err(|error| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "source provenance Git operation failed",
-                    error,
-                )
-            })?;
+            .get_snapshot_hash_by_tree_and_source(tree, source)
+            .map_err(map_error_to_source_provenance_document_error)?;
         if self.is_capacity_available() {
             self.hashes.insert(key, hash);
         }
@@ -316,6 +299,21 @@ fn build_observation(
             .collect(),
         issues: issue.into_iter().collect(),
     }
+}
+
+/// Converts a Git failure to a source provenance document error.
+///
+/// # Arguments
+///
+/// * `cause` — Git failure from a provenance operation.
+fn map_error_to_source_provenance_document_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "source provenance Git operation failed",
+        cause,
+    )
 }
 
 #[cfg(test)]

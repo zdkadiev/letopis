@@ -1,7 +1,9 @@
-use super::utils::{ELEMENT_ID, PATH, REASON, TARGET, get_detail, get_owner_path, get_sort_key};
+use super::utils::{
+    ELEMENT_ID, PATH, REASON, TARGET, get_detail_by_key, get_owner_path_by_id, get_sort_key,
+};
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandProblem, CommandResult, DiagnosticKind,
-    FileRow, GraphDiagnostics, NodeMetadata,
+    FileRow, GraphDiagnostics, NodeMetadata, TransactionError,
 };
 use crate::domain::{GraphProblem, KnowledgeId, RepoPath, find_graph_problems};
 use serde_json::Value;
@@ -36,27 +38,18 @@ impl<C: CacheDatabase> GraphDiagnostics for GraphDiagnosticsService<C> {
     fn find_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
         self.cache
             .with_read_tx(|| {
-                let nodes = self.cache.nodes_get().map_err(|error| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot read graph diagnostics",
-                        error,
-                    )
-                })?;
-                let edges = self.cache.edges_get_by_source_id(None).map_err(|error| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot read graph diagnostics",
-                        error,
-                    )
-                })?;
-                let files = self.cache.files_get().map_err(|error| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot read graph diagnostics",
-                        error,
-                    )
-                })?;
+                let nodes = self
+                    .cache
+                    .nodes_get()
+                    .map_err(map_error_to_graph_diagnostics_command_error)?;
+                let edges = self
+                    .cache
+                    .edges_get_by_source_id(None)
+                    .map_err(map_error_to_graph_diagnostics_command_error)?;
+                let files = self
+                    .cache
+                    .files_get()
+                    .map_err(map_error_to_graph_diagnostics_command_error)?;
                 let knowledge: BTreeSet<KnowledgeId> = nodes
                     .into_iter()
                     .filter_map(|node| match node.metadata {
@@ -75,19 +68,12 @@ impl<C: CacheDatabase> GraphDiagnostics for GraphDiagnosticsService<C> {
                 }
                 let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
                 problems.retain(|problem| {
-                    selected.is_empty() || selected.contains(get_detail(problem, PATH))
+                    selected.is_empty() || selected.contains(get_detail_by_key(problem, PATH))
                 });
                 problems.sort_by(|left, right| get_sort_key(left).cmp(&get_sort_key(right)));
                 Ok(problems)
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot read graph diagnostics",
-                    error,
-                ),
-            })
+            .map_err(map_transaction_error_to_graph_diagnostics_command_error)
     }
 }
 
@@ -118,7 +104,7 @@ fn format_graph_problem(problem: &GraphProblem) -> Vec<CommandProblem> {
             code: CommandErrorKind::ValidationFailed,
             message: "knowledge target is missing",
             details: BTreeMap::from([
-                (PATH.into(), Value::from(get_owner_path(source))),
+                (PATH.into(), Value::from(get_owner_path_by_id(source))),
                 (REASON.into(), Value::from("dangling_target")),
                 (ELEMENT_ID.into(), Value::from(source.as_str())),
                 (TARGET.into(), Value::from(target.as_str())),
@@ -133,7 +119,7 @@ fn format_cycle(members: &[KnowledgeId]) -> Vec<CommandProblem> {
     // Domain components are sorted, so the first member of each file is its minimum.
     for member in members {
         representatives
-            .entry(get_owner_path(member))
+            .entry(get_owner_path_by_id(member))
             .or_insert(member);
     }
     representatives
@@ -148,6 +134,35 @@ fn format_cycle(members: &[KnowledgeId]) -> Vec<CommandProblem> {
             ]),
         })
         .collect()
+}
+
+/// Converts a failure raised while reading graph diagnostics to a command error.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from a diagnostics read.
+fn map_error_to_graph_diagnostics_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot read graph diagnostics",
+        cause,
+    )
+}
+
+/// Converts a transaction failure from the diagnostics read to a command error.
+///
+/// # Arguments
+///
+/// * `error` — Transaction failure from the pinned read.
+fn map_transaction_error_to_graph_diagnostics_command_error(
+    error: TransactionError<CommandError>,
+) -> CommandError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => map_error_to_graph_diagnostics_command_error(error),
+    }
 }
 
 #[cfg(test)]

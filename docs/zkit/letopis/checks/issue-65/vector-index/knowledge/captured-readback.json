@@ -1,0 +1,36 @@
+{
+  "inspect_snapshot": "d17b76446f0dcc21e910c1b6167823405d10e1b9",
+  "source_snapshot": "96680e54c8a39e774291ea0c471296cf1b6ad33f",
+  "captured_knowledge_and_sources_read_from_same_tree": true,
+  "inspected_elements": [
+    {
+      "element": ".artifacts/issue-65/vector-index-2026-11-07/native-probe/control-v2-runs.json",
+      "bytes": 5130,
+      "sha256": "7df35a23f18e9bbd80611106ae6716d76ac2ebcb4b6739ad35f04a3fe285bbf5"
+    },
+    {
+      "element": ".artifacts/issue-65/vector-index-2026-11-07/native-probe/report.md",
+      "bytes": 11784,
+      "sha256": "14545ba446ac21b130e1e46088b769a4291f9a6699cb9defe3d8b624062493b9"
+    },
+    {
+      "element": ".artifacts/issue-65/vector-index-2026-11-07/native-probe/summary.json",
+      "bytes": 8330,
+      "sha256": "a4ba7cf782b827d5f79cfb5f7e78ab7f074e1962b81486f61a26cfdb6722c51a"
+    },
+    {
+      "element": "letopis/architecture/storage.md",
+      "bytes": 9348,
+      "sha256": "620fb4fd74330ed51e663ca6aa9cba3930c5e49e3ae06c3da6c2ff7157da992f"
+    },
+    {
+      "element": "vendor/vec1/vec1.c",
+      "bytes": 378128,
+      "sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9"
+    }
+  ],
+  "all_18_sources_match_verified_author_basis": true,
+  "binary": "/opt/homebrew/Cellar/letopis/0.2.0/bin/letopis",
+  "version": "letopis 0.2.0",
+  "sha256": "d3ba8489434413250dd64858306945a40af8335833ab6e356f18c176355f838c"
+}

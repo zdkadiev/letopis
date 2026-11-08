@@ -1,0 +1,10 @@
+{
+  "revision": 100,
+  "source_bindings_verified": 27,
+  "author_basis": "9942751be3da3e64918d7aa755b995d443cf7f36",
+  "reading_snapshot": "492ac2d345d9a835d30c613c8d0c09b2e347958d",
+  "scoped_check_passed": true,
+  "same_tree_source_readback_verified": true,
+  "root_cache_provider_config_unchanged": true,
+  "successful_new_knowledge_vectorization_not_claimed": true
+}

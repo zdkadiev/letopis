@@ -267,6 +267,20 @@ fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
     }
 }
 
+#[test]
+fn adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings() {
+    // Given: uneven sections include CRLF, a fenced fake heading, a gap and no final LF.
+    let text = "前文\r\n\r\n## A {#a}\r\n<!-- letopis: {\"created_at\":1} -->\r\nА\r\n\r\n```md\r\n## Fake {#fake}\r\n```\r\n# Outside\r\nGap\r\n\r\n## B {#b}\r\n<!-- letopis: {\"created_at\":2} -->\r\nБ";
+    // When: parse both non-overlapping elements with their complete document context.
+    let parsed = parse_file("a.md", text);
+    // Then: both section line ranges retain independent literal coordinates.
+    assert_eq!(parsed.elements.len(), 2);
+    assert_eq!(parsed.elements[0].element.lines.get_start(), 3);
+    assert_eq!(parsed.elements[0].element.lines.get_end(), 9);
+    assert_eq!(parsed.elements[1].element.lines.get_start(), 13);
+    assert_eq!(parsed.elements[1].element.lines.get_end(), 15);
+}
+
 fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
     let got = &parsed.element;
     assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");

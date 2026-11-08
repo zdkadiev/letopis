@@ -1,0 +1,30 @@
+{
+  "5-fts": {
+    "source": "src/storage/cache.rs",
+    "sql_sha256": "f715dad26e5258f75d479ce562468b83e17283b43c50cf3a072a6d29532c5786",
+    "bound": 5,
+    "SQL_before_Rust_decoding": true,
+    "native_complete_K": null
+  },
+  "100-fts": {
+    "source": "src/storage/cache.rs",
+    "sql_sha256": "f715dad26e5258f75d479ce562468b83e17283b43c50cf3a072a6d29532c5786",
+    "bound": 100,
+    "SQL_before_Rust_decoding": true,
+    "native_complete_K": null
+  },
+  "5-vectors": {
+    "source": "src/storage/vector.rs",
+    "sql_sha256": "36bfd659118c58c269c3599aec4d4897f26b9f56e478bee1132590d86f7bcd6f",
+    "bound": 5,
+    "SQL_before_Rust_decoding": true,
+    "native_complete_K": 100000
+  },
+  "100-vectors": {
+    "source": "src/storage/vector.rs",
+    "sql_sha256": "36bfd659118c58c269c3599aec4d4897f26b9f56e478bee1132590d86f7bcd6f",
+    "bound": 100,
+    "SQL_before_Rust_decoding": true,
+    "native_complete_K": 100000
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "scope": "both retrieval paths executed in the separate profiled mixed query; ordinary result membership alone proves vector contribution and lexical-hit retention",
+  "profile_sha256": "43b80285dfa449aa75fe34d885d1ddcb435163bc10b9d392e67cb92e03c26895",
+  "functions": {
+    "text_index_get_by_expression": {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::StorageRead>::text_index_get_by_expression",
+      "inclusive_cpu_delta": 16683,
+      "stack_observations": 23
+    },
+    "fts5Bm25Function": {
+      "function": "fts5Bm25Function",
+      "inclusive_cpu_delta": 15476,
+      "stack_observations": 20
+    },
+    "vector_index_get_by_vector": {
+      "function": "<letopis::storage::cache::CacheStorage as letopis::service::StorageRead>::vector_index_get_by_vector",
+      "inclusive_cpu_delta": 2129037,
+      "stack_observations": 2340
+    }
+  }
+}

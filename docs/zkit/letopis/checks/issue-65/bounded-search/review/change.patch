@@ -1,0 +1,1649 @@
+--- a/docs/zkit/letopis/contracts/X-1-cli.md
++++ b/docs/zkit/letopis/contracts/X-1-cli.md
+@@ -12,7 +12,7 @@
+ | init | {} / {} | инициализация Git work tree, не являющегося bare: `.letopis/`, схемы `cache.db`/`vectors.db`, сгенерированный `config.json`, если файла нет; существующие валидные файлы и данные не заменяются, [D-70](../decisions.md#D-70), [D-95](../decisions.md#D-95), [D-104](../decisions.md#D-104) |
+ | check | необязательный paths / errors | проверка всего корпуса или путей по X-4; файлы не меняются; пустой errors — корпус валиден, [D-93](../decisions.md#D-93) |
+ | inspect | element_ids / snapshot, elements | актуальные path/lines/hash знаний и source одного Git-снимка, без текста; неизвестный ID отклоняет пакет |
+-| search | query, limit, необязательный filters / список ссылок | гибридный поиск; до настройки и при сбое query embedding — FTS |
++| search | query; необязательные limit, filters / список ссылок | гибридный поиск; до настройки и при сбое query embedding — FTS |
+ | traverse | element_ids, mode, direction, depth, limit; необязательные edge_types, edge_limit / elements и опциональный edges | relations/containment/both; стартовые элементы исключены, повторные достижения возвращаются один раз |
+ | index | необязательный paths / revision, published, files_updated, files_removed, invalid_files_updated | argv: без флагов инкрементально; --verify проверяет замыкания снимков; --full принудительно перепарсивает выбранные файлы и проверяет замыкания. paths ограничивает наблюдаемые владельцы и удаления, но проверка снимков остаётся глобальной; пустые paths охватывают весь корпус |
+ | status | {} / revision, embedding_backlog, embedding_failed, locks (занятые flock index/embed и PID), problems | только текущее состояние: число текстов без вектора и с исчерпанными попытками, текущие проблемы (невалидные файлы, висячие ссылки, циклы includes, отсутствующие в Git source_snapshot, исчерпанные попытки embeddings, последняя ошибка embedding запроса, невалидный config.json), [D-95](../decisions.md#D-95) |
+@@ -91,3 +91,16 @@
+ ## Index command — issue #94
+ 
+ `index` uses argv flags `--verify` and `--full` in either order; `--full` implies verification. Its stdin is `{}` or `{"paths":["letopis/architecture"]}` without a command wrapper. Nonempty paths select the named owner file or descendants at a directory boundary. Rows and removals outside the scope are untouched; valid unmatched selectors contribute nothing. An unchanged incremental corpus reports `published:false` and keeps its revision. Full mode always publishes and increments the revision, including for unchanged corpus. The `check.paths` input only filters findings and never scopes refresh. The former `reindex` command is removed; use `index --full`.
++
++### Ограниченная SQL-выборка search (2026-11-07, D-108)
++
++Для search отсутствующий limit означает 100, явно заданный положительный limit
++используется как min(limit,100); ноль, null и неверные типы отклоняются. SQL FTS
++возвращает не более L знаний по BM25/ID, SQL vec1 — не более L текущих знаний
++по cosine distance/ID после joins. В Rust поступают только выбранные строки: до
++2L уникальных кандидатов. Свежесть, source/revision/flag filters и RRF считаются
++внутри этого пула; ответ содержит до L ссылок. Дозаполнения из остального корпуса
++нет: фильтры могут уменьшить ответ, а полный eligible-корпус даёт иной порядок.
++Метаданные и provenance непопавших в SQL-пул кандидатов не проверяются. Ошибки
++выбранных кандидатов и preflight всех requested revisions остаются ошибками.
++Внутреннее сканирование и рабочая память SQLite не равны числу выданных строк.
+--- a/docs/zkit/letopis/contracts/schemas/X-1-cli.yaml
++++ b/docs/zkit/letopis/contracts/schemas/X-1-cli.yaml
+@@ -319,15 +319,16 @@
+         },
+         "limit": {
+           "type": "integer",
+-          "minimum": 1
++          "minimum": 1,
++          "default": 100,
++          "description": "Optional positive integer; omitted defaults to 100, explicit values above 100 are clamped to 100. Each SQL channel and final output use the effective limit."
+         },
+         "filters": {
+           "$ref": "#/$defs/Filters"
+         }
+       },
+       "required": [
+-        "query",
+-        "limit"
++        "query"
+       ],
+       "additionalProperties": false
+     },
+@@ -985,7 +986,7 @@
+         "$ref": "#/$defs/Failure"
+       },
+       "x-idempotency": "natural",
+-      "description": "Read; hybrid with FTS fallback; no timed truncation.",
++      "description": "Read; SQL-selected top-L per channel, L=min(limit or 100,100), then freshness/filtering/fusion within the bounded pool; no refill; FTS fallback.",
+       "stdout": "one JSON",
+       "exit": {
+         "success": 0,
+--- a/docs/zkit/letopis/decisions.md
++++ b/docs/zkit/letopis/decisions.md
+@@ -2318,3 +2318,28 @@
+ 
+ **Связи:** [design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md),
+ [mechanics](mechanics.md), [D-79](#D-79), [D-96](#D-96).
++
++
++### D-108 — ограниченные SQL-кандидаты гибридного search {#D-108}
++
++**Статус:** согласовано пользователем; реализация и измерения выполняются · **Дата:** 2026-11-07
++
++Пользователь согласовал ограничение выборки из БД: без limit применяется 100,
++явное положительное значение ограничивается сверху 100. FTS и nearest-vector
++matching, SQL ordering и final candidate limit выполняются в SQLite; приложение
++получает только выбранные metadata-строки. Конкретный согласованный дизайн —
++до L knowledge hits на канал, до 2L уникальных кандидатов, до L ссылок в ответе.
++Фильтры и fresh captures работают внутри этого пула, без refill; ошибки и
++изменения за его пределами не наблюдаются. Это явное изменение прежнего полного
++eligible-channel ranking и tail-error поведения D-107/MC-6.
++
++Нативный K внутри vec1 пока сохраняет полное покрытие для orphan vectors и URI
++ties, а SQL LIMIT после joins ограничивает выдачу knowledge rows. Ни полный набор
++векторов, ни все совпадения не материализуются в Rust. SQLite работает внутри
++процесса CLI и имеет собственную рабочую память; bounded output не обещает O(L)
++внутреннего сканирования. Векторное хранение/identity, синхронная модель и FTS
++fallback не меняются. Измеренный корпус — 100k знаний/100k векторов; существующее
++физическое sharing по search_hash сохраняется, новая схема дедупликации не вводится.
++
++**Связи:** [design](../../superpowers/specs/2026-11-07-bounded-search-design.md),
++[plan](../../superpowers/plans/2026-11-07-bounded-search.md), [MC-6](mechanics.md#mc-6--чтение-поиск-и-обход).
+--- a/docs/zkit/letopis/mechanics.md
++++ b/docs/zkit/letopis/mechanics.md
+@@ -252,7 +252,7 @@
+ 
+ Search/traverse после обнаружения изменений (MC-2) синхронизируют готовую конфигурацию через MC-3 до закрепления read view, затем открывают read-транзакцию ([D-102](decisions.md#D-102), порядок уточнён для TK-12 2026-10-23); BEGIN и первое чтение project.revision закрепляют один read snapshot кэша; vectors.db читается в той же транзакции. Конфигурация берётся из `.letopis/config.json` и принимается, только если её identity совпадает с meta.config_identity, иначе FTS-only. Query embedding вызывается напрямую с этой конфигурацией, без write lock; при ошибке выполняется один FTS-поиск с обычным успешным ответом без предупреждения, а ошибка записывается в единственную строку vec.query_error и видна только в status.problems; успешный query embedding её удаляет ([D-62](decisions.md#D-62)). Read view освобождается при результате/отмене/error.
+ 
+-Фильтры разных полей объединяются И, внутри списков — хотя бы одно совпадение; пустой/отсутствующий список одинаковы. Source и source_revision проверяются на одной привязке. Полный eligible-набор формируется до итогового limit, включая динамическую проверку источников. Source не самостоятельный search text, но доступен inspect/traverse. FTS возвращает все подходящие совпадения, vec1 exact — все доступные подходящие vectors; преждевременный LIMIT перед фильтрами запрещён. Первый baseline допускает полный перебор метаданных и векторов, без необоснованного oversampling.
++Фильтры разных полей объединяются И, внутри списков — хотя бы одно совпадение; пустой/отсутствующий список одинаковы. Source и source_revision проверяются на одной привязке. По D-108 (2026-11-07) search использует L=min(limit или 100,100). SQL каждого канала возвращает до L знаний после joins, сортировки BM25/distance и ID tie-break; Rust получает не более 2L уникальных кандидатов. Свежие наблюдения и фильтры применяются внутри пула, затем eligible ranks/fusion и до L ссылок. Дозаполнения нет; вне SQL-пула candidate metadata/provenance не проверяются. Source не самостоятельный search text, но доступен inspect/traverse. Это заменяет прежний baseline полного перебора, а не сохраняет его full-corpus ranking. Внутреннее сканирование vec1 остаётся точным и может охватывать все векторы.
+ 
+ FTS сортируется по bm25, vector — по cosine distance по `.letopis/vectors.db` с соединением vector_keys.search_hash = nodes.search_hash текущего read view (D-92); read view двух файлов не обязан быть одним снимком: векторы аддитивны и адресованы текстом, поэтому виден либо нет только готовый корректный вектор; ties по ID (лексикографически). При наличии каналов union объединяется score=Σ(1/rank), rank от 1 в каждом канале; отсутствующий ранг даёт 0. Итог score desc, ID asc, затем limit. При отсутствии vectors/config/query embedding только FTS. Значения метрик и вычисленный score внутренние, новый публичный score не добавляется. FTS query строится как литеральные токены в кавычках из строки пользователя, без прямой SQL/FTS-синтаксической интерполяции. Пустая нетокенизируемая строка даёт пустую выдачу, не ошибку SQL. Конкретное качество токенизации/rank проверяется P-1; языковых квот нет.
+ 
+@@ -491,8 +491,8 @@
+ of combined path/element-ID content. Edges and search text are released before
+ retention. These are logical payload/entry budgets, not a total allocator/RSS cap.
+ Missing, invalid and unmarked observations leave no reusable parse. Source reads,
+-provenance, filter/error demand order and complete eligible-channel ranking remain
+-unchanged. The parser computes line coordinates with a monotonic byte/line cursor
++provenance and filter/error demand order remain unchanged within the SQL-selected
++pool. D-108 subsequently replaces complete-corpus ranking with bounded retrieval. The parser computes line coordinates with a monotonic byte/line cursor
+ after disjoint element bounds are validated, preserving CRLF, Unicode and EOF
+ coordinates without repeated prefix scans. See the
+ [search experiment spec](../../superpowers/specs/2026-11-06-search-optimization-design.md).
+--- a/examples/storage_check.rs
++++ b/examples/storage_check.rs
+@@ -6,7 +6,7 @@
+         CacheDatabase, KnowledgeMetadata, NodeMetadata, StorageError, VectorDatabase, VectorOutcome,
+     },
+ };
+-use std::{error::Error, fs, path::Path};
++use std::{error::Error, fs, num::NonZeroUsize, path::Path};
+ 
+ const TEXT: &str = "shared acceptance text";
+ const VECTOR: [f32; 3] = [1.0, 0.25, -0.5];
+@@ -78,9 +78,10 @@
+ }
+ 
+ fn verify_text(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
++    let limit = NonZeroUsize::new(2).ok_or("invalid fixture limit")?;
+     cache.with_read_tx(|| {
+         assert_eq!(cache.project_get_by_id()?, 1);
+-        let matches = cache.text_index_get_by_expression("shared")?;
++        let matches = cache.text_index_get_by_expression("shared", limit)?;
+         assert_eq!(
+             matches
+                 .iter()
+@@ -94,12 +95,13 @@
+ }
+ 
+ fn verify_vectors(cache: &impl CacheDatabase, identity: &Sha256) -> Result<(), Box<dyn Error>> {
++    let limit = NonZeroUsize::new(2).ok_or("invalid fixture limit")?;
+     let (vector, matches) = cache.with_read_tx(|| {
+         assert_eq!(cache.project_get_by_id()?, 1);
+         assert_eq!(cache.meta_get_by_id()?, Some(*identity));
+         Ok::<_, StorageError>((
+             cache.vector_keys_get_by_search_hash(identity, &Sha256::digest(TEXT.as_bytes()))?,
+-            cache.vector_index_get_by_vector(identity, &VECTOR, 3)?,
++            cache.vector_index_get_by_vector(identity, &VECTOR, 3, limit)?,
+         ))
+     })?;
+     let vector = require_current(vector)?.ok_or("missing vector")?;
+--- a/src/cli/help.rs
++++ b/src/cli/help.rs
+@@ -96,7 +96,7 @@
+ 
+ const SEARCH_DETAILS: &str = r#"Input (JSON object):
+   query    required string
+-  limit    required integer >= 1
++  limit    optional integer >= 1; default 100, values above 100 use 100
+   filters  optional object:
+     needs_recheck     true: only results with flags; false: only without
+     sources           array of source URIs: path, path#Lstart-Lend or
+--- a/src/cli/input.rs
++++ b/src/cli/input.rs
+@@ -1,8 +1,8 @@
+ use super::help::help_get_by_args;
+ use crate::domain::{EdgeType, RepoPath, SourceUri, TreeOid};
+ use crate::service::{
+-    CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
+-    SearchRequest, TraversalDirection, TraversalMode, TraversalRequest,
++    CommandError, CommandErrorKind, CommandResult, ElementAddress, MAX_SEARCH_LIMIT, RecheckFilter,
++    SearchFilters, SearchRequest, TraversalDirection, TraversalMode, TraversalRequest,
+ };
+ use serde::{
+     Deserialize, Deserializer,
+@@ -74,7 +74,8 @@
+ #[serde(deny_unknown_fields)]
+ struct SearchInput {
+     query: String,
+-    limit: u64,
++    #[serde(default, deserialize_with = "non_null_option_deserialize")]
++    limit: Option<u64>,
+     #[serde(default, deserialize_with = "non_null_option_deserialize")]
+     filters: Option<SearchFiltersInput>,
+ }
+@@ -265,7 +266,8 @@
+ 
+ fn search_request_parse(input: impl Read) -> CommandResult<SearchRequest> {
+     let dto: SearchInput = object_parse(input)?;
+-    let limit = positive_limit_parse(dto.limit)?;
++    let requested = dto.limit.unwrap_or(MAX_SEARCH_LIMIT.get() as u64);
++    let limit = positive_limit_parse(requested.min(MAX_SEARCH_LIMIT.get() as u64))?;
+     let filters = dto
+         .filters
+         .as_ref()
+@@ -392,3 +394,43 @@
+         )
+     })
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::search_request_parse;
++    use crate::service::CommandErrorKind;
++
++    #[test]
++    fn search_defaults_and_caps_positive_limits() {
++        // Given: omitted, small, boundary and oversized valid limits.
++        for (input, expected) in [
++            (r#"{"query":"sqlite"}"#, 100),
++            (r#"{"query":"sqlite","limit":1}"#, 1),
++            (r#"{"query":"sqlite","limit":5}"#, 5),
++            (r#"{"query":"sqlite","limit":100}"#, 100),
++            (r#"{"query":"sqlite","limit":101}"#, 100),
++            (r#"{"query":"sqlite","limit":18446744073709551615}"#, 100),
++        ] {
++            // When: the search request is decoded.
++            let request = search_request_parse(input.as_bytes()).unwrap();
++            // Then: each request has its independently specified effective bound.
++            assert_eq!(request.limit.get(), expected, "{input}");
++        }
++    }
++
++    #[test]
++    fn search_rejects_invalid_limits_without_defaulting_them() {
++        // Given: supplied limits that are not positive unsigned integers.
++        for limit in ["0", "null", "-1", "1.0", "1e0", "18446744073709551616"] {
++            let input = format!(r#"{{"query":"sqlite","limit":{limit}}}"#);
++            // When: the search request is decoded.
++            let error = search_request_parse(input.as_bytes()).unwrap_err();
++            // Then: an explicit invalid value is rejected rather than replaced by a default.
++            assert_eq!(
++                error.get_kind(),
++                CommandErrorKind::InvalidRequest,
++                "{limit}"
++            );
++        }
++    }
++}
+--- a/src/service/document_refresher.rs
++++ b/src/service/document_refresher.rs
+@@ -1050,6 +1050,7 @@
+     use crate::service::{
+         Clock, FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
+     };
++    use std::num::NonZeroUsize;
+ 
+     use std::rc::Rc;
+ 
+@@ -1584,9 +1585,12 @@
+                 assert_eq!(read.project_get_by_id().unwrap(), 1);
+                 assert_eq!(read.files_get().unwrap().len(), 1);
+                 assert_eq!(
+-                    read.text_index_get_by_expression("AlphaToken")
+-                        .unwrap()
+-                        .len(),
++                    read.text_index_get_by_expression(
++                        "AlphaToken",
++                        NonZeroUsize::new(100).unwrap()
++                    )
++                    .unwrap()
++                    .len(),
+                     1
+                 );
+ 
+@@ -1620,9 +1624,12 @@
+                 assert_eq!(read.project_get_by_id().unwrap(), 1);
+                 assert_eq!(read.files_get().unwrap(), before);
+                 assert_eq!(
+-                    read.text_index_get_by_expression("AlphaToken")
+-                        .unwrap()
+-                        .len(),
++                    read.text_index_get_by_expression(
++                        "AlphaToken",
++                        NonZeroUsize::new(100).unwrap()
++                    )
++                    .unwrap()
++                    .len(),
+                     1
+                 );
+ 
+@@ -1712,7 +1719,11 @@
+     fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
+         service
+             .storage
+-            .with_read_tx(|| service.storage.text_index_get_by_expression(text))
++            .with_read_tx(|| {
++                service
++                    .storage
++                    .text_index_get_by_expression(text, NonZeroUsize::new(100).unwrap())
++            })
+             .unwrap()
+             .into_iter()
+             .map(|row| row.id.as_str().to_owned())
+@@ -3322,8 +3333,9 @@
+             fn text_index_get_by_expression(
+                 &self,
+                 expression: &str,
++                limit: NonZeroUsize,
+             ) -> StorageResult<Vec<TextMatch>> {
+-                self.inner.text_index_get_by_expression(expression)
++                self.inner.text_index_get_by_expression(expression, limit)
+             }
+             fn vector_keys_get_by_search_hash(
+                 &self,
+@@ -3338,9 +3350,10 @@
+                 expected: &Sha256,
+                 query: &[f32],
+                 dimensions: usize,
++                limit: NonZeroUsize,
+             ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
+                 self.inner
+-                    .vector_index_get_by_vector(expected, query, dimensions)
++                    .vector_index_get_by_vector(expected, query, dimensions, limit)
+             }
+             fn embed_failures_get_by_search_hash(
+                 &self,
+@@ -3406,6 +3419,7 @@
+         use super::{INITIAL, build_service, get_matches};
+         use crate::service::{CacheDatabase, Refresher, StorageRead};
+         use rusqlite::Connection;
++        use std::num::NonZeroUsize;
+ 
+         #[test]
+         fn reindex_rebuilds_unchanged_fts_and_advances_once() {
+@@ -3475,7 +3489,11 @@
+                     assert_eq!(read.project_get_by_id().unwrap(), 1);
+                     assert_eq!(read.files_get().unwrap(), before);
+                     assert_eq!(
+-                        read.text_index_get_by_expression("AlphaToken").unwrap()[0]
++                        read.text_index_get_by_expression(
++                            "AlphaToken",
++                            NonZeroUsize::new(100).unwrap()
++                        )
++                        .unwrap()[0]
+                             .id
+                             .as_str(),
+                         "note.md"
+--- a/src/service/embedding.rs
++++ b/src/service/embedding.rs
+@@ -1274,7 +1274,7 @@
+                 assert_eq!(read.project_get_by_id().unwrap(), revision);
+                 assert_eq!(service.files.documents, documents);
+                 assert_eq!(
+-                    read.text_index_get_by_expression("knowledge")
++                    read.text_index_get_by_expression("knowledge", NonZeroUsize::new(100).unwrap())
+                         .unwrap()
+                         .len(),
+                     1
+--- a/src/service/mod.rs
++++ b/src/service/mod.rs
+@@ -369,7 +369,9 @@
+     StoredVectorKey, TextMatch, TransactionRequirement, Traversal, TraversalDirection,
+     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
+ };
+-pub(crate) use types::{GENERATED_CONFIG, MAX_DIMENSIONS, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM};
++pub(crate) use types::{
++    GENERATED_CONFIG, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM,
++};
+ mod background_runner;
+ mod check;
+ mod configuration;
+@@ -640,11 +642,16 @@
+     /// # Errors
+     /// Returns an internal error for I/O or malformed persisted values.
+     fn files_get(&self) -> StorageResult<Vec<FileRow>>;
+-    /// Execute an already-prepared FTS expression without a candidate limit.
++    /// Select at most `limit` FTS knowledge hits, ordered by BM25 then identity in SQL.
++    /// Only selected rows are decoded; filtering and fusion operate on this bounded pool.
+     ///
+     /// # Errors
+     /// Returns an invalid request for malformed expressions, or an internal error for I/O.
+-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>>;
++    fn text_index_get_by_expression(
++        &self,
++        expression: &str,
++        limit: NonZeroUsize,
++    ) -> StorageResult<Vec<TextMatch>>;
+     /// Read a text-addressed vector under the expected pinned identity.
+     ///
+     /// # Errors
+@@ -654,7 +661,9 @@
+         expected: &Sha256,
+         search_hash: &Sha256,
+     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
+-    /// Find native cosine matches joined to current node search hashes.
++    /// Select at most `limit` current knowledge hits ordered by cosine distance then identity.
++    /// Native matching, joins, ordering and the knowledge-row limit execute in `SQLite`.
++    /// Unreferenced vectors consume no returned slots; only selected rows are decoded.
+     ///
+     /// # Errors
+     /// Rejects invalid query vectors or reports database/integrity failures.
+@@ -663,6 +672,7 @@
+         expected: &Sha256,
+         query: &[f32],
+         dimensions: usize,
++        limit: NonZeroUsize,
+     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>>;
+     /// Read durable attempts and the latest failure under the pinned identity.
+     ///
+--- a/src/service/search.rs
++++ b/src/service/search.rs
+@@ -1,3 +1,4 @@
++use super::MAX_SEARCH_LIMIT;
+ use super::utils::is_current_knowledge;
+ use super::utils::map_document_file;
+ use super::{
+@@ -94,6 +95,7 @@
+ > Searcher for SearchService<D, E, F, M, P, C>
+ {
+     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
++        let limit = request.limit.min(MAX_SEARCH_LIMIT);
+         self.refresher.refresh(&[]).map_err(map_search_error)?;
+         self.provenance
+             .validate_revisions(&request.filters.source_revisions)
+@@ -115,9 +117,9 @@
+                     storage: read,
+                     embeddings: &mut self.embeddings,
+                 }
+-                .find_vector_candidates(captured, &request.query)?;
++                .find_vector_candidates(captured, &request.query, limit)?;
+                 let fts = read
+-                    .text_index_get_by_expression(&expression)
++                    .text_index_get_by_expression(&expression, limit)
+                     .map_err(map_search_error)?;
+                 validate_metrics(&fts, &vectors)?;
+                 let metadata = candidates.get_candidate_metadata(&fts, &vectors)?;
+@@ -129,7 +131,7 @@
+                 };
+                 let mut links = eligibility.get_eligible_links(&metadata, &request.filters)?;
+                 let eligible = links.keys().cloned().collect();
+-                let ranked = rank_candidates(&fts, &vectors, &eligible, request.limit)?;
++                let ranked = rank_candidates(&fts, &vectors, &eligible, limit)?;
+                 ranked
+                     .into_iter()
+                     .map(|id| {
+@@ -315,6 +317,7 @@
+         &mut self,
+         captured: Option<(&EmbeddingConfig, NonZeroUsize)>,
+         query: &str,
++        limit: NonZeroUsize,
+     ) -> CommandResult<Vec<VectorMatch>> {
+         let Some((config, dimensions)) = captured else {
+             return Ok(Vec::new());
+@@ -341,7 +344,7 @@
+         }
+         match self
+             .storage
+-            .vector_index_get_by_vector(&identity, &vector, dimensions.get())
++            .vector_index_get_by_vector(&identity, &vector, dimensions.get(), limit)
+             .map_err(map_search_error)?
+         {
+             VectorOutcome::Current(matches) => Ok(matches),
+@@ -1147,7 +1150,11 @@
+                         storage: read,
+                         embeddings: &mut embeddings,
+                     }
+-                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
++                    .find_vector_candidates(
++                        Some((&config, NonZeroUsize::new(2).unwrap())),
++                        "query",
++                        NonZeroUsize::new(100).unwrap(),
++                    )
+                     .unwrap_err();
+                     // Then: invalid index data and infrastructure failures propagate.
+                     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+@@ -1163,7 +1170,11 @@
+                         storage: read,
+                         embeddings: &mut embeddings
+                     }
+-                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
++                    .find_vector_candidates(
++                        Some((&config, NonZeroUsize::new(2).unwrap())),
++                        "query",
++                        NonZeroUsize::new(100).unwrap()
++                    )
+                     .is_err()
+                 );
+ 
+@@ -1192,7 +1203,11 @@
+                         storage: read,
+                         embeddings: &mut embeddings
+                     }
+-                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
++                    .find_vector_candidates(
++                        Some((&config, NonZeroUsize::new(2).unwrap())),
++                        "query",
++                        NonZeroUsize::new(100).unwrap()
++                    )
+                     .unwrap()
+                     .is_empty()
+                 );
+@@ -1204,7 +1219,11 @@
+                         storage: read,
+                         embeddings: &mut unavailable
+                     }
+-                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
++                    .find_vector_candidates(
++                        Some((&config, NonZeroUsize::new(2).unwrap())),
++                        "query",
++                        NonZeroUsize::new(100).unwrap()
++                    )
+                     .unwrap()
+                     .is_empty()
+                 );
+@@ -1216,7 +1235,7 @@
+                         storage: read,
+                         embeddings: &mut unused
+                     }
+-                    .find_vector_candidates(None, "query")
++                    .find_vector_candidates(None, "query", NonZeroUsize::new(100).unwrap())
+                     .unwrap()
+                     .is_empty()
+                 );
+@@ -1316,7 +1335,7 @@
+                 domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri, TreeOid},
+                 service::{CacheDatabase, CommandErrorKind, NodeMetadata, Searcher, StorageRead},
+             };
+-            use std::path::Path;
++            use std::{num::NonZeroUsize, path::Path};
+ 
+             #[test]
+             fn revision_cache_keeps_demand_order_and_resets_between_searches() {
+@@ -1337,6 +1356,26 @@
+                         "validate", "compare", "observe", "observe", "validate", "compare",
+                         "observe", "observe"
+                     ]
++                );
++            }
++
++            #[test]
++            fn sql_pool_limits_fresh_candidate_observations() {
++                // Given: two equally ranked candidates share one source comparison.
++                let fixture = ScopedFixture::new();
++                add_second_candidate(fixture.root.path(), 'a');
++                let mut search = fixture.build_search(None, None);
++                let mut request = build_filtered_request();
++                request.limit = NonZeroUsize::MIN;
++                // When: each SQL channel is limited to one knowledge hit.
++                let links = search.search(&request).unwrap();
++                // Then: only the selected candidate is captured and observed; there is no tail walk.
++                assert_eq!(links.len(), 1);
++                assert_eq!(links[0].element_id.as_str(), "a.md");
++                assert_eq!(fixture.reads.get(), 1);
++                assert_eq!(
++                    *search.provenance.events.borrow(),
++                    ["validate", "compare", "observe"]
+                 );
+             }
+ 
+--- a/src/service/status.rs
++++ b/src/service/status.rs
+@@ -1131,8 +1131,12 @@
+         fn files_get(&self) -> StorageResult<Vec<FileRow>> {
+             StorageRead::files_get(&self.inner)
+         }
+-        fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
+-            StorageRead::text_index_get_by_expression(&self.inner, expression)
++        fn text_index_get_by_expression(
++            &self,
++            expression: &str,
++            limit: NonZeroUsize,
++        ) -> StorageResult<Vec<TextMatch>> {
++            StorageRead::text_index_get_by_expression(&self.inner, expression, limit)
+         }
+         fn vector_keys_get_by_search_hash(
+             &self,
+@@ -1146,8 +1150,9 @@
+             expected: &Sha256,
+             query: &[f32],
+             dimensions: usize,
++            limit: NonZeroUsize,
+         ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
+-            StorageRead::vector_index_get_by_vector(&self.inner, expected, query, dimensions)
++            StorageRead::vector_index_get_by_vector(&self.inner, expected, query, dimensions, limit)
+         }
+         fn embed_failures_get_by_search_hash(
+             &self,
+--- a/src/service/traversal.rs
++++ b/src/service/traversal.rs
+@@ -1222,7 +1222,11 @@
+             fn files_get(&self) -> StorageResult<Vec<FileRow>> {
+                 self.inner.files_get()
+             }
+-            fn text_index_get_by_expression(&self, _: &str) -> StorageResult<Vec<TextMatch>> {
++            fn text_index_get_by_expression(
++                &self,
++                _: &str,
++                _limit: NonZeroUsize,
++            ) -> StorageResult<Vec<TextMatch>> {
+                 panic!("query text")
+             }
+             fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+@@ -1257,6 +1261,7 @@
+                 _: &Sha256,
+                 _: &[f32],
+                 _: usize,
++                _limit: NonZeroUsize,
+             ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
+                 panic!("query vectors")
+             }
+--- a/src/service/types.rs
++++ b/src/service/types.rs
+@@ -15,6 +15,12 @@
+     collections::{BTreeMap, BTreeSet},
+     fmt,
+     num::{NonZeroU32, NonZeroUsize},
++};
++
++/// Default and maximum number of knowledge hits returned by each search channel.
++pub(crate) const MAX_SEARCH_LIMIT: NonZeroUsize = match NonZeroUsize::new(100) {
++    Some(limit) => limit,
++    None => panic!("the fixed search limit must be positive"),
+ };
+ 
+ /// Internal bound shared by neighbor producers and consumers.
+@@ -363,12 +369,12 @@
+     pub hash: Option<Sha256>,
+ }
+ 
+-/// Literal search text, normalized restrictions and final result bound.
++/// Literal search text, normalized restrictions and bounded retrieval/result limit.
+ #[derive(Debug)]
+ pub struct SearchRequest {
+     /// Uninterpreted user query, tokenized by the search service.
+     pub query: String,
+-    /// Maximum links after combining complete candidate channels.
++    /// Positive per-channel and final limit; search caps it at 100.
+     pub limit: NonZeroUsize,
+     /// Normalized source, revision and current-flag restrictions.
+     pub filters: SearchFilters,
+--- a/src/service/utils.rs
++++ b/src/service/utils.rs
+@@ -429,7 +429,7 @@
+ fn edges_get_by_source_id(&$receiver, source_id: Option<&$crate::domain::KnowledgeId>) -> $crate::service::StorageResult<Vec<$crate::domain::Edge>> { $crate::service::StorageRead::edges_get_by_source_id($target, source_id) }
+ fn files_get_by_path(&$receiver, path: &$crate::domain::RepoPath) -> $crate::service::StorageResult<Option<$crate::service::FileRow>> { $crate::service::StorageRead::files_get_by_path($target, path) }
+ fn files_get(&$receiver) -> $crate::service::StorageResult<Vec<$crate::service::FileRow>> { $crate::service::StorageRead::files_get($target) }
+-fn text_index_get_by_expression(&$receiver, expression: &str) -> $crate::service::StorageResult<Vec<$crate::service::TextMatch>> { $crate::service::StorageRead::text_index_get_by_expression($target, expression) }
++fn text_index_get_by_expression(&$receiver, expression: &str, limit: std::num::NonZeroUsize) -> $crate::service::StorageResult<Vec<$crate::service::TextMatch>> { $crate::service::StorageRead::text_index_get_by_expression($target, expression, limit) }
+ fn vector_keys_get_by_search_hash(
+         &$receiver,
+         expected: &$crate::domain::Sha256,
+@@ -440,7 +440,7 @@
+         expected: &$crate::domain::Sha256,
+         query: &[f32],
+         dimensions: usize,
+-    ) -> $crate::service::StorageResult<$crate::service::VectorOutcome<Vec<$crate::service::VectorMatch>>> { $crate::service::StorageRead::vector_index_get_by_vector($target, expected, query, dimensions) }
++    limit: std::num::NonZeroUsize,) -> $crate::service::StorageResult<$crate::service::VectorOutcome<Vec<$crate::service::VectorMatch>>> { $crate::service::StorageRead::vector_index_get_by_vector($target, expected, query, dimensions, limit) }
+ fn embed_failures_get_by_search_hash(
+         &$receiver,
+         expected: &$crate::domain::Sha256,
+--- a/src/storage/cache.rs
++++ b/src/storage/cache.rs
+@@ -522,7 +522,11 @@
+         Ok(files)
+     }
+ 
+-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
++    fn text_index_get_by_expression(
++        &self,
++        expression: &str,
++        limit: NonZeroUsize,
++    ) -> StorageResult<Vec<TextMatch>> {
+         let db = self.get_connection()?;
+         let mut stmt = db
+             .prepare(
+@@ -530,11 +534,16 @@
+                  from text_index
+                  join nodes on nodes.id = text_index.rowid
+                  where text_index match ?1 and nodes.kind <> ?2
+-                 order by score, nodes.uri",
++                 order by score, nodes.uri
++                 limit ?3",
+             )
+             .map_err(map_sqlite)?;
+         let mut rows = stmt
+-            .query(params![expression, SOURCE_KIND])
++            .query(params![
++                expression,
++                SOURCE_KIND,
++                i64::try_from(limit.get()).map_err(map_invalid_value)?
++            ])
+             .map_err(map_match)?;
+         let mut found = Vec::new();
+         while let Some(row) = rows.next().map_err(map_match)? {
+@@ -565,11 +574,13 @@
+         expected: &Sha256,
+         query: &[f32],
+         dimensions: usize,
++        limit: NonZeroUsize,
+     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
+         if self.meta_get_by_id()? != Some(*expected) {
+             return Ok(VectorOutcome::ConfigChanged);
+         }
+-        get_nearest_vectors(self.get_connection()?, query, dimensions).map(VectorOutcome::Current)
++        get_nearest_vectors(self.get_connection()?, query, dimensions, limit)
++            .map(VectorOutcome::Current)
+     }
+ 
+     fn embed_failures_get_by_search_hash(
+@@ -1842,6 +1853,7 @@
+ mod cancellation_tests {
+     use crate::service::StorageError;
+     use crate::service::TransactionError;
++    use std::num::NonZeroUsize;
+ 
+     use crate::storage::TestDatabases;
+     use crate::{
+@@ -2219,7 +2231,7 @@
+     }
+ 
+     fn get_text_matches_by_expression(read: &dyn StorageRead, expression: &str) -> Vec<String> {
+-        read.text_index_get_by_expression(expression)
++        read.text_index_get_by_expression(expression, NonZeroUsize::new(100).unwrap())
+             .expect("FTS expression")
+             .into_iter()
+             .map(|found| found.id.as_str().to_owned())
+--- a/src/storage/vector.rs
++++ b/src/storage/vector.rs
+@@ -639,13 +639,14 @@
+     connection: &Connection,
+     query: &[f32],
+     dimensions: usize,
++    limit: NonZeroUsize,
+ ) -> StorageResult<Vec<VectorMatch>> {
+     let bytes = encode_vector(query, dimensions)?;
+     let count = vector_keys_get(connection)?;
+     if count == 0 {
+         return Ok(Vec::new());
+     }
+-    vector_index_get_by_vector(connection, &bytes, count)
++    vector_index_get_by_vector(connection, &bytes, count, limit)
+ }
+ 
+ fn vector_keys_get(connection: &Connection) -> StorageResult<i64> {
+@@ -663,6 +664,7 @@
+     connection: &Connection,
+     bytes: &[u8],
+     count: i64,
++    limit: NonZeroUsize,
+ ) -> StorageResult<Vec<VectorMatch>> {
+     let mut statement = connection
+         .prepare(
+@@ -671,17 +673,26 @@
+          join vec.vector_keys k on k.row_id = v.rowid
+          join nodes n on n.search_hash = k.search_hash
+          where n.kind <> ?3
+-         order by v.distance, n.uri",
++         order by v.distance, n.uri
++         limit ?4",
+         )
+         .map_err(map_sqlite)?;
+     let rows = statement
+-        .query_map(params![bytes, format!("{{K:{count}}}"), SOURCE_KIND], |r| {
+-            Ok((
+-                r.get::<_, String>(0)?,
+-                r.get::<_, String>(1)?,
+-                r.get::<_, f64>(2)?,
+-            ))
+-        })
++        .query_map(
++            params![
++                bytes,
++                format!("{{K:{count}}}"),
++                SOURCE_KIND,
++                i64::try_from(limit.get()).map_err(map_invalid_value)?
++            ],
++            |r| {
++                Ok((
++                    r.get::<_, String>(0)?,
++                    r.get::<_, String>(1)?,
++                    r.get::<_, f64>(2)?,
++                ))
++            },
++        )
+         .map_err(map_sqlite)?;
+     rows.map(|row| {
+         let (id, search_hash, distance) = row.map_err(map_sqlite)?;
+--- a/tests/cancellation_concurrency.rs
++++ b/tests/cancellation_concurrency.rs
+@@ -1,6 +1,7 @@
+ use letopis::service::StorageError;
+ use letopis::service::TransactionError;
+ use letopis::service::{CacheDatabase, StorageRead};
++use std::num::NonZeroUsize;
+ #[expect(
+     dead_code,
+     reason = "Shared cancellation fixtures expose unrelated wait observers"
+@@ -204,6 +205,7 @@
+         },
+     ]);
+     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
++    let identity = config.get_identity();
+     let old_hash = get_search_hash(&repo);
+     let mut drain = spawn_drain(&repo);
+     barrier.wait_until_entered();
+@@ -223,10 +225,6 @@
+         get_vector_by_search_hash(&repo, &config, &new_hash),
+         Some(vec![0., 1.])
+     );
+-    assert_ne!(
+-        get_vector_by_search_hash(&repo, &config, &new_hash),
+-        Some(vec![1., 0.])
+-    );
+     let old = get_vector_by_search_hash(&repo, &config, &old_hash);
+     assert!(old.is_none() || old == Some(vec![1., 0.]), "{old:?}");
+     let second = http.take_requests();
+@@ -238,7 +236,7 @@
+         .with_read_tx(|| {
+             let read = &storage.cache;
+             let matches = match read
+-                .vector_index_get_by_vector(&config.get_identity(), &[0., 1.], 2)
++                .vector_index_get_by_vector(&identity, &[0., 1.], 2, NonZeroUsize::MIN)
+                 .expect("vector query")
+             {
+                 VectorOutcome::Current(matches) => matches,
+--- a/tests/check_lifecycle.rs
++++ b/tests/check_lifecycle.rs
+@@ -1,5 +1,6 @@
+ use letopis::service::StorageError;
+ use letopis::service::{CacheDatabase, StorageRead};
++use std::num::NonZeroUsize;
+ mod support;
+ 
+ use letopis::{
+@@ -167,13 +168,19 @@
+         .with_read_tx(|| {
+             let view = &storage.cache;
+             assert!(
+-                view.text_index_get_by_expression("RetainedOriginal")
+-                    .unwrap()
+-                    .is_empty()
++                view.text_index_get_by_expression(
++                    "RetainedOriginal",
++                    NonZeroUsize::new(100).unwrap()
++                )
++                .unwrap()
++                .is_empty()
+             );
+             assert_eq!(
+-                view.text_index_get_by_expression("RepairedCurrent")
+-                    .unwrap()[0]
++                view.text_index_get_by_expression(
++                    "RepairedCurrent",
++                    NonZeroUsize::new(100).unwrap()
++                )
++                .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "retained.md"
+@@ -230,7 +237,9 @@
+                 };
+                 assert_eq!(metadata.id.as_str(), id);
+                 assert_eq!(metadata.created_at, created_at);
+-                let matches = view.text_index_get_by_expression(text).unwrap();
++                let matches = view
++                    .text_index_get_by_expression(text, NonZeroUsize::new(100).unwrap())
++                    .unwrap();
+                 assert_eq!(matches.len(), 1);
+                 assert_eq!(matches[0].id.as_str(), id);
+             }
+--- a/tests/corruption_recovery.rs
++++ b/tests/corruption_recovery.rs
+@@ -215,7 +215,9 @@
+                 .collect();
+             assert_eq!(ids, ["a.md", "b.md"]);
+             for (token, id) in [("AlphaToken", "a.md"), ("BravoToken", "b.md")] {
+-                let matches = read.text_index_get_by_expression(token).unwrap();
++                let matches = read
++                    .text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
++                    .unwrap();
+                 assert_eq!(matches.len(), 1);
+                 assert_eq!(matches[0].id.as_str(), id);
+             }
+--- a/tests/corruption_reindex.rs
++++ b/tests/corruption_reindex.rs
+@@ -1,5 +1,6 @@
+ use letopis::service::StorageError;
+ use letopis::service::{CacheDatabase, StorageRead};
++use std::num::NonZeroUsize;
+ mod support;
+ 
+ use letopis::domain::RepoPath;
+@@ -225,13 +226,18 @@
+             assert_eq!(read.nodes_get().unwrap().len(), 1);
+             assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
+             assert_eq!(
+-                read.text_index_get_by_expression("CharlieToken").unwrap()[0]
++                read.text_index_get_by_expression("CharlieToken", NonZeroUsize::new(100).unwrap())
++                    .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "b.md"
+             );
+             for token in ["AlphaToken", "BravoToken"] {
+-                assert!(read.text_index_get_by_expression(token).unwrap().is_empty());
++                assert!(
++                    read.text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
++                        .unwrap()
++                        .is_empty()
++                );
+             }
+             let files = read.files_get().unwrap();
+             let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
+@@ -275,12 +281,18 @@
+             assert_eq!(read.nodes_get().unwrap().len(), 2);
+             assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
+             for (token, id) in [("DeltaToken", "a.md"), ("CharlieToken", "b.md")] {
+-                let found = read.text_index_get_by_expression(token).unwrap();
++                let found = read
++                    .text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
++                    .unwrap();
+                 assert_eq!(found.len(), 1);
+                 assert_eq!(found[0].id.as_str(), id);
+             }
+             for token in ["AlphaToken", "BravoToken"] {
+-                assert!(read.text_index_get_by_expression(token).unwrap().is_empty());
++                assert!(
++                    read.text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
++                        .unwrap()
++                        .is_empty()
++                );
+             }
+             let files = read.files_get().unwrap();
+             assert_eq!(files.len(), 3);
+--- a/tests/embedding_lifecycle.rs
++++ b/tests/embedding_lifecycle.rs
+@@ -1,5 +1,6 @@
+ use letopis::service::StorageError;
+ use letopis::service::{CacheDatabase, StorageRead};
++use std::num::NonZeroUsize;
+ mod support;
+ 
+ use letopis::{
+@@ -44,7 +45,9 @@
+         .cache
+         .with_read_tx(|| {
+             let read = &storage.cache;
+-            let matches = read.text_index_get_by_expression(FINAL_MARKER).unwrap();
++            let matches = read
++                .text_index_get_by_expression(FINAL_MARKER, NonZeroUsize::new(100).unwrap())
++                .unwrap();
+             assert_eq!(matches.len(), 1);
+             assert_eq!(matches[0].id.as_str(), "long.md");
+             let node = StorageRead::nodes_get_by_id(
+--- a/tests/embedding_service.rs
++++ b/tests/embedding_service.rs
+@@ -221,7 +221,9 @@
+             .with_read_tx(|| {
+                 Ok::<_, StorageError>({
+                     let read = &storage.cache;
+-                    let matches = read.text_index_get_by_expression("knowledge").unwrap();
++                    let matches = read
++                        .text_index_get_by_expression("knowledge", NonZeroUsize::new(100).unwrap())
++                        .unwrap();
+                     Corpus {
+                         rows,
+                         files,
+--- a/tests/index_command.rs
++++ b/tests/index_command.rs
+@@ -16,6 +16,7 @@
+ use letopis::service::{CacheDatabase, StorageRead};
+ use letopis::{open_filesystem, service::FileLocker};
+ use serde_json::{Value, json};
++use std::num::NonZeroUsize;
+ use std::process::{Command, Stdio};
+ use support::git::isolate_command;
+ use support::reading::ReadingRepo;
+@@ -64,7 +65,11 @@
+     let storage = repo.open_storage();
+     let rows = storage
+         .cache
+-        .with_read_tx(|| storage.cache.text_index_get_by_expression("BravoToken"))
++        .with_read_tx(|| {
++            storage
++                .cache
++                .text_index_get_by_expression("BravoToken", NonZeroUsize::new(100).unwrap())
++        })
+         .unwrap();
+     assert_eq!(rows[0].id.as_str(), "b.md");
+     // When / Then: both combined flag orders force the selected full reparse.
+@@ -138,7 +143,11 @@
+     let storage = repo.open_storage();
+     let rows = storage
+         .cache
+-        .with_read_tx(|| storage.cache.text_index_get_by_expression("ChangedToken"))
++        .with_read_tx(|| {
++            storage
++                .cache
++                .text_index_get_by_expression("ChangedToken", NonZeroUsize::new(100).unwrap())
++        })
+         .unwrap();
+     assert_eq!(rows[0].id.as_str(), "a.md");
+ 
+@@ -211,7 +220,11 @@
+         let storage = repo.open_storage();
+         let outside = storage
+             .cache
+-            .with_read_tx(|| storage.cache.text_index_get_by_expression("OutsideToken"))
++            .with_read_tx(|| {
++                storage
++                    .cache
++                    .text_index_get_by_expression("OutsideToken", NonZeroUsize::new(100).unwrap())
++            })
+             .unwrap();
+         assert_eq!(outside[0].id.as_str(), "outside.md");
+     }
+--- a/tests/knowledge_search.rs
++++ b/tests/knowledge_search.rs
+@@ -14,6 +14,47 @@
+     embedding::{FixtureReply, HttpFixture},
+     reading::{ReadingRepo, run_with_credentials},
+ };
++
++#[test]
++fn service_caps_direct_requests_at_one_hundred_results() {
++    // Given: 105 equally searchable knowledge files and a direct service caller.
++    let repo = ReadingRepo::new();
++    for index in 0..105 {
++        repo.write_knowledge(&format!("n{index:03}.md"), "sqlite");
++    }
++    // When: the caller supplies a limit above the search maximum.
++    let links = wire_searcher(repo.get_root())
++        .unwrap()
++        .search(&make_request("sqlite", 1000))
++        .unwrap();
++    // Then: the effective limit caps both retrieval and the final response at 100.
++    assert_eq!(links.len(), 100);
++    assert_eq!(links.first().unwrap().element_id.as_str(), "n000.md");
++    assert_eq!(links.last().unwrap().element_id.as_str(), "n099.md");
++}
++
++#[test]
++fn restrictive_filter_does_not_refill_outside_sql_candidates() {
++    // Given: the first lexical candidate has no sources; a lower candidate has one.
++    let repo = ReadingRepo::new();
++    repo.write_knowledge("a.md", "sqlite");
++    repo.write_knowledge(
++        "b.md",
++        "sqlite extra [source](code.rs \"letopis:type=external;path=code.rs\")",
++    );
++    let mut request = make_request("sqlite", 1);
++    request
++        .filters
++        .sources
++        .insert(letopis::domain::SourceUri::parse("code.rs").unwrap());
++    // When: a source filter excludes the single SQL-selected candidate.
++    let links = wire_searcher(repo.get_root())
++        .unwrap()
++        .search(&request)
++        .unwrap();
++    // Then: the service returns fewer hits rather than scanning/refilling the whole corpus.
++    assert!(links.is_empty());
++}
+ 
+ #[test]
+ fn search_refreshes_and_returns_only_knowledge_links() {
+@@ -307,7 +348,7 @@
+     assert_eq!(server.take_requests().len(), 1);
+ }
+ #[test]
+-fn malformed_persisted_knowledge_uri_fails_even_beyond_final_limit() {
++fn malformed_persisted_knowledge_uri_is_decoded_only_inside_sql_limit() {
+     // Given: two searchable elements with one persisted address corrupted.
+     let repo = ReadingRepo::new();
+     repo.write_knowledge("a.md", "sqlite sqlite sqlite");
+@@ -326,12 +367,20 @@
+             .unwrap(),
+         1
+     );
+-    // When: search inspects candidates beyond its final result limit.
++    // When: SQL selects the stronger valid hit with limit one.
++    let links = wire_searcher(repo.get_root())
++        .unwrap()
++        .search(&make_request("sqlite", 1))
++        .unwrap();
++    // Then: an unselected malformed URI is not decoded as a search candidate.
++    assert_eq!(links.len(), 1);
++    assert_eq!(links[0].element_id.as_str(), "a.md");
++    // When: the candidate pool includes the malformed lower-scoring hit.
+     let error = wire_searcher(repo.get_root())
+         .unwrap()
+-        .search(&make_request("sqlite", 1))
++        .search(&make_request("sqlite", 2))
+         .unwrap_err();
+-    // Then: the malformed persisted address produces a safe internal error.
++    // Then: selected corruption remains a safe internal error.
+     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+ }
+ #[test]
+@@ -406,6 +455,7 @@
+                         &config.get_identity(),
+                         &[1.0, 0.0],
+                         2,
++                        NonZeroUsize::new(100).unwrap(),
+                     ))
+                 })
+                 .unwrap()
+--- a/tests/markdown_link_lifecycle.rs
++++ b/tests/markdown_link_lifecycle.rs
+@@ -1,6 +1,7 @@
+ use crate::support::storage::get_current;
+ use letopis::service::StorageError;
+ use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
++use std::num::NonZeroUsize;
+ mod support;
+ 
+ use letopis::{
+@@ -129,7 +130,9 @@
+     assert!(
+         storage
+             .cache
+-            .with_read_tx(|| storage.cache.text_index_get_by_expression("new OR old"))
++            .with_read_tx(|| storage
++                .cache
++                .text_index_get_by_expression("new OR old", NonZeroUsize::new(100).unwrap()))
+             .unwrap()
+             .is_empty()
+     );
+@@ -245,7 +248,8 @@
+                 }))
+             );
+             assert_eq!(
+-                read.text_index_get_by_expression("StableToken").unwrap()[0]
++                read.text_index_get_by_expression("StableToken", NonZeroUsize::new(100).unwrap())
++                    .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "note.md"
+--- a/tests/reindex_command.rs
++++ b/tests/reindex_command.rs
+@@ -1,5 +1,6 @@
+ use letopis::service::StorageError;
+ use letopis::service::{CacheDatabase, StorageRead};
++use std::num::NonZeroUsize;
+ mod support;
+ use letopis::{
+     domain::{EdgeTarget, KnowledgeId},
+@@ -32,7 +33,8 @@
+         .with_read_tx(|| {
+             let read = &storage.cache;
+             assert_eq!(
+-                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
++                read.text_index_get_by_expression("AlphaToken", NonZeroUsize::new(100).unwrap())
++                    .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "a.md"
+@@ -81,19 +83,21 @@
+         .with_read_tx(|| {
+             let read = &storage.cache;
+             assert_eq!(
+-                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
++                read.text_index_get_by_expression("AlphaToken", NonZeroUsize::new(100).unwrap())
++                    .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "a.md"
+             );
+             assert_eq!(
+-                read.text_index_get_by_expression("CharlieToken").unwrap()[0]
++                read.text_index_get_by_expression("CharlieToken", NonZeroUsize::new(100).unwrap())
++                    .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "b.md"
+             );
+             assert!(
+-                read.text_index_get_by_expression("BravoToken")
++                read.text_index_get_by_expression("BravoToken", NonZeroUsize::new(100).unwrap())
+                     .unwrap()
+                     .is_empty()
+             );
+@@ -321,15 +325,19 @@
+             let read = &storage.cache;
+             assert_eq!(read.project_get_by_id().unwrap(), 1);
+             assert_eq!(
+-                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
++                read.text_index_get_by_expression("AlphaToken", NonZeroUsize::new(100).unwrap())
++                    .unwrap()[0]
+                     .id
+                     .as_str(),
+                 "a.md"
+             );
+             assert!(
+-                read.text_index_get_by_expression("UnpublishedToken")
+-                    .unwrap()
+-                    .is_empty()
++                read.text_index_get_by_expression(
++                    "UnpublishedToken",
++                    NonZeroUsize::new(100).unwrap()
++                )
++                .unwrap()
++                .is_empty()
+             );
+             Ok::<_, StorageError>(())
+         })
+--- a/tests/search_consistency.rs
++++ b/tests/search_consistency.rs
+@@ -100,7 +100,12 @@
+             let next = repo.write_config("ollama", "http://localhost/api", "next");
+             repo.seed_vectors(&next, &[("a.md", &[0.0, 0.0, 1.0])]);
+             let matches = old
+-                .vector_index_get_by_vector(&identity, &[1.0, 0.0], 2)
++                .vector_index_get_by_vector(
++                    &identity,
++                    &[1.0, 0.0],
++                    2,
++                    NonZeroUsize::new(100).unwrap(),
++                )
+                 .unwrap();
+             let VectorOutcome::Current(matches) = matches else {
+                 panic!("old identity must remain pinned")
+--- a/tests/source_projection.rs
++++ b/tests/source_projection.rs
+@@ -1,5 +1,6 @@
+ use letopis::service::StorageError;
+ use letopis::service::{CacheDatabase, StorageRead};
++use std::num::NonZeroUsize;
+ mod support;
+ 
+ use letopis::{
+@@ -188,7 +189,7 @@
+                 storage.cache.edges_get_by_source_id(None)?.len(),
+                 storage
+                     .cache
+-                    .text_index_get_by_expression("RepairedToken")?
++                    .text_index_get_by_expression("RepairedToken", NonZeroUsize::new(100).unwrap())?
+                     .len(),
+             ))
+         })
+--- a/tests/storage_cache.rs
++++ b/tests/storage_cache.rs
+@@ -1,6 +1,7 @@
+ use letopis::service::StorageError;
+ use letopis::service::TransactionError;
+ use letopis::service::{CacheDatabase, GraphRead, StorageRead, VectorDatabase};
++use std::num::NonZeroUsize;
+ use storage_support::{Databases, open_storage};
+ #[path = "support/storage.rs"]
+ mod storage_support;
+@@ -10,6 +11,41 @@
+ };
+ use storage_support::{build_file, build_knowledge, build_source};
+ use tempfile::TempDir;
++#[test]
++fn fts_limits_rows_in_sql_before_decoding() {
++    // Given: equally scored matches inserted in reverse identity order.
++    let root = TempDir::new().unwrap();
++    let storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
++    storage
++        .cache
++        .with_write_tx(|| {
++            for id in ["c.md", "b.md", "a.md"] {
++                storage
++                    .cache
++                    .nodes_upsert_by_id(&build_knowledge(id, "alpha"))?;
++                storage
++                    .cache
++                    .replace_text(&KnowledgeId::parse(id).unwrap(), "alpha")?;
++            }
++            Ok::<_, StorageError>(())
++        })
++        .unwrap();
++    // When: SQL selects a single highest-scoring knowledge hit.
++    let hits = storage
++        .cache
++        .with_read_tx(|| {
++            storage
++                .cache
++                .text_index_get_by_expression("alpha", NonZeroUsize::MIN)
++        })
++        .unwrap();
++    // Then: the database returns only the first URI, with no unbounded result decoding.
++    assert_eq!(
++        hits.iter().map(|hit| hit.id.as_str()).collect::<Vec<_>>(),
++        ["a.md"]
++    );
++}
++
+ #[test]
+ fn shared_read_exposes_graph_and_metadata_in_one_scope() {
+     // Given: the real cache contains one published knowledge node.
+@@ -90,11 +126,7 @@
+ fn cache_commit_preserves_node_row_id() {
+     // Given: an inserted knowledge node with an initial FTS entry.
+     let root = TempDir::new().unwrap();
+-    let storage = open_storage(
+-        &root.path().join("cache.db"),
+-        &root.path().join("vectors.db"),
+-    )
+-    .unwrap();
++    let storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+     let write_result = storage
+         .cache
+         .with_write_tx(|| {
+@@ -133,8 +165,14 @@
+         .with_read_tx(|| {
+             let read = &storage.cache;
+             assert_eq!(second, first);
+-            assert_eq!(read.text_index_get_by_expression("alpha").unwrap().len(), 0);
+-            assert_eq!(read.text_index_get_by_expression("beta").unwrap().len(), 1);
++            let alpha = read
++                .text_index_get_by_expression("alpha", NonZeroUsize::MIN)
++                .unwrap();
++            let beta = read
++                .text_index_get_by_expression("beta", NonZeroUsize::MIN)
++                .unwrap();
++            assert!(alpha.is_empty());
++            assert_eq!(beta.len(), 1);
+             assert_eq!(
+                 StorageRead::nodes_get_by_id(
+                     read,
+@@ -674,13 +712,18 @@
+         .with_read_tx(|| {
+             let read = &db.cache;
+             assert_eq!(
+-                read.text_index_get_by_expression("privatepayload")
+-                    .unwrap()
+-                    .len(),
++                read.text_index_get_by_expression(
++                    "privatepayload",
++                    NonZeroUsize::new(100).unwrap()
++                )
++                .unwrap()
++                .len(),
+                 1
+             );
+             let expression = "privatepayload Authorization:Bearer-secret \"";
+-            let error = read.text_index_get_by_expression(expression).unwrap_err();
++            let error = read
++                .text_index_get_by_expression(expression, NonZeroUsize::new(100).unwrap())
++                .unwrap_err();
+             assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+             assert!(error.source().is_some());
+             for marker in ["privatepayload", "Authorization", expression] {
+@@ -772,7 +815,12 @@
+     // When: all lexical matches are retrieved without a candidate limit.
+     let results = db
+         .cache
+-        .with_read_tx(|| Ok::<_, StorageError>(db.cache.text_index_get_by_expression("alpha")))
++        .with_read_tx(|| {
++            Ok::<_, StorageError>(
++                db.cache
++                    .text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap()),
++            )
++        })
+         .unwrap()
+         .unwrap();
+     // Then: all matches sort by native score and then normalized identity.
+@@ -975,7 +1023,9 @@
+     assert!(write_result.is_err());
+     assert_eq!(
+         db.cache
+-            .with_read_tx(|| db.cache.text_index_get_by_expression("alpha"))
++            .with_read_tx(|| db
++                .cache
++                .text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap()))
+             .unwrap()
+             .len(),
+         1
+@@ -995,7 +1045,7 @@
+         .with_read_tx(|| {
+             let read = &db.cache;
+             assert!(
+-                read.text_index_get_by_expression("alpha")
++                read.text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap())
+                     .unwrap()
+                     .is_empty()
+             );
+@@ -1283,7 +1333,7 @@
+                     .is_none()
+             );
+             assert!(
+-                read.text_index_get_by_expression("alpha")
++                read.text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap())
+                     .unwrap()
+                     .is_empty()
+             );
+--- a/tests/storage_corruption.rs
++++ b/tests/storage_corruption.rs
+@@ -2,6 +2,7 @@
+ use letopis::service::StorageError;
+ use letopis::service::TransactionError;
+ use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
++use std::num::NonZeroUsize;
+ use support::open_storage;
+ #[path = "support/storage.rs"]
+ mod support;
+@@ -103,7 +104,9 @@
+                 // When / Then: cache revision and lexical results survive with no vector identity.
+                 assert_eq!(view.project_get_by_id().unwrap(), 1);
+                 assert_eq!(view.meta_get_by_id().unwrap(), None);
+-                let matches = view.text_index_get_by_expression("searchable").unwrap();
++                let matches = view
++                    .text_index_get_by_expression("searchable", NonZeroUsize::new(100).unwrap())
++                    .unwrap();
+                 assert_eq!(matches.len(), 1);
+                 assert_eq!(matches[0].id.as_str(), NODE_ID);
+                 Ok::<_, StorageError>(())
+@@ -246,7 +249,9 @@
+             let view = &storage.cache;
+             assert_eq!(view.project_get_by_id().unwrap(), 1);
+             assert_eq!(view.meta_get_by_id().unwrap(), Some(*identity));
+-            let matches = view.text_index_get_by_expression("searchable").unwrap();
++            let matches = view
++                .text_index_get_by_expression("searchable", NonZeroUsize::new(100).unwrap())
++                .unwrap();
+             assert_eq!(matches.len(), 1);
+             assert_eq!(matches[0].id.as_str(), NODE_ID);
+             let vector = unwrap_current(
+--- a/tests/storage_vectors.rs
++++ b/tests/storage_vectors.rs
+@@ -2,6 +2,7 @@
+ use letopis::service::StorageError;
+ use letopis::service::TransactionError;
+ use letopis::service::{CacheDatabase, VectorDatabase};
++use std::num::NonZeroUsize;
+ use support::{Databases, open_storage};
+ #[path = "support/storage.rs"]
+ mod support;
+@@ -10,6 +11,82 @@
+     service::{StorageErrorKind, StorageRead, VectorOutcome},
+ };
+ use tempfile::TempDir;
++
++#[test]
++fn nearest_limits_current_knowledge_after_joins_and_ties() {
++    // Given: the closest vector is orphaned; far vectors tie and one has two nodes.
++    let root = TempDir::new().unwrap();
++    let storage = build_bounded_nearest_fixture(&root);
++    let identity = Sha256::digest(b"model");
++    for (limit, expected) in [
++        (1, &["z.md"][..]),
++        (2, &["z.md", "a.md"][..]),
++        (3, &["z.md", "a.md", "b.md"][..]),
++        (10, &["z.md", "a.md", "b.md", "c.md"][..]),
++    ] {
++        // When: SQL selects bounded current knowledge hits from the full native search.
++        let hits = storage
++            .cache
++            .with_read_tx(|| {
++                storage.cache.vector_index_get_by_vector(
++                    &identity,
++                    &[1.0, 0.0],
++                    2,
++                    NonZeroUsize::new(limit).unwrap(),
++                )
++            })
++            .unwrap();
++        // Then: orphans consume no slots; tied and shared-vector nodes use URI order.
++        assert_eq!(
++            unwrap_current(hits)
++                .iter()
++                .map(|hit| hit.id.as_str())
++                .collect::<Vec<_>>(),
++            expected
++        );
++    }
++}
++
++#[test]
++fn nearest_does_not_decode_an_unselected_malformed_uri() {
++    // Given: a lower-scoring current knowledge URI is malformed in persisted storage.
++    let root = TempDir::new().unwrap();
++    let storage = build_bounded_nearest_fixture(&root);
++    let connection = rusqlite::Connection::open(root.path().join("c")).unwrap();
++    connection
++        .execute(
++            "update nodes set uri = '../wrong.md' where uri = 'a.md'",
++            [],
++        )
++        .unwrap();
++    let identity = Sha256::digest(b"model");
++    // When: SQL selects only the nearest valid knowledge hit.
++    let hits = storage
++        .cache
++        .with_read_tx(|| {
++            storage
++                .cache
++                .vector_index_get_by_vector(&identity, &[1.0, 0.0], 2, NonZeroUsize::MIN)
++        })
++        .unwrap();
++    // Then: the malformed lower hit is never decoded into a Rust candidate.
++    assert_eq!(unwrap_current(hits)[0].id.as_str(), "z.md");
++    // When: the requested pool includes the malformed hit.
++    let error = storage
++        .cache
++        .with_read_tx(|| {
++            storage.cache.vector_index_get_by_vector(
++                &identity,
++                &[1.0, 0.0],
++                2,
++                NonZeroUsize::new(2).unwrap(),
++            )
++        })
++        .unwrap_err()
++        .into_inner();
++    // Then: selected-row corruption remains a typed error.
++    assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
++}
+ 
+ #[test]
+ #[expect(
+@@ -67,8 +144,13 @@
+                 Some(vec![1.0, 0.0, 0.0])
+             );
+             let matches = unwrap_current(
+-                read.vector_index_get_by_vector(&identity, &[1.0, 0.0, 0.0], 3)
+-                    .unwrap(),
++                read.vector_index_get_by_vector(
++                    &identity,
++                    &[1.0, 0.0, 0.0],
++                    3,
++                    NonZeroUsize::new(100).unwrap(),
++                )
++                .unwrap(),
+             );
+             assert_eq!(
+                 matches.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+@@ -110,7 +192,8 @@
+                 VectorOutcome::ConfigChanged
+             ));
+             assert!(matches!(
+-                read.vector_index_get_by_vector(&m2, &[], 0).unwrap(),
++                read.vector_index_get_by_vector(&m2, &[], 0, NonZeroUsize::new(100).unwrap())
++                    .unwrap(),
+                 VectorOutcome::ConfigChanged
+             ));
+             Ok::<_, StorageError>(())
+@@ -206,8 +289,13 @@
+             let read = &storage.cache;
+             // When: nearest vectors are joined to the currently published node hashes.
+             let matches = unwrap_current(
+-                read.vector_index_get_by_vector(&m1, &[1.0, 0.0, 0.0], 3)
+-                    .unwrap(),
++                read.vector_index_get_by_vector(
++                    &m1,
++                    &[1.0, 0.0, 0.0],
++                    3,
++                    NonZeroUsize::new(100).unwrap(),
++                )
++                .unwrap(),
+             );
+             // Then: nearest-vector results join only the current node hash.
+             assert_eq!(matches.len(), 1);
+@@ -377,6 +465,7 @@
+     let root = TempDir::new().unwrap();
+     let storage = open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
+     let identity = Sha256::digest(b"M1");
++    let limit = NonZeroUsize::new(3).unwrap();
+     storage.vectors.reset_vectors(None, &identity).unwrap();
+     storage
+         .cache
+@@ -416,12 +505,12 @@
+             ] {
+                 // When / Then: each invalid vector or dimension combination returns an error.
+                 assert!(
+-                    read.vector_index_get_by_vector(&identity, &query, dimensions)
++                    read.vector_index_get_by_vector(&identity, &query, dimensions, limit)
+                         .is_err()
+                 );
+             }
+             let matches = unwrap_current(
+-                read.vector_index_get_by_vector(&identity, &[1.0, 0.0, 0.0], 3)
++                read.vector_index_get_by_vector(&identity, &[1.0, 0.0, 0.0], 3, limit)
+                     .unwrap(),
+             );
+             assert_eq!(
+@@ -476,8 +565,13 @@
+ 
+ fn assert_nearest(read: &dyn StorageRead, identity: &Sha256, query: &[f32]) {
+     let matches = unwrap_current(
+-        read.vector_index_get_by_vector(identity, query, query.len())
+-            .unwrap(),
++        read.vector_index_get_by_vector(
++            identity,
++            query,
++            query.len(),
++            NonZeroUsize::new(100).unwrap(),
++        )
++        .unwrap(),
+     );
+     assert_eq!(matches.len(), 1);
+     assert_eq!(matches[0].id.as_str(), "a.md");
+@@ -491,3 +585,41 @@
+         VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
+     }
+ }
++
++fn build_bounded_nearest_fixture(
++    root: &TempDir,
++) -> Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>> {
++    let storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
++    let identity = Sha256::digest(b"model");
++    storage.vectors.reset_vectors(None, &identity).unwrap();
++    storage
++        .cache
++        .with_write_tx(|| {
++            for (id, text) in [
++                ("z.md", "close"),
++                ("b.md", "far-b"),
++                ("a.md", "far-a"),
++                ("c.md", "far-b"),
++            ] {
++                storage
++                    .cache
++                    .nodes_upsert_by_id(&support::build_knowledge(id, text))?;
++            }
++            Ok::<_, StorageError>(())
++        })
++        .unwrap();
++    for (text, vector) in [
++        ("orphan", [1.0, 0.0]),
++        ("close", [1.0, 0.0]),
++        ("far-b", [0.0, 1.0]),
++        ("far-a", [0.0, 1.0]),
++    ] {
++        store(
++            &storage,
++            &identity,
++            &Sha256::digest(text.as_bytes()),
++            &vector,
++        );
++    }
++    storage
++}
+--- a/tests/support/documents.rs
++++ b/tests/support/documents.rs
+@@ -5,6 +5,7 @@
+     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, SourceUri},
+     service::{FileRow, NodeMetadata, StoredNode},
+ };
++use std::num::NonZeroUsize;
+ use std::{fs, path::Path, process::Command};
+ use tempfile::TempDir;
+ 
+@@ -64,7 +65,11 @@
+         storage
+             .cache
+             .with_read_tx(|| {
+-                Ok::<_, StorageError>(storage.cache.text_index_get_by_expression(text))
++                Ok::<_, StorageError>(
++                    storage
++                        .cache
++                        .text_index_get_by_expression(text, NonZeroUsize::new(100).unwrap()),
++                )
+             })
+             .unwrap()
+             .unwrap()

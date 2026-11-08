@@ -15,7 +15,7 @@ Examples applied in the current root crate:
 | `SnapshotError::kind` / `message` | `get_kind` / `get_message` |
 | `RetainedTree::oid` | `get_oid` |
 | `ByteSpan`, `LineRange`: `start` / `end` | `get_start` / `get_end` |
-| `Edge::source` / `target` / `edge_type` | `get_source` / `get_target` / `get_edge_type` |
+| `Edge::source` / `target` / `edge_type` | `get_source_by_uri` / `get_target` / `get_edge_type` |
 | `kind_for` | `derive_element_kind` |
 
 These accessor/function renames change the Rust API spelling; current root-crate call sites and test helpers were updated. Test names and scenarios remain unchanged. Existing trait contracts for creating, reading and retaining Git snapshots are unchanged.

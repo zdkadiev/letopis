@@ -1,0 +1,1 @@
+{"bytes": 1195606, "libraries": ["dyld", "letopis", "libsystem_c.dylib", "libsystem_kernel.dylib", "libsystem_pthread.dylib", "libsystem_malloc.dylib", "libsystem_platform.dylib", "libsamply_mac_preload.dylib", "libdyld.dylib"], "samples": 116371, "sha256": "43b80285dfa449aa75fe34d885d1ddcb435163bc10b9d392e67cb92e03c26895", "threads": 2, "usable_stacks": 116371}

@@ -827,8 +827,12 @@ impl StorageRead for Reads {
         StorageRead::files_get(&self.inner)
     }
 
-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
-        StorageRead::text_index_get_by_expression(&self.inner, expression)
+    fn text_index_get_by_expression(
+        &self,
+        expression: &str,
+        limit: NonZeroUsize,
+    ) -> StorageResult<Vec<TextMatch>> {
+        StorageRead::text_index_get_by_expression(&self.inner, expression, limit)
     }
 
     fn vector_keys_get_by_search_hash(
@@ -844,8 +848,9 @@ impl StorageRead for Reads {
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
+        limit: NonZeroUsize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
-        StorageRead::vector_index_get_by_vector(&self.inner, expected, query, dimensions)
+        StorageRead::vector_index_get_by_vector(&self.inner, expected, query, dimensions, limit)
     }
 
     fn embed_failures_get_by_search_hash(
@@ -1571,7 +1576,7 @@ mod storage_status {
             provenance: &super::Provenance { is_failing: false },
             provider: &provider,
         };
-        service.get_embedding_status(policy)
+        service.get_embedding_status_by_policy(policy)
     }
     fn build_knowledge(id: &str, text: &str) -> crate::service::NodeMetadata {
         use crate::{

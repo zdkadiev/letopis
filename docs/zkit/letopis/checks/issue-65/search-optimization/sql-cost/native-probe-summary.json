@@ -1,0 +1,54 @@
+{
+  "scope": "SQL-only C probe of copied cache, pinned SQLite 3.53.2 amalgamation; excludes SeaQuery, Rust decoding, filesystem, parsing, provenance, embeddings and full search",
+  "engine_flags": [
+    "-O2",
+    "-DSQLITE_ENABLE_FTS5",
+    "-DSQLITE_THREADSAFE=1"
+  ],
+  "build_parity_limit": "Same pinned SQLite source as libsqlite3-sys 0.38.2; simplified compile flags, not the exact product binary",
+  "samples_seconds": {
+    "nodes_cached_0": [
+      0.216056,
+      0.219577,
+      0.217145
+    ],
+    "revision_cached_0": [
+      0.06319,
+      0.064561,
+      0.066649
+    ],
+    "edges_cached_0": [
+      1.205266,
+      1.099431,
+      1.090756
+    ],
+    "nodes_cached_1": [
+      0.064811,
+      0.06669,
+      0.063797
+    ],
+    "revision_cached_1": [
+      0.013127,
+      0.013021,
+      0.013508
+    ],
+    "edges_cached_1": [
+      0.268672,
+      0.21372,
+      0.210977
+    ]
+  },
+  "medians_seconds": {
+    "nodes_cached_0": 0.217145,
+    "revision_cached_0": 0.064561,
+    "edges_cached_0": 1.099431,
+    "nodes_cached_1": 0.064811,
+    "revision_cached_1": 0.013127,
+    "edges_cached_1": 0.21372
+  },
+  "input_sha256": {
+    "native-probe.c": "636144a2e7b9a6fea201e756dc345f4eb792417e4a5f024d85d0a029c2876b02",
+    "native-probe": "7ca15aa2e1a08b83cdf9e05475b583b824d4d9f90d836f6661563e31acf7207f",
+    "cache-copy.db": "6eb479a70e8345f632a8f6acf8752ebe0ee53bd1087333316feb10c9e3a15abf"
+  }
+}

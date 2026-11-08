@@ -2,6 +2,11 @@ use super::tree::tree_entry_get;
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{cmp::Ordering, collections::BTreeSet};
 
+#[cfg(test)]
+thread_local! {
+    static TREE_VALIDATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 const TREE_INTEGRITY_MESSAGE: &str = "Git tree integrity failed";
 const TREE_MODE: u16 = 0o040000;
 const SYMLINK_MODE: u16 = 0o120000;
@@ -21,6 +26,8 @@ const MAX_NAME_BYTES: usize = 4096;
 /// # Errors
 /// Returns `InternalError` when the body fails Git's structural checks.
 pub(super) fn tree_bytes_validate(mut bytes: &[u8], oid_len: usize) -> Result<(), SnapshotError> {
+    #[cfg(test)]
+    TREE_VALIDATION_COUNT.with(|count| count.set(count.get() + 1));
     if !matches!(oid_len, 40 | 64) {
         return Err(SnapshotError::new(
             SnapshotErrorKind::InternalError,
@@ -60,6 +67,12 @@ pub(super) fn tree_bytes_validate(mut bytes: &[u8], oid_len: usize) -> Result<()
         bytes = remaining;
     }
     Ok(())
+}
+
+/// Count full structural validations on the current test thread.
+#[cfg(test)]
+pub(super) fn tree_validation_get_count() -> usize {
+    TREE_VALIDATION_COUNT.with(std::cell::Cell::get)
 }
 
 fn validate_name(name: &[u8], mode: u16) -> Result<(), SnapshotError> {

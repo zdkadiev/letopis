@@ -1,0 +1,7 @@
+{
+  "valid": true,
+  "scope": "independent revalidation of saved conditioning response after exclusive-output helper collision; no ordinary measurement claimed",
+  "raw_receipt_sha256": "f4fe2f3a73acde0da2946f8ad8dc4d2b9f8c8c04daf6ca57e334ee018e2b20be",
+  "known_unique_current_uris": 5,
+  "corpus_hashes_verified": 4334
+}

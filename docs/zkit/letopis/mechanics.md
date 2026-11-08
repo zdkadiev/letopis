@@ -138,7 +138,19 @@ Drain (`letopis embed --drain`, MC-5) обрабатывает один текс
 
 Векторы хранятся в `.letopis/vectors.db` ([D-92](decisions.md#D-92)), подключаемом через ATTACH: vector_keys(row_id, search_hash UNIQUE), vec1 vector_index с тем же rowid, meta(config_identity), embed_failures(search_hash PK, attempts, error). Удаление кэша не затрагивает vectors.db: после пересборки работа — только новые тексты. Удаление или повреждение vectors.db — полный пересчёт векторов и попыток без потери знаний. В выдачу попадают только векторы, соединённые с nodes.search_hash текущего read view.
 
-VectorPort принимает конечные float32 одинаковой длины, проверяет размерность/непустоту и запрещает некорректные значения. Native Ollama использует truncate:false, совместимый API проверяет индексы соответствия. Baseline vec1 no-index/cos без training/ANN и лишнего flat rebuild; при config reset vec1 в `.letopis/vectors.db` пересоздаётся транзакционно, чтобы очистить старую размерность. Совместимость schema change/rollback со старым read view — обязательная реализационная проверка R-8/P-2, не доказанная моделью.
+VectorPort принимает конечные float32 одинаковой длины, проверяет размерность/непустоту и запрещает некорректные значения. Native Ollama использует truncate:false, совместимый API проверяет индексы соответствия. Текущая реализация использует точный vec1 flat/cos без training/ANN ([D-107](decisions.md#D-107)); исходный no-index/cos baseline сохраняет исторический смысл. При config reset vec1 в `.letopis/vectors.db` пересоздаётся транзакционно с flat/cos, чтобы очистить старую размерность. Совместимость schema change/rollback со старым read view проверяется отдельно; модель сама её не доказывает.
+
+Writable bootstrap переводит любую не-flat модель в flat/cos до создания
+consumer read views. Opaque model сравнивается только с моделью, созданной тем
+же закреплённым native module; описание vec1cat само по себе скрывает неизвестные
+distance tags. Под bounded immediate transaction повторяется проверка модели,
+затем native rebuild сохраняет rowids, payload, dimensions, identity и execution
+state. Ошибка откатывает переход; уже-flat не требует writer. Legacy-совместимость
+не поддерживается: индекс — это кеш, и несовместимая база пересоздаётся из
+существующих knowledge-файлов. Query-only и наблюдательный status не перестраивают
+данные. Flat blocks содержат авторитетные векторы и не являются удаляемой
+избыточной копией. Детали и проверки:
+[exact-index design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md).
 
 ### MC-4 — источники и актуальность
 
@@ -241,7 +253,7 @@ TK-28 UI, пилоты и gates этой проверкой не сертифи�
 
 Search/traverse после обнаружения изменений (MC-2) синхронизируют готовую конфигурацию через MC-3 до закрепления read view, затем открывают read-транзакцию ([D-102](decisions.md#D-102), порядок уточнён для TK-12 2026-10-23); BEGIN и первое чтение project.revision закрепляют один read snapshot кэша; vectors.db читается в той же транзакции. Конфигурация берётся из `.letopis/config.json` и принимается, только если её identity совпадает с meta.config_identity, иначе FTS-only. Query embedding вызывается напрямую с этой конфигурацией, без write lock; при ошибке выполняется один FTS-поиск с обычным успешным ответом без предупреждения, а ошибка записывается в единственную строку vec.query_error и видна только в status.problems; успешный query embedding её удаляет ([D-62](decisions.md#D-62)). Read view освобождается при результате/отмене/error.
 
-Фильтры разных полей объединяются И, внутри списков — хотя бы одно совпадение; пустой/отсутствующий список одинаковы. Source и source_revision проверяются на одной привязке. Полный eligible-набор формируется до итогового limit, включая динамическую проверку источников. Source не самостоятельный search text, но доступен inspect/traverse. FTS возвращает все подходящие совпадения, vec1 exact — все доступные подходящие vectors; преждевременный LIMIT перед фильтрами запрещён. Первый baseline допускает полный перебор метаданных и векторов, без необоснованного oversampling.
+Фильтры разных полей объединяются И, внутри списков — хотя бы одно совпадение; пустой/отсутствующий список одинаковы. Source и source_revision проверяются на одной привязке. По D-108 (2026-11-07) search использует L=min(limit или 100,100). SQL каждого канала возвращает до L знаний после joins, сортировки BM25/distance и ID tie-break; Rust получает не более 2L уникальных кандидатов. Свежие наблюдения и фильтры применяются внутри пула, затем eligible ranks/fusion и до L ссылок. Дозаполнения нет; вне SQL-пула candidate metadata/provenance не проверяются. Source не самостоятельный search text, но доступен inspect/traverse. Это заменяет прежний baseline полного перебора, а не сохраняет его full-corpus ranking. Внутреннее сканирование vec1 остаётся точным и может охватывать все векторы.
 
 FTS сортируется по bm25, vector — по cosine distance по `.letopis/vectors.db` с соединением vector_keys.search_hash = nodes.search_hash текущего read view (D-92); read view двух файлов не обязан быть одним снимком: векторы аддитивны и адресованы текстом, поэтому виден либо нет только готовый корректный вектор; ties по ID (лексикографически). При наличии каналов union объединяется score=Σ(1/rank), rank от 1 в каждом канале; отсутствующий ранг даёт 0. Итог score desc, ID asc, затем limit. При отсутствии vectors/config/query embedding только FTS. Значения метрик и вычисленный score внутренние, новый публичный score не добавляется. FTS query строится как литеральные токены в кавычках из строки пользователя, без прямой SQL/FTS-синтаксической интерполяции. Пустая нетокенизируемая строка даёт пустую выдачу, не ошибку SQL. Конкретное качество токенизации/rank проверяется P-1; языковых квот нет.
 
@@ -482,3 +494,28 @@ External-source access and retained historical snapshot membership are separate.
 Config/status/init/drain do not refresh discovery; all refreshing commands and
 index modes share it, with existing index scope semantics. Discovery changes do
 not reset retained embedding state. See [acceptance](checks/issue-97/report.md).
+## Tree validation reuse — issue #65 (2026-11-06)
+
+The invocation-owned raw Git reader may retain up to 4096 successful tree-body
+validation identities, without retaining their payloads. Each addressed read still
+reads/decodes and independently verifies the current exact object type and hash
+before consulting that metadata. Failed validation is never memoized; overflow
+continues normal validation. Full closure audits validate each visited tree body
+directly on every audit, independent of addressed-read reuse. Current source
+captures and provenance batch/error boundaries are unchanged.
+
+## Pure Markdown reuse during search — issue #65 (2026-11-06)
+
+Search eligibility retains at most the last successful pure Markdown projection
+within one invocation, after every binding performs its fresh confined file
+capture and hashes the captured bytes. Reuse requires the same repository path
+and byte hash; the existing per-node identity/hash/line predicate still runs.
+Retention bypasses inputs over 256 KiB, more than 1024 elements or over 256 KiB
+of combined path/element-ID content. Edges and search text are released before
+retention. These are logical payload/entry budgets, not a total allocator/RSS cap.
+Missing, invalid and unmarked observations leave no reusable parse. Source reads,
+provenance and filter/error demand order remain unchanged within the SQL-selected
+pool. D-108 subsequently replaces complete-corpus ranking with bounded retrieval. The parser computes line coordinates with a monotonic byte/line cursor
+after disjoint element bounds are validated, preserving CRLF, Unicode and EOF
+coordinates without repeated prefix scans. See the
+[search experiment spec](../../superpowers/specs/2026-11-06-search-optimization-design.md).

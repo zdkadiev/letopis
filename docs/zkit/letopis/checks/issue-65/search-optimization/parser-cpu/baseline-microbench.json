@@ -1,0 +1,47 @@
+{
+  "samples": [
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.261909042
+    },
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.230741833
+    },
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.229578292
+    },
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.226560709
+    },
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.203531583
+    },
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.266775334
+    },
+    {
+      "iterations": 2000,
+      "bytes": 60000,
+      "elements": 30,
+      "elapsed_seconds": 1.228903375
+    }
+  ],
+  "median_seconds": 1.229578292
+}

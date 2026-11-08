@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.10s
+     Running tests/markdown_elements.rs (../target/debug/deps/markdown_elements-c4e21ca0b637474f)
+
+running 1 test
+test adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings ... FAILED
+
+failures:
+
+---- adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings stdout ----
+
+thread 'adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings' (541269428) panicked at tests/markdown_elements.rs:280:5:
+assertion `left == right` failed
+  left: 5
+ right: 13
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test markdown_elements`

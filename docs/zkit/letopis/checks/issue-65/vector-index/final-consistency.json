@@ -1,0 +1,32 @@
+{
+  "captured_utc": "2026-11-06T22:18:19Z",
+  "root_product_inputs": 107,
+  "host_runner_inputs": 269,
+  "host_commands_passed": 16,
+  "original_corpus_files_verified": 4334,
+  "copied_corpus_files_verified": 4334,
+  "canonical_manifest_sha256": "cf2235261a3ed884a0721080b1da745870c274998d74fff38f7e7f254c0cdd1f",
+  "historical_evidence_unchanged": {
+    "current": 122,
+    "2026-11-06-100k": 26,
+    "check-status-profiling": 17,
+    "native-followup": 119,
+    "search-optimization": 202
+  },
+  "historical_artifact_total": 486,
+  "existing_unrelated_diff_preserved": true,
+  "root_head": "52ed491a6688e0a4eee0cb5eceb3fc19f900465e",
+  "git_diff_check_exit": 0,
+  "scope": "Fresh final read-only source/corpus/history audit after all benchmarks and profile; no new performance run.",
+  "markdown_links_checked": 596,
+  "link_scope": "Actual Markdown navigation outside fenced/inline examples",
+  "final_knowledge_revision": 100,
+  "final_knowledge_source_bindings": 27,
+  "final_profile_usable_stacks": 79244,
+  "original_vectors_ordered_digest_preserved": true,
+  "independent_reviews": [
+    "review/report.md",
+    "review/data-method-review.md",
+    "review/final-data-review.md"
+  ]
+}

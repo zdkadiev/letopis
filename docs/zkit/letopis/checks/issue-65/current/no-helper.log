@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running tests/git_no_subprocess.rs (target/debug/deps/git_no_subprocess-31279e310fc69f4d)
+
+running 4 tests
+test help_version_and_invalid_roots_need_no_git_executable ... ok
+test sparse_index_inspect_captures_unrequested_tracked_ignored_members_without_helpers ... ok
+test error_paths_never_fall_back_to_executable_git ... ok
+test model_free_commands_use_only_local_library_git ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.15s
+

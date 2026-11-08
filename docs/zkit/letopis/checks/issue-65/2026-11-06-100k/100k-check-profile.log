@@ -1,0 +1,8 @@
+40.53377958294004 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+{'calls': 391, 'function': 'src/service/provenance.rs::observe_sources_batch', 'inclusive_nanoseconds': 38734767702}
+{'calls': 100000, 'function': 'src/service/provenance.rs::get_snapshot_hash', 'inclusive_nanoseconds': 29973764962}
+{'calls': 100000, 'function': 'src/git/objects.rs::blob_get_by_tree_oid_and_path', 'inclusive_nanoseconds': 29767775626}
+{'calls': 100000, 'function': 'src/service/provenance.rs::get_current_hash', 'inclusive_nanoseconds': 8671169592}
+{'calls': 100000, 'function': 'src/filesystem/file.rs::file_get_by_path', 'inclusive_nanoseconds': 8550927961}
+{'calls': 1, 'function': 'src/git/refs.rs::tree_pin_by_oid', 'inclusive_nanoseconds': 111114500}
+{'calls': 1, 'function': 'src/git/refs.rs::tree_verify_closure_by_oid', 'inclusive_nanoseconds': 105667334}

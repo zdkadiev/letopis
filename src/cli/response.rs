@@ -25,9 +25,12 @@ pub(crate) enum ResponseResult {
     Help(String),
 }
 
+/// One typed command result with the nonfatal warnings that accompany it.
 #[derive(Debug)]
 pub(crate) struct CommandResponse {
+    /// Result the command produced.
     pub result: ResponseResult,
+    /// Nonfatal problems reported alongside the result.
     pub warnings: Vec<CommandProblem>,
 }
 

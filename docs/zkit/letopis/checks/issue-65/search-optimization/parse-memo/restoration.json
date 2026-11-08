@@ -1,0 +1,7 @@
+{
+  "source_sha256": "94a1c8473134b681fa36690368da520bff9fab2d241093775e9fc5d6939f7c41",
+  "matches_full_verify_source_manifest": true,
+  "mutants_caught": 10,
+  "mutants_total": 10,
+  "scoped_green_passed": 8
+}

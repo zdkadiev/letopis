@@ -1,0 +1,626 @@
+[
+  {
+    "name": "k5-pair0-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.09640087489970028,
+    "process_user_seconds": 0.045498999999999984,
+    "process_system_seconds": 0.04863000000000006,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.089993,
+        "user_seconds": 0.04353,
+        "system_seconds": 0.046332,
+        "cpu_seconds": 0.089862
+      }
+    ],
+    "K": 5,
+    "rows": 5,
+    "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+  },
+  {
+    "name": "k5-pair0-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.06075174990110099,
+    "process_user_seconds": 0.019731,
+    "process_system_seconds": 0.03866499999999995,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.05452,
+        "user_seconds": 0.017892,
+        "system_seconds": 0.036559,
+        "cpu_seconds": 0.054451
+      }
+    ],
+    "K": 5,
+    "rows": 5,
+    "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+  },
+  {
+    "name": "k5-pair1-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.06243712501600385,
+    "process_user_seconds": 0.020318000000000003,
+    "process_system_seconds": 0.03977200000000003,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.055916,
+        "user_seconds": 0.018331,
+        "system_seconds": 0.037519,
+        "cpu_seconds": 0.05585
+      }
+    ],
+    "K": 5,
+    "rows": 5,
+    "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+  },
+  {
+    "name": "k5-pair1-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.09272316703572869,
+    "process_user_seconds": 0.04344399999999998,
+    "process_system_seconds": 0.04635900000000004,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.085725,
+        "user_seconds": 0.041475,
+        "system_seconds": 0.044028,
+        "cpu_seconds": 0.085503
+      }
+    ],
+    "K": 5,
+    "rows": 5,
+    "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+  },
+  {
+    "name": "k5-pair2-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.09418070805259049,
+    "process_user_seconds": 0.04390500000000003,
+    "process_system_seconds": 0.04764899999999994,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.087841,
+        "user_seconds": 0.042114,
+        "system_seconds": 0.045527,
+        "cpu_seconds": 0.087641
+      }
+    ],
+    "K": 5,
+    "rows": 5,
+    "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+  },
+  {
+    "name": "k5-pair2-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.059446125058457255,
+    "process_user_seconds": 0.019197999999999993,
+    "process_system_seconds": 0.03741800000000006,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.05255,
+        "user_seconds": 0.017301,
+        "system_seconds": 0.035133,
+        "cpu_seconds": 0.052433999999999995
+      }
+    ],
+    "K": 5,
+    "rows": 5,
+    "output_sha256": "884b7e05d511e93d0a6dcde940283ec8fc506c74e264eea99c9f5e4235d72673"
+  },
+  {
+    "name": "k100-pair0-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.09423037501983345,
+    "process_user_seconds": 0.045304999999999984,
+    "process_system_seconds": 0.04646299999999992,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.088188,
+        "user_seconds": 0.043629,
+        "system_seconds": 0.044383,
+        "cpu_seconds": 0.088012
+      }
+    ],
+    "K": 100,
+    "rows": 100,
+    "output_sha256": "f79b301bd4a58c78974b35dc215b37000f5014d8475f3bf909b977ba0cf72d4b"
+  },
+  {
+    "name": "k100-pair0-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.06143091688863933,
+    "process_user_seconds": 0.019888000000000017,
+    "process_system_seconds": 0.03875000000000006,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.054389,
+        "user_seconds": 0.017944,
+        "system_seconds": 0.036251,
+        "cpu_seconds": 0.054195
+      }
+    ],
+    "K": 100,
+    "rows": 100,
+    "output_sha256": "f79b301bd4a58c78974b35dc215b37000f5014d8475f3bf909b977ba0cf72d4b"
+  },
+  {
+    "name": "k100-pair1-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.1261287909001112,
+    "process_user_seconds": 0.02124699999999996,
+    "process_system_seconds": 0.056512999999999924,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.11921,
+        "user_seconds": 0.019288,
+        "system_seconds": 0.054213,
+        "cpu_seconds": 0.073501
+      }
+    ],
+    "K": 100,
+    "rows": 100,
+    "output_sha256": "f79b301bd4a58c78974b35dc215b37000f5014d8475f3bf909b977ba0cf72d4b"
+  },
+  {
+    "name": "k100-pair1-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.10204266710206866,
+    "process_user_seconds": 0.04721500000000006,
+    "process_system_seconds": 0.05115000000000003,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.094926,
+        "user_seconds": 0.045357,
+        "system_seconds": 0.048889,
+        "cpu_seconds": 0.094246
+      }
+    ],
+    "K": 100,
+    "rows": 100,
+    "output_sha256": "f79b301bd4a58c78974b35dc215b37000f5014d8475f3bf909b977ba0cf72d4b"
+  },
+  {
+    "name": "k100-pair2-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.09417945914901793,
+    "process_user_seconds": 0.04429799999999995,
+    "process_system_seconds": 0.046925000000000106,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.087644,
+        "user_seconds": 0.042631,
+        "system_seconds": 0.044861,
+        "cpu_seconds": 0.087492
+      }
+    ],
+    "K": 100,
+    "rows": 100,
+    "output_sha256": "f79b301bd4a58c78974b35dc215b37000f5014d8475f3bf909b977ba0cf72d4b"
+  },
+  {
+    "name": "k100-pair2-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.06471737497486174,
+    "process_user_seconds": 0.02099300000000004,
+    "process_system_seconds": 0.04079799999999989,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.057421,
+        "user_seconds": 0.018929,
+        "system_seconds": 0.038325,
+        "cpu_seconds": 0.057254
+      }
+    ],
+    "K": 100,
+    "rows": 100,
+    "output_sha256": "f79b301bd4a58c78974b35dc215b37000f5014d8475f3bf909b977ba0cf72d4b"
+  },
+  {
+    "name": "k1000-pair0-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.14129350008442998,
+    "process_user_seconds": 0.06428999999999996,
+    "process_system_seconds": 0.073245,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.134313,
+        "user_seconds": 0.062288,
+        "system_seconds": 0.070978,
+        "cpu_seconds": 0.133266
+      }
+    ],
+    "K": 1000,
+    "rows": 1000,
+    "output_sha256": "ef1a67bbd6f6bbca87a85c22f74f23157f29a4bbc5d517a2ccc441fa696921a0"
+  },
+  {
+    "name": "k1000-pair0-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.06404295796528459,
+    "process_user_seconds": 0.020665000000000044,
+    "process_system_seconds": 0.040200000000000014,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.056858,
+        "user_seconds": 0.018872,
+        "system_seconds": 0.037684,
+        "cpu_seconds": 0.056556
+      }
+    ],
+    "K": 1000,
+    "rows": 1000,
+    "output_sha256": "ef1a67bbd6f6bbca87a85c22f74f23157f29a4bbc5d517a2ccc441fa696921a0"
+  },
+  {
+    "name": "k1000-pair1-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.07261429214850068,
+    "process_user_seconds": 0.02054199999999995,
+    "process_system_seconds": 0.040939999999999976,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.061236,
+        "user_seconds": 0.018496,
+        "system_seconds": 0.038454,
+        "cpu_seconds": 0.05695
+      }
+    ],
+    "K": 1000,
+    "rows": 1000,
+    "output_sha256": "ef1a67bbd6f6bbca87a85c22f74f23157f29a4bbc5d517a2ccc441fa696921a0"
+  },
+  {
+    "name": "k1000-pair1-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.17444250010885298,
+    "process_user_seconds": 0.06660900000000003,
+    "process_system_seconds": 0.08002100000000012,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.164348,
+        "user_seconds": 0.064577,
+        "system_seconds": 0.077453,
+        "cpu_seconds": 0.14203
+      }
+    ],
+    "K": 1000,
+    "rows": 1000,
+    "output_sha256": "ef1a67bbd6f6bbca87a85c22f74f23157f29a4bbc5d517a2ccc441fa696921a0"
+  },
+  {
+    "name": "k1000-pair2-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.13438745797611773,
+    "process_user_seconds": 0.060633999999999966,
+    "process_system_seconds": 0.07034300000000004,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.12774,
+        "user_seconds": 0.058878,
+        "system_seconds": 0.068066,
+        "cpu_seconds": 0.126944
+      }
+    ],
+    "K": 1000,
+    "rows": 1000,
+    "output_sha256": "ef1a67bbd6f6bbca87a85c22f74f23157f29a4bbc5d517a2ccc441fa696921a0"
+  },
+  {
+    "name": "k1000-pair2-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.056809958070516586,
+    "process_user_seconds": 0.01834199999999997,
+    "process_system_seconds": 0.03529099999999996,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.050304,
+        "user_seconds": 0.016681,
+        "system_seconds": 0.033421,
+        "cpu_seconds": 0.050102
+      }
+    ],
+    "K": 1000,
+    "rows": 1000,
+    "output_sha256": "ef1a67bbd6f6bbca87a85c22f74f23157f29a4bbc5d517a2ccc441fa696921a0"
+  },
+  {
+    "name": "k100000-pair0-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 2.4900710419751704,
+    "process_user_seconds": 0.564536,
+    "process_system_seconds": 1.584397,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 2.483382,
+        "user_seconds": 0.562841,
+        "system_seconds": 1.582382,
+        "cpu_seconds": 2.145223
+      }
+    ],
+    "K": 100000,
+    "rows": 100000,
+    "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+  },
+  {
+    "name": "k100000-pair0-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.10560300014913082,
+    "process_user_seconds": 0.059911999999999965,
+    "process_system_seconds": 0.04078899999999974,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.097766,
+        "user_seconds": 0.058082,
+        "system_seconds": 0.038444,
+        "cpu_seconds": 0.096526
+      }
+    ],
+    "K": 100000,
+    "rows": 100000,
+    "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+  },
+  {
+    "name": "k100000-pair1-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.14361770800314844,
+    "process_user_seconds": 0.072457,
+    "process_system_seconds": 0.05884299999999998,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.135671,
+        "user_seconds": 0.070534,
+        "system_seconds": 0.056358,
+        "cpu_seconds": 0.126892
+      }
+    ],
+    "K": 100000,
+    "rows": 100000,
+    "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+  },
+  {
+    "name": "k100000-pair1-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 2.0855374168604612,
+    "process_user_seconds": 0.547717,
+    "process_system_seconds": 1.480251,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 2.077929,
+        "user_seconds": 0.545903,
+        "system_seconds": 1.477933,
+        "cpu_seconds": 2.023836
+      }
+    ],
+    "K": 100000,
+    "rows": 100000,
+    "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+  },
+  {
+    "name": "k100000-pair2-none",
+    "mode": "none",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 2.4106469170656055,
+    "process_user_seconds": 0.5895670000000002,
+    "process_system_seconds": 1.6183050000000003,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 2.402859,
+        "user_seconds": 0.587583,
+        "system_seconds": 1.615817,
+        "cpu_seconds": 2.2034000000000002
+      }
+    ],
+    "K": 100000,
+    "rows": 100000,
+    "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+  },
+  {
+    "name": "k100000-pair2-flat",
+    "mode": "flat",
+    "argv": [
+      "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "-readonly",
+      "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.15001495787873864,
+    "process_user_seconds": 0.06518599999999974,
+    "process_system_seconds": 0.04636399999999963,
+    "stdout": "",
+    "stderr": "",
+    "sqlite_timers": [
+      {
+        "wall_seconds": 0.141434,
+        "user_seconds": 0.063222,
+        "system_seconds": 0.043884,
+        "cpu_seconds": 0.107106
+      }
+    ],
+    "K": 100000,
+    "rows": 100000,
+    "output_sha256": "4adeb97a02eabf436f7320a20eff5468e888c2158597ee589ed6d256800605e9"
+  }
+]

@@ -1,5 +1,6 @@
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead};
+use std::num::NonZeroUsize;
 mod support;
 
 use letopis::{
@@ -167,13 +168,19 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
         .with_read_tx(|| {
             let view = &storage.cache;
             assert!(
-                view.text_index_get_by_expression("RetainedOriginal")
-                    .unwrap()
-                    .is_empty()
+                view.text_index_get_by_expression(
+                    "RetainedOriginal",
+                    NonZeroUsize::new(100).unwrap()
+                )
+                .unwrap()
+                .is_empty()
             );
             assert_eq!(
-                view.text_index_get_by_expression("RepairedCurrent")
-                    .unwrap()[0]
+                view.text_index_get_by_expression(
+                    "RepairedCurrent",
+                    NonZeroUsize::new(100).unwrap()
+                )
+                .unwrap()[0]
                     .id
                     .as_str(),
                 "retained.md"
@@ -230,7 +237,9 @@ fn concurrent_check_publishes_edits_from_both_writers() {
                 };
                 assert_eq!(metadata.id.as_str(), id);
                 assert_eq!(metadata.created_at, created_at);
-                let matches = view.text_index_get_by_expression(text).unwrap();
+                let matches = view
+                    .text_index_get_by_expression(text, NonZeroUsize::new(100).unwrap())
+                    .unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(matches[0].id.as_str(), id);
             }

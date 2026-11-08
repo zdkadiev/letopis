@@ -1,0 +1,1016 @@
+{
+  "schema_version": 1,
+  "scope": "Search optimization isolated methods, final actual-root verification, paired ordinary full100k synthetic-corpus real-provider comparisons and genuine Samply; prior evidence preserved; excludes this index itself.",
+  "artifacts": [
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/after-build.json",
+      "bytes": 10943,
+      "sha256": "6344d90dcf8f7eb732d9b375f711a93a2d500e4a3ead907129818eddbbb79466"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/baseline-build.json",
+      "bytes": 10819,
+      "sha256": "d888ce5e84240cb33c36d034d80331786d849039f683ee5e34fd5aefbd29c6de"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/combined/build.json",
+      "bytes": 10889,
+      "sha256": "fb8acd2488634ede9ed611b2e6e3f451a724fa807b9dd2fc4b27439187fc3ae7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/combined/build.log",
+      "bytes": 202,
+      "sha256": "85c03836fa0996b296247390792d8a5d2b26d5d0a6c329eedd6c83d7d02b7f99"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/combined/related-tests-corrected.log",
+      "bytes": 6090,
+      "sha256": "0a08fd1f5d01142020e20c2a8391cbbc418ad107b48144a5c197a607fddc57b3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/combined/related-tests.log",
+      "bytes": 1667,
+      "sha256": "f98a5a4de3192d8052341530b3b78cb0583b1830d1be841ac64f678edf6aafb4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/combined/search-tests.log",
+      "bytes": 4269,
+      "sha256": "8576a7cb10487c8f696ccefd00df18f7a85653214c41c74e320f74e6c148b0d7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/commands.md",
+      "bytes": 4828,
+      "sha256": "1a3054ff7ee958cd8b33e8219f7754e2cb51649d24a163c16eff9e7fb8753bd8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/comparison-manifest.json",
+      "bytes": 22613,
+      "sha256": "779dcd35c1b0689507c094cc0b2157e947b89c969e770a2a4544b866e9038ac6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/comparison-model-warmup.json",
+      "bytes": 203,
+      "sha256": "dd011aa05a2c7fa31e57081534f5c3d4a6cf04089495356098806da768cfef2c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/comparison-summary.json",
+      "bytes": 458,
+      "sha256": "b1b0a212cf0ee6d99b794f838affc377525c74d4cc92ca534d138b2e707978d2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/corpus-verification.json",
+      "bytes": 425229,
+      "sha256": "99bb1b80af34a1a3db1bdc4714e8a697b2a7c0f804262bdda93fa8d40da8ea0e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/final-comparison.log",
+      "bytes": 2754,
+      "sha256": "5d1554ba959f6f3ca119727fb7ba812f12796f42b668ae8e759b08a0234cde09"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/final-consistency.json",
+      "bytes": 1005,
+      "sha256": "6774859dee09cbc6fd08135228c371b3da76518ce57c8eaa19f15a8c21404390"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-after/manifest.json",
+      "bytes": 10980,
+      "sha256": "926347135e57fd66c4f11c70b2a2120e91416f34bab13a2992c71bd589dbf729"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-after/measurement.json",
+      "bytes": 1705,
+      "sha256": "7e9ddbefde63889d1ca9668be1c14132876813adec5789eea99a0b822d2390e9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-after/raw-measurement.json",
+      "bytes": 1406,
+      "sha256": "b26db36832ecfc790e558ca4a7f0d95b8ed00539d23656b7fae72065b473bbaf"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-after/startup.json",
+      "bytes": 3591,
+      "sha256": "b4e0aa92f4676996a693d443111d43768f84a486dd138e26e2e52fcaaef5df61"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-before/manifest.json",
+      "bytes": 11031,
+      "sha256": "e0ab30274d4850e452eb8cdc323b2032616783e17561db9210dc496f12ed8d18"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-before/measurement.json",
+      "bytes": 1697,
+      "sha256": "3fe49a5a2208fe2a2d21b5f9a6f46a5d7f24316019cd31f357539e962de2341b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-before/raw-measurement.json",
+      "bytes": 1398,
+      "sha256": "d7b9b3c4ddc8b6a52cbfa509faa8d86ec453168ae731c4a13bebf7cb1b4117cb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/0-before/startup.json",
+      "bytes": 3581,
+      "sha256": "90eccfcf5bfaa61b196914b54ca1057bda766a1cae8eed55a33f00c275bbf6ba"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-after/manifest.json",
+      "bytes": 10979,
+      "sha256": "15aec36fca2746744805b0940f58d07fb7554f178ace874d179e769789c870e5"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-after/measurement.json",
+      "bytes": 1695,
+      "sha256": "55778b2a969601dad0a57a5fadaa1ec0d84ce6ac472046a9cd6a622b9fe43d3b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-after/raw-measurement.json",
+      "bytes": 1396,
+      "sha256": "2d16f84b4ad228d0db5ab96fa85ece4514eab3c93a77c8e97e6ceee179a65233"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-after/startup.json",
+      "bytes": 3580,
+      "sha256": "8aef4b7136ad757223b5096c2e4e2e9089f15796fa07848f64fcfb621bcb13bd"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-before/manifest.json",
+      "bytes": 11030,
+      "sha256": "ce4c272c0ce041cef7bc52e9488387e8e24bf5bbbe7382676e833dbc668cb203"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-before/measurement.json",
+      "bytes": 1706,
+      "sha256": "0802a6992965095cf9a87ceaab3434a510d58fb5cf9fb20c100d84252c4bfb01"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-before/raw-measurement.json",
+      "bytes": 1407,
+      "sha256": "b2afd38a0217d67b089b73172166474d676bd83e5921530808cf9dc678273be6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/1-before/startup.json",
+      "bytes": 3594,
+      "sha256": "deae9e78c478dc48c952bb570864e76dfd6614c7f194dfff218aa7276c3e0fab"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-after/manifest.json",
+      "bytes": 10979,
+      "sha256": "197bbcb69521a2ef4739c1b5fde38aa91a01814e4ee8cdd28cbb2a4c13fbff58"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-after/measurement.json",
+      "bytes": 1694,
+      "sha256": "0fec77d33c023cd3bc26e04c29e99f25c0f476d8a23aa42fc08c345e39d9a8c6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-after/raw-measurement.json",
+      "bytes": 1395,
+      "sha256": "bb04686bc8bdfc46c03622127ba78254194f9ee234d688ebfce167fadede59d3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-after/startup.json",
+      "bytes": 3581,
+      "sha256": "7fc70ec6fcf470c18ccaf77269cb7d3110bf5e6a0b83ab796b832782fb58f1d6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-before/manifest.json",
+      "bytes": 11030,
+      "sha256": "41df72c8f2cd76fbbc03a1bf09867ac437fcab81ae447896f03b87a49e9d0291"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-before/measurement.json",
+      "bytes": 1696,
+      "sha256": "b6d8211be7532ff1fea8cc2d5ea0c90a40dd41866d9e47fed0ce296adfca0d0f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-before/raw-measurement.json",
+      "bytes": 1397,
+      "sha256": "9715ee58915739900cdc5e7cca836dbae6f579c22c9993ee6643297abedb9266"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/2-before/startup.json",
+      "bytes": 3581,
+      "sha256": "15016ff29f67902398e627ac9939551f5f60aac517bc024c15f7a395e46ac5a0"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-after/manifest.json",
+      "bytes": 10979,
+      "sha256": "197bbcb69521a2ef4739c1b5fde38aa91a01814e4ee8cdd28cbb2a4c13fbff58"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-after/measurement.json",
+      "bytes": 1704,
+      "sha256": "a9e2b180d1910f2ecabe35f99217f85021aa5e4a667b8298418ca76d2fd6c488"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-after/raw-measurement.json",
+      "bytes": 1405,
+      "sha256": "6b8d736d876ae92098cb9a4b70e88960ca445a7155d6a906a7db632044d41484"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-after/startup.json",
+      "bytes": 3581,
+      "sha256": "07d10179667322aacb124eefe9e33bfb748442749da26eab4ceb401c8de8d6c8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-before/manifest.json",
+      "bytes": 11030,
+      "sha256": "4c44ad3541a2b2158b7b17cc3624939e096d08ddd31bd32a04b2d0c557573acb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-before/measurement.json",
+      "bytes": 1710,
+      "sha256": "69190ef99f053d40138243474f2704da5a1c28997d2d74fa3a10d3f3b714e9c6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-before/raw-measurement.json",
+      "bytes": 1411,
+      "sha256": "da74e9da6cd7b1669e8fe0d671f88652d36921c0ee6474a61c00d741bc03ddb3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/3-before/startup.json",
+      "bytes": 3582,
+      "sha256": "fc255d1f543ccba376e102dd51d44b1c9670691b70d6d12a50bcba7f9679d59f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-after/manifest.json",
+      "bytes": 10983,
+      "sha256": "c5839d39bb738c83c3369b9ca7b714111e39864eda0158be90009b81f95dbd1e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-after/measurement.json",
+      "bytes": 1699,
+      "sha256": "7d61fcaa9a634af971f5202e5da7ceac5fc5edd679940adbdaf8d3f245f865c9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-after/raw-measurement.json",
+      "bytes": 1400,
+      "sha256": "bc6720833912b724a314bcb6f1d188cc559f6ea4ced5983af127e4c77823c928"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-after/startup.json",
+      "bytes": 3595,
+      "sha256": "89c79653e779fc8bc7e09289a7ad2e47bb284bff485bf7da6399c9c170f10931"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-before/manifest.json",
+      "bytes": 11034,
+      "sha256": "45c0ad11af601789cd935ea5fc261993ebc0981b9041c6dad37dc88ea5dc7b21"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-before/measurement.json",
+      "bytes": 1699,
+      "sha256": "640f0e372311b7208d815d085ef32bd0f568a37b075df53b484be68508af9476"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-before/raw-measurement.json",
+      "bytes": 1400,
+      "sha256": "00deaf604d3a8b6e59383ff13c626ff31621aa267944349a3a03ca02e29638c5"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts/4-before/startup.json",
+      "bytes": 3592,
+      "sha256": "2b5c4852d7833d6258c6836a24c65211dd96f9a34aee0ca8e9f935195ab3e3a5"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/fts-summary.json",
+      "bytes": 467,
+      "sha256": "5fecf3b6a7e483fb66294876873c343e595e9ffd5c0c7b437725af494d28c2c3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/measure-search.py",
+      "bytes": 4969,
+      "sha256": "7ce59b44862c0ede6c5559b9126ef4bae2ebeb26cde55ff9ebf7a430d80ac4b5"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/native-vectors-final.json",
+      "bytes": 262,
+      "sha256": "89fb97a86e4a34479f1c3828aae5594eb1ae64b4d6bee4727b19afbe3cabb213"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-after/manifest.json",
+      "bytes": 11016,
+      "sha256": "e99f6ba4e96f119365856501a728f73a0431cde9e66f746686862ab429bf04bd"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-after/measurement.json",
+      "bytes": 2715,
+      "sha256": "0283d4ebd693085e8bbcbef69c8dd51c2c41052b8408dda9090f4a2b6654d652"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-after/raw-measurement.json",
+      "bytes": 2416,
+      "sha256": "182af5077bf6908dcf7ce962a3406e07cd06a6675d90d66b0784def51d88fb29"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-after/startup.json",
+      "bytes": 3580,
+      "sha256": "db531d645459c13b97b0ded39c6467246891b0cb8beade47d12287b02732ff78"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-before/manifest.json",
+      "bytes": 11064,
+      "sha256": "7e2f19fe318413fa7c9c486450a935325e259932f9d423965f0d89cdc3e92751"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-before/measurement.json",
+      "bytes": 2717,
+      "sha256": "3b7286d63815bfc561f543462b2a937044564f7875568477df9194240f0d077c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-before/raw-measurement.json",
+      "bytes": 2418,
+      "sha256": "051aa9e6f722e89e82c0514997b6db2a9a7441cef93cafe72db78c9c3ca573b2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/0-before/startup.json",
+      "bytes": 3581,
+      "sha256": "c5a844ad71503d92e9d7dd5aa3b7d8f961b219464dc9b8a7c82c79fad544b9fe"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-after/manifest.json",
+      "bytes": 11016,
+      "sha256": "9e25729b7a133f114a99af27a58f6e354839be12601ade541648745caff30e33"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-after/measurement.json",
+      "bytes": 2703,
+      "sha256": "2d0704383f40684eac092b7426450274822d4a80e47aece4d418081ec4a58f11"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-after/raw-measurement.json",
+      "bytes": 2404,
+      "sha256": "542d6dfc837748c3999ab98bcfb3b75f5d517cdadeb3d1738c7e308822aa81bf"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-after/startup.json",
+      "bytes": 3581,
+      "sha256": "00f689e8bfd9af8e4927a686c98eb89571cd96e164f65534e1e1734ab551fa93"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-before/manifest.json",
+      "bytes": 11066,
+      "sha256": "37fb7d34674e5c921952e07ae808e84afe98920037245eb7b5bb658dea7b838a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-before/measurement.json",
+      "bytes": 2716,
+      "sha256": "751c27de63da5879a4a97998a3757301025d0725d497da95b9a4cc3a9ae1ccf9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-before/raw-measurement.json",
+      "bytes": 2417,
+      "sha256": "39a097e61cc2f1a86f9bfc76f3d210d1c0f288bc2656be755f97c0cf227da1b2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/1-before/startup.json",
+      "bytes": 3580,
+      "sha256": "0b25d4ae910f210f5276c26d79cc26beb84952fd0593aec5f8beee2e99b23a88"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-after/manifest.json",
+      "bytes": 11016,
+      "sha256": "9c5a9ee82fbcbadef4a605f6b5a5af6adec2f13f157b6f47b7bd1a205b495f4e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-after/measurement.json",
+      "bytes": 2701,
+      "sha256": "50afe3803c6b9c83dfadc6ab7756326d57960d22ac674292a00f70c591472ce3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-after/raw-measurement.json",
+      "bytes": 2402,
+      "sha256": "5c47f65b62ab6f13b1e42e0cea6bd36432237623421c62f36c9c9f77eb1f8696"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-after/startup.json",
+      "bytes": 3595,
+      "sha256": "c647a40fba512824e70e4a2d2293a7812a089a458c61286671bf364b3d995aa1"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-before/manifest.json",
+      "bytes": 11066,
+      "sha256": "47d6ac2410986777d2a480f85816697ca13bfc060babd3711481a30c1762ba63"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-before/measurement.json",
+      "bytes": 2709,
+      "sha256": "b70c8bffe8b29d4415a47519e7f2692032a8e93a303277145376364efbf30bcc"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-before/raw-measurement.json",
+      "bytes": 2410,
+      "sha256": "6d550f04877734b8a89d0bd8a8cfa5ef03d081634948b9258b0997ff40b67f24"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/pairs/2-before/startup.json",
+      "bytes": 3580,
+      "sha256": "3ec7fffd2a7d83abb4303b87fac404dbdcb7bf172a0d18df41eb984603f7bc61"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/binary-manifest.json",
+      "bytes": 739,
+      "sha256": "446a10a9fafaf287720c6830a027335a9fef4cb40fc99ebbf66b2cbf5890ad0b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/build-release.log",
+      "bytes": 798,
+      "sha256": "7790ac8898b855e1aec63d26efcbd5cc37a18877cdac5eff2bcfd373202d7602"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/candidate.patch",
+      "bytes": 23848,
+      "sha256": "a9fd5947e0db0d9eb7972d3b1eb4510435b84fbb9386d3d39518fa5e0dd5c4a8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/final-green.log",
+      "bytes": 1234,
+      "sha256": "1047cdf64cf713daa5a35eb623a7ae1948645d993eab48a6b6bdcc6e6db2ea1e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/green.log",
+      "bytes": 1234,
+      "sha256": "ab98f8edb2cb5c5c9f6505e796dc4441a133d26a680666ea0d0664821c437e85"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/layout.rs",
+      "bytes": 308,
+      "sha256": "239c76f763173928ca01057faa139d0f1998a15dc2e4dfb5b36bb3c53fe14de8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/layout.txt",
+      "bytes": 56,
+      "sha256": "f4cacbb2192a5c106e42ae8922038fe9d74ac423216a38d3060b4ef517942828"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-binding-predicates.attempt1.log",
+      "bytes": 1087,
+      "sha256": "35a9fe2f33b21141798bfb34f3612c6d53dc71e4bbea3eb18b09d496649953a2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-binding-predicates.log",
+      "bytes": 1087,
+      "sha256": "9c242c5807e81bfacd7df9c991c0b5e0c8e14e22de5918b107dce2253b8d0a0d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-binding-predicates.pre-dyn.log",
+      "bytes": 1087,
+      "sha256": "4bb3f975267394855148ed3d94eeb7880b0ff1638860809756f39e06e48e5084"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-content-hash.attempt1.log",
+      "bytes": 573,
+      "sha256": "847cafb89b26d901863771a5db6f6a85691d323c553bec0bb54577a2dad85863"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-content-hash.log",
+      "bytes": 1377,
+      "sha256": "503e8d70ab66d9842045ea8cfb392d57603508d8d8c369933d4e928dd8a274e1"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-content-hash.pre-dyn.log",
+      "bytes": 1214,
+      "sha256": "546ca9a6477ac0968f433968c2e57fc6a60ee7b631ffe509645e18ae15d17b3e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-path.attempt1.log",
+      "bytes": 535,
+      "sha256": "98e6df48edab218d81589a76068305537d184263bf7545f607f064d3e33b3d29"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-path.log",
+      "bytes": 1067,
+      "sha256": "dd020a9c275e3c3945dc7fff394a1d7584c6353baa0e9a1696ec73c416f4ab48"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-ignore-path.pre-dyn.log",
+      "bytes": 1067,
+      "sha256": "5cc7617a1fa7f58197189bc5a136d39c7aa50fa73ab2250a62fe94d32c822609"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-byte-bound.attempt1.log",
+      "bytes": 524,
+      "sha256": "27b4bd8f78cd8a1cc53411ef72c17b2cf166fc7e2d56cd415439fc51224b9d23"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-byte-bound.log",
+      "bytes": 1045,
+      "sha256": "8b96594f41afe57ebd343415736908f1a974a7d9f97e619cefc262253d601c49"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-byte-bound.pre-dyn.log",
+      "bytes": 1045,
+      "sha256": "8fdb42725626ba28e9b2b68c6feb889cf61d005991209f10d0c2fbb085ed86a8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-entry-bound.attempt1.log",
+      "bytes": 512,
+      "sha256": "a7ee6f4c6f80ef0c98398dc530db12e45792f1f792a979e467a1e2a247c850a6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-entry-bound.log",
+      "bytes": 1045,
+      "sha256": "5186219469c5d46773419aeea5900a839940218beba76029e1cd11444c285e0e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-entry-bound.pre-dyn.log",
+      "bytes": 1045,
+      "sha256": "1eed9a148072d9a7ef07ee61a09acd83544be0528c67dda98bb0eeb4f422938a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-id-bound.attempt1.log",
+      "bytes": 868,
+      "sha256": "b105795c669df8f51add39475aaaab9b2dc1a1d109c2af1568ab91b884f559a8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-id-bound.log",
+      "bytes": 1045,
+      "sha256": "c2635b1488eee0c6a1986e2d2070ad123fd2e688cd4e4292c2be2004b9c26cc8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-remove-id-bound.pre-dyn.log",
+      "bytes": 1045,
+      "sha256": "0d56c1a32e43cb650942602701dde49d94abad346c2113ce03e80cb340026d87"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-graph.attempt1.log",
+      "bytes": 1058,
+      "sha256": "447c3595c49f03c137437545ca99d3c2e3459dcf15fb976c890db558c43c90e1"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-graph.log",
+      "bytes": 1058,
+      "sha256": "adcf100e7892e7091b5b29ae99e5539731a2897c0af07ba93d6f428f5dcdfb1d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-graph.pre-dyn.log",
+      "bytes": 1058,
+      "sha256": "215b037e4d900c779c236ba8129537d31738d521e355a730b195e565f64ccd88"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-search-text.attempt1.log",
+      "bytes": 1070,
+      "sha256": "9b92f386fbc00e92f9f3f5d61edf745f12ace7d8f22912f3aa73d7a93156b6b4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-search-text.log",
+      "bytes": 1070,
+      "sha256": "a330a77aca5797290b3d9ea95456f067083c6daa041cf935ee55383b41940aed"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-search-text.pre-dyn.log",
+      "bytes": 1070,
+      "sha256": "470de76d7240d59e206bb63f982c89b446d1b9c14b1f6278477ea82ad7f37b43"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-through-missing.attempt1.log",
+      "bytes": 1033,
+      "sha256": "d219dc25091bca56e7c3692a1768f2194e7c444bfc41670fcdc4c2a4c2a3bc54"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-through-missing.log",
+      "bytes": 1033,
+      "sha256": "040df283f715d7f0ad69a5f8266bd5bae8e386beedafb75c8773582e6ba76a7b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-retain-through-missing.pre-dyn.log",
+      "bytes": 1033,
+      "sha256": "ff8a3a3910d8538f6a3bb56c2ca7fc8d6308b06848ab47ff77820204986f1fa4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-skip-fresh-capture.attempt1.log",
+      "bytes": 1162,
+      "sha256": "00b1fd7cafdf82522d354525a95dd1d22eb32d09ffb962e54742fa7678aa6e6d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-skip-fresh-capture.log",
+      "bytes": 1162,
+      "sha256": "875397bb71c1638c41224bb9473baed8559753941000f20b3b8472fc36d25723"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutant-skip-fresh-capture.pre-dyn.log",
+      "bytes": 1162,
+      "sha256": "4c35a64671f28fcd47a7f69e69f3909c94b01f7e5640a4a92dd0a67ecca3a453"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutation-check.py",
+      "bytes": 2813,
+      "sha256": "a45a1e7ea95ef398745cbfa6058141c42a970a12a564abb8b9536e9275efab7a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutation-run.attempt1.log",
+      "bytes": 521,
+      "sha256": "b07e17c694def61ffde20c42aa6c822c319f7c9051ea99ff84db6662d3a97b95"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutation-run.log",
+      "bytes": 255,
+      "sha256": "ba836aea985da2e7593cc9a0a1b5f7fdbb6437d196cf309aa540e2e7b39ad433"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutation-run.pre-dyn.log",
+      "bytes": 255,
+      "sha256": "ba836aea985da2e7593cc9a0a1b5f7fdbb6437d196cf309aa540e2e7b39ad433"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutations.attempt1.json",
+      "bytes": 1478,
+      "sha256": "8f18db725686af3366b9eefc155689e035354c34e147a5a72aedf41150fb0d80"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutations.json",
+      "bytes": 1473,
+      "sha256": "1bac3bace4cb5c178b9f8a71784f91c0cfd4a041b122978c0e68045fa5bf200c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/mutations.pre-dyn.json",
+      "bytes": 1473,
+      "sha256": "1bac3bace4cb5c178b9f8a71784f91c0cfd4a041b122978c0e68045fa5bf200c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/red.log",
+      "bytes": 7786,
+      "sha256": "e3e1f3df7c191e6ec8057c2d528bb0e83fa999951ef5c82ad34656e50cca5aa4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/report.md",
+      "bytes": 10015,
+      "sha256": "c7dc0681729b6dea9ae4708456b6ac00864086f245cd24489c50165eb4de042d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/restoration.json",
+      "bytes": 212,
+      "sha256": "f56dcbfb2fb61b77900a1acedcc4be83a0fd6d4709224032a22e1bd1c8238b4b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/source-manifest.json",
+      "bytes": 1042,
+      "sha256": "37abe02eef2917f50b313a3c68e6f8819bf5104d66428e685e7e4a2fa14cd8ba"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/verify-summary.json",
+      "bytes": 258,
+      "sha256": "ec9bff8e460ce81e0e572666d37952f69a01e919deb925b3a3fb93284ea28815"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parse-memo/verify.log",
+      "bytes": 246335,
+      "sha256": "d4253b52560c757e0c88e2b0fbfa76136fd3c05b4478f3eda31561f429bef27d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/baseline-build.log",
+      "bytes": 5802,
+      "sha256": "1ef9f174cc1e36f3743cd54e2915004f6b0f3741334d0d2256611f28d2c21d28"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/baseline-microbench.json",
+      "bytes": 895,
+      "sha256": "6c2c00c4d6284d1a39ade9dfa65c2ea8c1ccc8146a666b584b0941996c26737d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/baseline-projection.txt",
+      "bytes": 91617,
+      "sha256": "57b833d020128004161c601264da19a323b5c47e96f6c34d83f5a50b70c78796"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/candidate-build.json",
+      "bytes": 1050,
+      "sha256": "ac232b3fcef10d260afd7f9464c905573c0af1c20b1d91c6a2db3b4088c7fa0b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/candidate-build.log",
+      "bytes": 204,
+      "sha256": "d9364b649d7a0a0662bd72f890b19b546c205b5bcdc29c180e1ab09171131aee"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/coordinates-baseline.log",
+      "bytes": 6094,
+      "sha256": "23460fe171226ec3dfb8ef7e6bc740795123132ed055aaaef29255b82da8b495"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/coordinates-candidate.log",
+      "bytes": 1864,
+      "sha256": "8fdf44d0477a6259ef42b5fa11148aba49da76ad55ac534c3df3396f6a756307"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/coordinates-green.log",
+      "bytes": 1156,
+      "sha256": "fcc7cf46a61de0eb8d3f41bd065a181cd585fcd74e421a467b7a3bc820ab2019"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/coordinates-reset-mutation.log",
+      "bytes": 1019,
+      "sha256": "f50359c68a42007b3ccc09d3a466001759fe5dc93cb4bac3cdac5f8acc0087cd"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/coordinates-restored.log",
+      "bytes": 495,
+      "sha256": "ad3aa51f8f2b9183bcc79709e2e3cc8cdf189b0c621a7457ba55cd6b8e4a9c7d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/coordinates-utf8-red.log",
+      "bytes": 1864,
+      "sha256": "8fdf44d0477a6259ef42b5fa11148aba49da76ad55ac534c3df3396f6a756307"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/line-cursor-microbench.json",
+      "bytes": 2571,
+      "sha256": "5e9073796ec6a31106c810c995470d5d76787e88d615ef7101f39dbfdbe3acbc"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/line_cursor-projection.txt",
+      "bytes": 91617,
+      "sha256": "57b833d020128004161c601264da19a323b5c47e96f6c34d83f5a50b70c78796"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/make-verify.log",
+      "bytes": 3,
+      "sha256": "dc51b8c96c2d745df3bd5590d990230a482fd247123599548e0632fdbf97fc22"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/markdown-suites.log",
+      "bytes": 3861,
+      "sha256": "d7c718a46edd218574c52801619532e82c4589ee2507c2452cd392a0cbbb9d7e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/parser-cpu.patch",
+      "bytes": 3356,
+      "sha256": "77dfcf06ae68866147fe15a6c16693487ea30c70762a749cfe6742552513511e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/parser_cpu_probe.rs",
+      "bytes": 1076,
+      "sha256": "6ac7cff1a5450602125bd7275d4e4a22a4ce1d16f3e3f3409fad048c6dc2331d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/release-build-final.log",
+      "bytes": 204,
+      "sha256": "49e9d8555e68287b5b36562a211fa2cf5c48f9c945b9ef34bd5321c49abc6463"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/release-build.log",
+      "bytes": 635,
+      "sha256": "4add289e9740de97bbb81be1a44b8fc55ea21db59e0bb162a900072217c3f1af"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/report.md",
+      "bytes": 7394,
+      "sha256": "dff5f836baf4d8bf66a1d9f421143ce192a4d9474335b63695aeba49c059c7f9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/run_microbench.py",
+      "bytes": 1094,
+      "sha256": "c23417d119dd8e37dc49b19e01eeca7df68f3d4b8ee5db5deac03054604f9506"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/scan-candidate.rs",
+      "bytes": 6882,
+      "sha256": "d1fd2f97f74d08190f57a35f8dd05002bafd80dc1de0d430a917edd1e600b4fd"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/parser-cpu/work-counts.json",
+      "bytes": 552,
+      "sha256": "848553ae94d2b31400076eca283010e71b5dbb6d0cba1b8d24d6071ff6e584e6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/profile/receipt.json",
+      "bytes": 2341,
+      "sha256": "b56c6945cf10b84da76ff5114a00f296252e3aa6be2d169c9b2a237dd067cc8e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/profile/search.json.gz",
+      "bytes": 679552,
+      "sha256": "b0f3682db7ff69eb88390506b8658bc797aaf7a943e2b5223bdd2735eefaacb9"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/profile/search.json.syms.json",
+      "bytes": 263945,
+      "sha256": "8fce61f6271fb27497a0ff25bf66c58c6a32e2929f4eadbb88daa2bbd2800f68"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/profile/stacks.json",
+      "bytes": 175155,
+      "sha256": "37940d2eec24a4d4c3db4eeb3cbfc6509e085ed1f7ec2aec680ca8a4aeb92891"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/profile/validation.json",
+      "bytes": 345,
+      "sha256": "427fa971ebb3653826626966adef5e8ed407ece922ffd6f44cdb5b65b3822ba7"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/ranking-contracts/probe.py",
+      "bytes": 1963,
+      "sha256": "b735b633701a32d1e1976de2d890949a0ffaf9b11871fb5ae368fd9d5c2ea780"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/ranking-contracts/report.md",
+      "bytes": 6367,
+      "sha256": "6d998a68df10b8d6c775900d4b4cdace9458f5e95b9553f8261061e469d2e4a8"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/report.md",
+      "bytes": 10720,
+      "sha256": "ad520a099d940196f80c61977b2c14c55ea161df46643b498f4e8cc772c267a2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/resource-summary.json",
+      "bytes": 241,
+      "sha256": "aa44d105d7cd166505f7668b53173178afbf3caf5830254c21dd81a32d1af148"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/review/data-review.md",
+      "bytes": 8478,
+      "sha256": "7f19c76f497b68aca57b1cebda444ecca0de17337e16fe14a2530c49e79934db"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/review/report.md",
+      "bytes": 7758,
+      "sha256": "412ff26caba7d162eac1277c12fa5d8f6521485d484300c9842ce2ec4b00889c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/root-release-build.log",
+      "bytes": 298,
+      "sha256": "d40861808376890785f5e04c3cee978e9eb58672acd399f3591eaec548e3b6cb"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/root-verify.log",
+      "bytes": 235352,
+      "sha256": "5953367dc0f675b9555e24e1b874aadef4181d4f253a9d71c7ab9df0c610946b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/run-final-comparison.py",
+      "bytes": 4215,
+      "sha256": "ee5da5155975fbaabf2a689cde0680e2e11c0213d2c0fdb9363893b6b8d08588"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/run-screening.py",
+      "bytes": 1924,
+      "sha256": "539800b133f614a65abb730cdf1f48585b424002fee66023a9664faff139d56d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/baseline/manifest.json",
+      "bytes": 11067,
+      "sha256": "f46ba947c0c78c1e8a0bc3f869659c4e02aeaedbf5cc90282ff6c89a68f67cc3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/baseline/measurement.json",
+      "bytes": 2715,
+      "sha256": "05456be0df0b281b801ebb9ae6ddf07580076c367e5b5db96ec3ec47f3292650"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/baseline/raw-measurement.json",
+      "bytes": 2416,
+      "sha256": "b87e1b770e794e30866cc499a6067e587bc7522d4c517897c98df37378d64ca3"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/baseline/startup.json",
+      "bytes": 3593,
+      "sha256": "6a2467d4fe6f4c36ce22d32669b77b776e3247eaa7438071265fef786a3d528e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/combined/manifest.json",
+      "bytes": 11094,
+      "sha256": "4ffb8e2b7f6c0ef124382cca0743bbdeb5c8c9bcabe92c0bed1d6e8a10ea8b59"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/combined/measurement.json",
+      "bytes": 2702,
+      "sha256": "48d39dbffc164e42005ec09cb2e1a63948b7969859fc3bc5cb645306fe10d9a2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/combined/raw-measurement.json",
+      "bytes": 2403,
+      "sha256": "1294d3403c89fdb9102df3d033a99744c4e257d38be126866a488cf35c98fe2a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/combined/startup.json",
+      "bytes": 3591,
+      "sha256": "27700bd254578c8c727803ffe5bcf47be53251b6e4aa1cbcec8728dff74d59f5"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/conditioning/manifest.json",
+      "bytes": 11030,
+      "sha256": "4ec085ce0afd24b9b368f09225dcabfdddf6e9d7e711250bbee1868360482629"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/conditioning/measurement.json",
+      "bytes": 2414,
+      "sha256": "f4fe2f3a73acde0da2946f8ad8dc4d2b9f8c8c04daf6ca57e334ee018e2b20be"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/conditioning/startup.json",
+      "bytes": 3593,
+      "sha256": "66841d019fbea834484d24cccbf8afcbf6189c128a740ee78aeda26e78988746"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/conditioning/validation-recovery.json",
+      "bytes": 323,
+      "sha256": "de6c2f099fbdb2f2efefcaf795c0931a6580b71ab72737401d5bd4665f881f52"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/memo/manifest.json",
+      "bytes": 11089,
+      "sha256": "cf249922801b7c488f1fa4e03ad06496345a7453b769e438732be8e58269a732"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/memo/measurement.json",
+      "bytes": 2704,
+      "sha256": "f0a7e078c99591d4afb67bdf7f4ea2a1e3f8c82ebf055ceb1cd2014c522134bc"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/memo/raw-measurement.json",
+      "bytes": 2405,
+      "sha256": "d29cad2590f1cf32796b8224866b121ba1ae2e96df169d6876dff7d26feab2d6"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/memo/startup.json",
+      "bytes": 3594,
+      "sha256": "3e545582f6e756c8142af65af38b5ed586817d2be68505d9656792aa584ff9a2"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/parser/manifest.json",
+      "bytes": 11096,
+      "sha256": "8c3a4fdf75dfb1405c2dc87c2ae415969a4ff8feb6ab789ee876a8e0f3589935"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/parser/measurement.json",
+      "bytes": 2705,
+      "sha256": "356c3c2f24803ee5c7f319c78ea860c163a814fb7d576abbe3d1d429c02c1356"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/parser/raw-measurement.json",
+      "bytes": 2406,
+      "sha256": "ab8805c910d626f415d7dc2bd029897b0aea948a7ca55bbee944a464a1bd9623"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening/parser/startup.json",
+      "bytes": 3589,
+      "sha256": "afba4870de9261d7c27166808aa76a8fa0100d1e9e6e401daca0455ad7232d5d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening-continuation-manifest.json",
+      "bytes": 1653,
+      "sha256": "fffcf3bf63053ff988dc4ae3099114d489d6173de400a80bb06e049d72f29049"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening-continuation.log",
+      "bytes": 591,
+      "sha256": "3bd8c742e45614f9d584fec90b91cf8e51614e5d6bf2d1662d828c9b22facbfc"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening-manifest.json",
+      "bytes": 1653,
+      "sha256": "36360e8dae156e729a6df7e1bd0ef4daf9583c9c911d2014e4195d7715de039a"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening-summary.json",
+      "bytes": 651,
+      "sha256": "32a81157f37ae4daf56a65dc65878393f10689e23c58c18e35fbb86a17f4bc3d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/screening.log",
+      "bytes": 2476,
+      "sha256": "a6bd15bf18c70197a0acad29f916e2e36e12a868337e3114c253c8cb17b667b4"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/fixture-counts.json",
+      "bytes": 328,
+      "sha256": "bfcba59bff7a9fdb85f866dd99d7cf6b082bcb9895293305cbb72db637f98379"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/native-probe-summary.json",
+      "bytes": 1419,
+      "sha256": "81b22f11b5ecf3d6ce81d86ef12e1604f2ddd451733eb6c6781006856c962f1d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/native-probe.c",
+      "bytes": 4024,
+      "sha256": "636144a2e7b9a6fea201e756dc345f4eb792417e4a5f024d85d0a029c2876b02"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/native-probe.tsv",
+      "bytes": 1449,
+      "sha256": "f823449df0f7b91d9c7f552311464764889094c54783646d3712e1fa17094979"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/native-profile-subset.json",
+      "bytes": 1179,
+      "sha256": "0de9b64918518dc837b70437686e3bbcaf460a9dd06636f6af7aa95f8a02bb56"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/report.md",
+      "bytes": 9677,
+      "sha256": "c4cabbf379dfe0890db6948fa0788295bb71b7c2509a2496ab1ab3d5c5ce462c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/sql-cost/summarize-probe.py",
+      "bytes": 1768,
+      "sha256": "3d223262f3115068c88922d6ed480222153827eb9c848a6ae8af39978f029117"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/search-optimization/verification.json",
+      "bytes": 392,
+      "sha256": "6d38af929d24e1bdded09699c7b5062444d94caaafa4f1bbd6da8198d9c67502"
+    }
+  ]
+}

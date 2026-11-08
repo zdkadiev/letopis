@@ -1,6 +1,7 @@
 use letopis::service::StorageError;
 use letopis::service::TransactionError;
 use letopis::service::{CacheDatabase, GraphRead, StorageRead, VectorDatabase};
+use std::num::NonZeroUsize;
 use storage_support::{Databases, open_storage};
 #[path = "support/storage.rs"]
 mod storage_support;
@@ -10,6 +11,41 @@ use letopis::{
 };
 use storage_support::{build_file, build_knowledge, build_source};
 use tempfile::TempDir;
+#[test]
+fn fts_limits_rows_in_sql_before_decoding() {
+    // Given: equally scored matches inserted in reverse identity order.
+    let root = TempDir::new().unwrap();
+    let storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    storage
+        .cache
+        .with_write_tx(|| {
+            for id in ["c.md", "b.md", "a.md"] {
+                storage
+                    .cache
+                    .nodes_upsert_by_id(&build_knowledge(id, "alpha"))?;
+                storage
+                    .cache
+                    .replace_text(&KnowledgeId::parse(id).unwrap(), "alpha")?;
+            }
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
+    // When: SQL selects a single highest-scoring knowledge hit.
+    let hits = storage
+        .cache
+        .with_read_tx(|| {
+            storage
+                .cache
+                .text_index_get_by_expression("alpha", NonZeroUsize::MIN)
+        })
+        .unwrap();
+    // Then: the database returns only the first URI, with no unbounded result decoding.
+    assert_eq!(
+        hits.iter().map(|hit| hit.id.as_str()).collect::<Vec<_>>(),
+        ["a.md"]
+    );
+}
+
 #[test]
 fn shared_read_exposes_graph_and_metadata_in_one_scope() {
     // Given: the real cache contains one published knowledge node.
@@ -92,11 +128,7 @@ fn closure_commit_abort_and_identity_guards() {
 fn cache_commit_preserves_node_row_id() {
     // Given: an inserted knowledge node with an initial FTS entry.
     let root = TempDir::new().unwrap();
-    let storage = open_storage(
-        &root.path().join("cache.db"),
-        &root.path().join("vectors.db"),
-    )
-    .unwrap();
+    let storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let write_result = storage
         .cache
         .with_write_tx(|| {
@@ -135,8 +167,14 @@ fn cache_commit_preserves_node_row_id() {
         .with_read_tx(|| {
             let read = &storage.cache;
             assert_eq!(second, first);
-            assert_eq!(read.text_index_get_by_expression("alpha").unwrap().len(), 0);
-            assert_eq!(read.text_index_get_by_expression("beta").unwrap().len(), 1);
+            let alpha = read
+                .text_index_get_by_expression("alpha", NonZeroUsize::MIN)
+                .unwrap();
+            let beta = read
+                .text_index_get_by_expression("beta", NonZeroUsize::MIN)
+                .unwrap();
+            assert!(alpha.is_empty());
+            assert_eq!(beta.len(), 1);
             assert_eq!(
                 StorageRead::nodes_get_by_uri(
                     read,
@@ -676,13 +714,18 @@ fn contentless_fts_does_not_return_original_text() {
         .with_read_tx(|| {
             let read = &db.cache;
             assert_eq!(
-                read.text_index_get_by_expression("privatepayload")
-                    .unwrap()
-                    .len(),
+                read.text_index_get_by_expression(
+                    "privatepayload",
+                    NonZeroUsize::new(100).unwrap()
+                )
+                .unwrap()
+                .len(),
                 1
             );
             let expression = "privatepayload Authorization:Bearer-secret \"";
-            let error = read.text_index_get_by_expression(expression).unwrap_err();
+            let error = read
+                .text_index_get_by_expression(expression, NonZeroUsize::new(100).unwrap())
+                .unwrap_err();
             assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
             assert!(error.source().is_some());
             for marker in ["privatepayload", "Authorization", expression] {
@@ -743,7 +786,7 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
         .unwrap();
 }
 #[test]
-fn fts_matches_use_native_score_then_id_without_candidate_limit() {
+fn fts_matches_use_native_score_then_id_with_an_explicit_bound() {
     // Given: equal-score documents and one stronger lexical match.
     let root = TempDir::new().unwrap();
     let db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
@@ -771,10 +814,15 @@ fn fts_matches_use_native_score_then_id_without_candidate_limit() {
             write.project_get_revision()
         })
         .unwrap();
-    // When: all lexical matches are retrieved without a candidate limit.
+    // When: all three fixture matches fit within the explicit SQL candidate bound.
     let results = db
         .cache
-        .with_read_tx(|| Ok::<_, StorageError>(db.cache.text_index_get_by_expression("alpha")))
+        .with_read_tx(|| {
+            Ok::<_, StorageError>(
+                db.cache
+                    .text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap()),
+            )
+        })
         .unwrap()
         .unwrap();
     // Then: all matches sort by native score and then normalized identity.
@@ -977,7 +1025,9 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
     assert!(write_result.is_err());
     assert_eq!(
         db.cache
-            .with_read_tx(|| db.cache.text_index_get_by_expression("alpha"))
+            .with_read_tx(|| db
+                .cache
+                .text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap()))
             .unwrap()
             .len(),
         1
@@ -997,7 +1047,7 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
         .with_read_tx(|| {
             let read = &db.cache;
             assert!(
-                read.text_index_get_by_expression("alpha")
+                read.text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap())
                     .unwrap()
                     .is_empty()
             );
@@ -1285,7 +1335,7 @@ fn assert_empty<C: CacheDatabase, V: VectorDatabase>(db: &Databases<C, V>) {
                     .is_none()
             );
             assert!(
-                read.text_index_get_by_expression("alpha")
+                read.text_index_get_by_expression("alpha", NonZeroUsize::new(100).unwrap())
                     .unwrap()
                     .is_empty()
             );

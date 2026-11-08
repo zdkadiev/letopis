@@ -1,0 +1,7 @@
+{
+  "name": "control-v2-short-before-read",
+  "exit_code": 0,
+  "wall_seconds": 0.005105915945023298,
+  "stdout": "[{\"rowid\":1,\"bytes\":\"0000803F00000000\"},\n{\"rowid\":2,\"bytes\":\"000080\"},\n{\"rowid\":3,\"bytes\":\"0000803F0000803F\"}]\n",
+  "stderr": ""
+}

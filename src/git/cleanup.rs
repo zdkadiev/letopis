@@ -56,7 +56,7 @@ impl GitWriteCleanup {
     ///
     /// # Errors
     /// Reports failed stage detachment/removal; arbitrary filesystem failures can leave residue.
-    pub(crate) fn writes_cancel_and_cleanup(&self) -> Result<(), SnapshotError> {
+    pub(crate) fn shutdown(&self) -> Result<(), SnapshotError> {
         self.cancelled.store(true, Ordering::SeqCst);
         let resources = std::mem::take(&mut self.state_lock().resources);
         #[cfg(test)]
@@ -64,7 +64,7 @@ impl GitWriteCleanup {
         let mut failure = None;
         for (id, resource) in resources {
             if let WriteResource::Stage(mut directory) = resource
-                && let Err(error) = stage_detach_and_remove(
+                && let Err(error) = stage_discard(
                     &mut directory,
                     #[cfg(test)]
                     checkpoint.take(),
@@ -82,6 +82,20 @@ impl GitWriteCleanup {
     /// Returns whether writes are cancelled without acquiring a repository or write lock.
     pub(crate) fn writes_is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::SeqCst)
+    }
+
+    /// Require an active command before and after confirming existing durable resources.
+    ///
+    /// # Errors
+    /// Returns the terminal cancellation error once cleanup has begun.
+    pub(super) fn writes_verify_active(&self) -> Result<(), SnapshotError> {
+        if self.writes_is_cancelled() {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                WRITE_CANCELLED_MESSAGE,
+            ));
+        }
+        Ok(())
     }
 
     /// Creates and registers an outer stage atomically with respect to cancellation.
@@ -124,10 +138,10 @@ impl GitWriteCleanup {
             Some(boundary.to_owned()),
             permissions,
         )
-        .map_err(|error| lock_map_error(&error))?;
-        let file = lock.with_mut(|file| file.try_clone()).map_err(|error| {
-            SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error))
-        })?;
+        .map_err(lock_map_error)?;
+        let file = lock
+            .with_mut(|file| file.try_clone())
+            .map_err(map_io_error_to_snapshot_cleanup_error)?;
         let lease = WriteLease {
             cleanup: Arc::clone(self),
             id: state.register(WriteResource::Ref(lock)),
@@ -156,7 +170,7 @@ impl GitWriteCleanup {
             Some(boundary.to_owned()),
             permissions,
         )
-        .map_err(|error| lock_map_error(&error))?;
+        .map_err(lock_map_error)?;
         Ok(WriteLease {
             cleanup: Arc::clone(self),
             id: state.register(WriteResource::Marker(lock)),
@@ -165,12 +179,7 @@ impl GitWriteCleanup {
 
     fn write_admit(&self) -> Result<MutexGuard<'_, WriteState>, SnapshotError> {
         let state = self.state_lock();
-        if self.writes_is_cancelled() {
-            return Err(SnapshotError::new(
-                SnapshotErrorKind::InternalError,
-                WRITE_CANCELLED_MESSAGE,
-            ));
-        }
+        self.writes_verify_active()?;
         Ok(state)
     }
 
@@ -192,9 +201,9 @@ impl WriteLease {
                 WRITE_CANCELLED_MESSAGE,
             ));
         };
-        directory.close().map_err(|error| {
-            SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error))
-        })
+        directory
+            .close()
+            .map_err(map_io_error_to_snapshot_cleanup_error)
     }
 
     /// Publishes an admitted complete object atomically; false means a racing object
@@ -221,9 +230,8 @@ impl WriteLease {
         let parent = destination.parent().ok_or_else(|| {
             SnapshotError::new(SnapshotErrorKind::InternalError, WRITE_CANCELLED_MESSAGE)
         })?;
-        gix::fs::dir::create::all(parent, Default::default(), permissions).map_err(|error| {
-            SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error))
-        })?;
+        gix::fs::dir::create::all(parent, Default::default(), permissions)
+            .map_err(map_io_error_to_snapshot_cleanup_error)?;
         match fs::hard_link(staged, destination) {
             Ok(()) => Ok(true),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(false),
@@ -243,9 +251,8 @@ impl WriteLease {
                 WRITE_CANCELLED_MESSAGE,
             ));
         };
-        lock.commit().map_err(|error| {
-            SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error.error))
-        })?;
+        lock.commit()
+            .map_err(map_ref_lock_error_to_snapshot_cleanup_error)?;
         Ok(())
     }
 }
@@ -273,7 +280,7 @@ impl Drop for WriteLease {
     }
 }
 
-fn stage_detach_and_remove(
+fn stage_discard(
     directory: &mut TempDir,
     #[cfg(test)] checkpoint: Option<tests::NamespaceCheckpoint>,
 ) -> Result<(), SnapshotError> {
@@ -281,9 +288,8 @@ fn stage_detach_and_remove(
         SnapshotError::new(SnapshotErrorKind::InternalError, WRITE_CANCELLED_MESSAGE)
     })?;
     let detached = directory_create(parent)?;
-    fs::rename(directory.path(), detached.path()).map_err(|error| {
-        SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error))
-    })?;
+    fs::rename(directory.path(), detached.path())
+        .map_err(map_io_error_to_snapshot_cleanup_error)?;
     // Only after rename succeeds does the old name lose ownership; it is never reused.
     let previous = std::mem::replace(directory, detached);
     let _ = previous.keep();
@@ -310,12 +316,32 @@ fn stage_detach_and_remove(
     ))
 }
 
+/// Maps an I/O failure into a cleanup snapshot error.
+///
+/// # Arguments
+///
+/// * `error` — I/O failure from a cleanup step.
+fn map_io_error_to_snapshot_cleanup_error(error: io::Error) -> SnapshotError {
+    SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error))
+}
+
+/// Maps a ref-lock failure into a cleanup snapshot error.
+///
+/// # Arguments
+///
+/// * `error` — ref-lock failure whose I/O cause is preserved.
+fn map_ref_lock_error_to_snapshot_cleanup_error(
+    error: gix::lock::commit::Error<gix::lock::File>,
+) -> SnapshotError {
+    SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error.error))
+}
+
 fn directory_create(root: &Path) -> Result<TempDir, SnapshotError> {
     tempfile::Builder::new()
         .prefix(".letopis-stage-")
         .permissions(fs::Permissions::from_mode(0o700))
         .tempdir_in(root)
-        .map_err(|error| SnapshotError::new_with_cause("Git write cleanup failed", SafeIo(error)))
+        .map_err(map_io_error_to_snapshot_cleanup_error)
 }
 
 #[cfg(test)]

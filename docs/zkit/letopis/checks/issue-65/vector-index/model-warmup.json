@@ -1,0 +1,1 @@
+{"seconds": 0.8426624999847263, "dimensions": 768, "model": "embeddinggemma:300m-qat-q4_0", "scope": "Query-only direct provider warmup outside timers; no vector database writes"}

@@ -171,7 +171,7 @@ fn returns_preserved_config_values() {
             "dimensions": 3
         })
     );
-    assert_eq!(config.get_dimensions(), NonZeroUsize::new(3));
+    assert_eq!(config.get_dimensions_by_parameters(), NonZeroUsize::new(3));
     assert_eq!(config.get_max_attempts(), 3);
     assert_eq!(files.reads.get(), 1);
     assert_eq!(files.lock_observations.get(), 0);

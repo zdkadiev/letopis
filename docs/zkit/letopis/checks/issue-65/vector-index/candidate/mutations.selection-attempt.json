@@ -1,0 +1,8 @@
+[
+  {
+    "name": "skip-migration",
+    "test": "exact_flat_bootstrap_preserves_populated_state_and_is_idempotent",
+    "exit": 101,
+    "caught": true
+  }
+]

@@ -119,9 +119,9 @@ use crate::{
     domain::{RepoPath, TreeOid},
     markdown::MarkdownParser,
     service::{
-        BasisRetainer, CacheDatabase, CapturedFile, Diagnostic, DocumentError, DocumentErrorKind,
-        DocumentResult, FileStat, MarkdownCodec, MockGitWorktreeListing, ParsedFile,
-        ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
+        CacheDatabase, CapturedFile, Diagnostic, DocumentError, DocumentErrorKind, DocumentResult,
+        FileStat, MarkdownCodec, MockGitWorktreeListing, ParsedFile, ProvenanceObservation,
+        ProvenanceRequest, Refresher, SnapshotError, SnapshotRefsUpdater, SourceProvenance,
         SourceRevisionComparison, SourceRevisionRequest, StorageRead,
     },
 };
@@ -328,13 +328,13 @@ impl SourceProvenance for TestProvenance {
     }
 }
 
-impl BasisRetainer for TestProvenance {
-    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+impl SnapshotRefsUpdater for TestProvenance {
+    fn snapshot_sync_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         assert!(snapshots.is_empty());
         Ok(())
     }
 
-    fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+    fn snapshot_refs_update_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         assert!(snapshots.is_empty());
         Ok(())
     }
@@ -677,9 +677,12 @@ fn reject_candidate_reappearing_before_publication() {
             assert_eq!(read.project_get_by_id().unwrap(), 1);
             assert_eq!(read.files_get().unwrap().len(), 1);
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken")
-                    .unwrap()
-                    .len(),
+                read.text_index_get_by_expression(
+                    "AlphaToken",
+                    std::num::NonZeroUsize::new(100).unwrap(),
+                )
+                .unwrap()
+                .len(),
                 1
             );
 
@@ -713,9 +716,12 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
             assert_eq!(read.project_get_by_id().unwrap(), 1);
             assert_eq!(read.files_get().unwrap(), before);
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken")
-                    .unwrap()
-                    .len(),
+                read.text_index_get_by_expression(
+                    "AlphaToken",
+                    std::num::NonZeroUsize::new(100).unwrap(),
+                )
+                .unwrap()
+                .len(),
                 1
             );
 
@@ -806,7 +812,11 @@ fn build_service() -> (TempDir, TestService) {
 fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
     service
         .cache
-        .with_read_tx(|| service.cache.text_index_get_by_expression(text))
+        .with_read_tx(|| {
+            service
+                .cache
+                .text_index_get_by_expression(text, std::num::NonZeroUsize::new(100).unwrap())
+        })
         .unwrap()
         .into_iter()
         .map(|row| row.id.as_str().to_owned())
@@ -822,9 +832,9 @@ mod basis {
     use crate::{
         domain::TreeOid,
         service::{
-            BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind, DocumentRefreshService,
-            DocumentResult, FileStat, ProvenanceObservation, ProvenanceRequest, Refresher,
-            SnapshotError, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
+            CapturedFile, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
+            FileStat, ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
+            SnapshotRefsUpdater, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
         },
     };
     use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
@@ -1190,8 +1200,8 @@ mod basis {
         }
     }
 
-    impl BasisRetainer for BoundaryProvenance {
-        fn verify_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+    impl SnapshotRefsUpdater for BoundaryProvenance {
+        fn snapshot_sync_by_oids(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
             self.events.borrow_mut().push("verify");
             if self.failure == Some("verify") {
                 return Err(DocumentError::new(
@@ -1202,7 +1212,7 @@ mod basis {
             Ok(())
         }
 
-        fn retain_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        fn snapshot_refs_update_by_oids(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
             self.events.borrow_mut().push("retain");
             if self.failure == Some("retain") {
                 return Err(DocumentError::new(
@@ -2387,10 +2397,10 @@ mod reading {
     use crate::{
         domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
         service::{
-            BasisRetainer, DocumentRefreshService, DocumentResult, ElementAddress,
-            EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead,
-            NeighborPageRequest, NodeMetadata, ProvenanceObservation, ProvenanceRequest,
-            QueryError, Refresher, SnapshotError, SourceProvenance, SourceRevisionComparison,
+            DocumentRefreshService, DocumentResult, ElementAddress, EmbeddingFailure,
+            EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest,
+            NodeMetadata, ProvenanceObservation, ProvenanceRequest, QueryError, Refresher,
+            SnapshotError, SnapshotRefsUpdater, SourceProvenance, SourceRevisionComparison,
             SourceRevisionRequest, StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch,
             VectorOutcome,
         },
@@ -2555,8 +2565,12 @@ mod reading {
             self.inner.files_get()
         }
 
-        fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
-            self.inner.text_index_get_by_expression(expression)
+        fn text_index_get_by_expression(
+            &self,
+            expression: &str,
+            limit: NonZeroUsize,
+        ) -> StorageResult<Vec<TextMatch>> {
+            self.inner.text_index_get_by_expression(expression, limit)
         }
 
         fn vector_keys_get_by_search_hash(
@@ -2573,9 +2587,10 @@ mod reading {
             expected: &Sha256,
             query: &[f32],
             dimensions: usize,
+            limit: NonZeroUsize,
         ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
             self.inner
-                .vector_index_get_by_vector(expected, query, dimensions)
+                .vector_index_get_by_vector(expected, query, dimensions, limit)
         }
 
         fn embed_failures_get_by_search_hash(
@@ -2620,8 +2635,8 @@ mod reading {
         }
     }
 
-    impl BasisRetainer for RetainingProvenance {
-        fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+    impl SnapshotRefsUpdater for RetainingProvenance {
+        fn snapshot_sync_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
             assert_eq!(
                 snapshots,
                 &BTreeSet::from([
@@ -2631,7 +2646,10 @@ mod reading {
             Ok(())
         }
 
-        fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        fn snapshot_refs_update_by_oids(
+            &self,
+            snapshots: &BTreeSet<TreeOid>,
+        ) -> DocumentResult<()> {
             assert_eq!(
                 snapshots,
                 &BTreeSet::from([
@@ -2720,7 +2738,11 @@ mod reindex {
                 assert_eq!(read.project_get_by_id().unwrap(), 1);
                 assert_eq!(read.files_get().unwrap(), before);
                 assert_eq!(
-                    read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                    read.text_index_get_by_expression(
+                        "AlphaToken",
+                        std::num::NonZeroUsize::new(100).unwrap(),
+                    )
+                    .unwrap()[0]
                         .id
                         .as_str(),
                     "note.md"
@@ -2760,7 +2782,7 @@ mod corpus {
         // When: the application selects document candidates from raw Git paths.
         let candidates = build_selector(root)
             .unwrap()
-            .get_candidates(&[])
+            .get_candidate_observation_by_paths(&[])
             .unwrap()
             .paths;
         // Then: the symlink is not validated as a document path.
@@ -2797,7 +2819,7 @@ mod corpus {
         // When: application selection observes current filesystem types for raw Git paths.
         let candidates = build_selector(root)
             .unwrap()
-            .get_candidates(&[])
+            .get_candidate_observation_by_paths(&[])
             .unwrap()
             .paths;
         // Then: only live regular files and the fixture's ordinary Markdown are returned.
@@ -2830,7 +2852,7 @@ mod corpus {
         let refs = repo.run_git_successfully(&["show-ref"], None);
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
-        let candidates = git.get_candidates(&[]).unwrap().paths;
+        let candidates = git.get_candidate_observation_by_paths(&[]).unwrap().paths;
         // Then: deleted and ignored tracked paths remain; ignored untracked and private paths do not. User state is unchanged.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -2866,7 +2888,7 @@ mod corpus {
                 provenance: (),
             };
             assert_eq!(
-                git.get_candidates(&[]).unwrap().paths,
+                git.get_candidate_observation_by_paths(&[]).unwrap().paths,
                 [RepoPath::parse("live.md").unwrap()]
             );
             // When: Git stages an ignored file and removes the previous index entry.
@@ -2875,7 +2897,10 @@ mod corpus {
             fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
             // Then: the clone sees the new index and fresh ignore bytes without reopening.
             assert_eq!(
-                shared.get_candidates(&[]).unwrap().paths,
+                shared
+                    .get_candidate_observation_by_paths(&[])
+                    .unwrap()
+                    .paths,
                 [RepoPath::parse("ignored.md").unwrap()]
             );
             // When: remove the tracked file and make the other live file eligible again.
@@ -2883,7 +2908,7 @@ mod corpus {
             fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
             // Then: the original handle also refreshes its index/exclude observation.
             assert_eq!(
-                git.get_candidates(&[]).unwrap().paths,
+                git.get_candidate_observation_by_paths(&[]).unwrap().paths,
                 [RepoPath::parse("live.md").unwrap()]
             );
         }
@@ -2907,7 +2932,7 @@ mod corpus {
             repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
-            let error = git.get_candidates(&[]).unwrap_err();
+            let error = git.get_candidate_observation_by_paths(&[]).unwrap_err();
             // Then: unsupported names produce InvalidRequest without exposing the filename.
             assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
             assert!(!error.to_string().contains("bad"));
@@ -2926,7 +2951,7 @@ mod corpus {
         repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
-        let candidates = git.get_candidates(&[]).unwrap().paths;
+        let candidates = git.get_candidate_observation_by_paths(&[]).unwrap().paths;
         // Then: conflict.md appears once beside live.md.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -2951,7 +2976,7 @@ mod corpus {
             repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
-            let candidates = git.get_candidates(&[]).unwrap().paths;
+            let candidates = git.get_candidate_observation_by_paths(&[]).unwrap().paths;
             // Then: .letopis components are excluded before decoding; .letopis-notes.md and live.md remain.
             assert_eq!(
                 candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3019,7 +3044,7 @@ mod corpus {
         // When: the library lists the current worktree's real index and ignore stack.
         let actual = build_selector(repo.get_root())
             .unwrap()
-            .get_candidates(&[])
+            .get_candidate_observation_by_paths(&[])
             .unwrap()
             .paths;
         // Then: all eligible oracle paths except the live symlink are returned.
@@ -3074,7 +3099,7 @@ mod corpus {
         // When: discovery begins in the linked worktree rather than the common gitdir.
         let actual = build_selector(&linked)
             .unwrap()
-            .get_candidates(&[])
+            .get_candidate_observation_by_paths(&[])
             .unwrap()
             .paths;
         // Then: the deleted-but-staged linked path is retained and the other index is untouched.
@@ -3087,7 +3112,7 @@ mod corpus {
         assert!(
             !build_selector(repo.get_root())
                 .unwrap()
-                .get_candidates(&[])
+                .get_candidate_observation_by_paths(&[])
                 .unwrap()
                 .paths
                 .contains(&RepoPath::parse("linked-only.md").unwrap())
@@ -3109,7 +3134,7 @@ mod corpus {
         // When: candidate enumeration falls back to the index's raw ignore blob.
         let actual = build_selector(repo.get_root())
             .unwrap()
-            .get_candidates(&[])
+            .get_candidate_observation_by_paths(&[])
             .unwrap()
             .paths;
         // Then: replacement refs cannot change corpus membership.
@@ -3156,7 +3181,7 @@ mod corpus {
             // When: listing expands the actual index's tree, including deleted tracked paths.
             let actual = build_selector(repo.get_root())
                 .unwrap()
-                .get_candidates(&[])
+                .get_candidate_observation_by_paths(&[])
                 .unwrap()
                 .paths;
             // Then: tracked paths survive ignores, untracked ignored paths do not.
@@ -3190,7 +3215,7 @@ mod corpus {
                 }
                 let before = repo.capture_fixture_state();
                 // When: listing needs the collapsed tree rather than trusting HEAD or prior policy.
-                let error = git.get_candidates(&[]).unwrap_err();
+                let error = git.get_candidate_observation_by_paths(&[]).unwrap_err();
                 // Then: no incomplete successful listing or raw object/path payload escapes.
                 assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
                 assert_eq!(error.to_string(), "cannot list document candidates");
@@ -3206,7 +3231,10 @@ mod corpus {
         stage_raw_path(&repo, b"irrelevant\xff.txt", "100644");
         let service = build_selector(repo.get_root()).unwrap();
         // When: the application selects documents from raw Git bytes.
-        let candidates = service.get_candidates(&[]).unwrap().paths;
+        let candidates = service
+            .get_candidate_observation_by_paths(&[])
+            .unwrap()
+            .paths;
         // Then: only the ordinary fixture document remains.
         assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
     }
@@ -3222,14 +3250,17 @@ mod corpus {
         stage_raw_path(&repo, b"raw\xff.md", "120000");
         let service = build_selector(repo.get_root()).unwrap();
         // When: the final symlink is observed before UTF-8 decoding.
-        let candidates = service.get_candidates(&[]).unwrap().paths;
+        let candidates = service
+            .get_candidate_observation_by_paths(&[])
+            .unwrap()
+            .paths;
         // Then: the invalid-byte symlink never becomes an unsupported document.
         assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
         // Given: the same tracked raw name is now an ordinary file.
         fs::remove_file(repo.get_root().join(name)).unwrap();
         fs::write(repo.get_root().join(name), b"ordinary").unwrap();
         // When: selection observes the changed type.
-        let error = service.get_candidates(&[]).unwrap_err();
+        let error = service.get_candidate_observation_by_paths(&[]).unwrap_err();
         // Then: relevant ordinary file encoding remains an invalid request.
         assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
         assert_eq!(error.to_string(), "unsupported document path");
@@ -3250,7 +3281,7 @@ mod corpus {
         stage_raw_path(&repo, b"linked/note.md", "100644");
         let service = build_selector(repo.get_root()).unwrap();
         // When: candidate selection observes the path without following parents.
-        let error = service.get_candidates(&[]).unwrap_err();
+        let error = service.get_candidate_observation_by_paths(&[]).unwrap_err();
         // Then: unsafe traversal is fatal with the preserved public listing diagnostic.
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert_eq!(error.to_string(), "cannot list document candidates");
@@ -3273,7 +3304,10 @@ mod corpus {
             provenance: (),
         };
         // When: the service selects and normalizes paths without probing raw file paths.
-        let candidates = service.get_candidates(&[]).unwrap().paths;
+        let candidates = service
+            .get_candidate_observation_by_paths(&[])
+            .unwrap()
+            .paths;
         // Then: normalization and deduplication remain owned by RepoPath.
         assert_eq!(
             candidates,
@@ -3308,8 +3342,14 @@ mod corpus {
         let directory = [RepoPath::parse("notes").unwrap()];
 
         // When: scopes select by normalized owner identity.
-        let selected = service.get_candidates(&exact).unwrap().paths;
-        let descendants = service.get_candidates(&directory).unwrap().paths;
+        let selected = service
+            .get_candidate_observation_by_paths(&exact)
+            .unwrap()
+            .paths;
+        let descendants = service
+            .get_candidate_observation_by_paths(&directory)
+            .unwrap()
+            .paths;
 
         // Then: an outside owner is excluded and the selected dot path is retained.
         assert_eq!(selected, exact);
@@ -3338,7 +3378,7 @@ mod corpus {
             provenance: (),
         };
         // When: lexical path validation sees the escaping candidate.
-        let error = service.get_candidates(&[]).unwrap_err();
+        let error = service.get_candidate_observation_by_paths(&[]).unwrap_err();
         // Then: it retains the old unsupported-document classification and cause.
         assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
         assert_eq!(error.to_string(), "unsupported document path");
@@ -3367,7 +3407,7 @@ mod corpus {
             provenance: (),
         };
         // When: selection has no eligible leaf to probe.
-        let error = service.get_candidates(&[]).unwrap_err();
+        let error = service.get_candidate_observation_by_paths(&[]).unwrap_err();
         // Then: the original root safety check still fails with the existing diagnostic.
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert_eq!(error.to_string(), "cannot list document candidates");

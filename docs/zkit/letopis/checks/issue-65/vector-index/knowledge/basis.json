@@ -1,0 +1,97 @@
+{
+  "source_snapshot": "96680e54c8a39e774291ea0c471296cf1b6ad33f",
+  "created_at_preserved": 1793727646,
+  "sources": [
+    {
+      "path": "src/storage/cache.sql",
+      "bytes": 4094,
+      "sha256": "a8caf0fa4da5c0291838348c8b3d5a535b70feb9bb8918b39d538c574a7072ae"
+    },
+    {
+      "path": "src/storage/vectors.sql",
+      "bytes": 534,
+      "sha256": "8887d0947c9e9fbf15bb4b27eb10d1b2fbfede34abd3d2a504e47b3483973f50"
+    },
+    {
+      "path": "src/storage/connection.rs",
+      "bytes": 22816,
+      "sha256": "0001ba4b71609cb5ecd618110f2675fdc8ea2d9e84e4fcd61384647f7efa7ad9"
+    },
+    {
+      "path": "src/storage/cache.rs",
+      "bytes": 110448,
+      "sha256": "88126a47843b1627c3149f7499a75fb766e759e75bec4b801862ae21026482d0"
+    },
+    {
+      "path": "src/storage/transaction.rs",
+      "bytes": 9185,
+      "sha256": "66f8ab6de96ca68a63353b478ce46ba22637cf78fd4c96770cf5c2ec07bae0e4"
+    },
+    {
+      "path": "src/storage/vector.rs",
+      "bytes": 49097,
+      "sha256": "6052fe55843164da11857223f18381e2c3b13bffdb41449d89b989e5ca5567f8"
+    },
+    {
+      "path": "tests/storage_read_scope_failures.rs",
+      "bytes": 3019,
+      "sha256": "db9bc78cd6d81ebd59a9623bf8b65c419c458dc48d3c6d3d2f2b60ae9136e305"
+    },
+    {
+      "path": "src/filesystem/file.rs",
+      "bytes": 8525,
+      "sha256": "dede73e3b1216c1a07a339ffe0df6f468b3a59e8dc2c32c1e0a7fc2c036e34df"
+    },
+    {
+      "path": "src/filesystem/path.rs",
+      "bytes": 14247,
+      "sha256": "e56e8a27ae997c7e1c88eb502754211f4fb544df5f762bd49c2728d91eebbf09"
+    },
+    {
+      "path": "src/filesystem/local.rs",
+      "bytes": 8278,
+      "sha256": "0bf819fd5cc1afd7c14676d825226fcd4505f76203efcb4ae97690d4dff347d6"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 59865,
+      "sha256": "276cfa2816f1ae84bc877c4621b4a17fe210abf4719a9d8cc86ad366e1409696"
+    },
+    {
+      "path": "src/service/status.rs",
+      "bytes": 72248,
+      "sha256": "753bd152c533492092181b94a354b136b69188b13439f715c512f20cdbec8152"
+    },
+    {
+      "path": "src/service/mod.rs",
+      "bytes": 48907,
+      "sha256": "572ab0eb134df1d3b32c1094ebdad579c1b888638a867c8c19b66cb3b623936c"
+    },
+    {
+      "path": "vendor/vec1/vec1.c",
+      "bytes": 378128,
+      "sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9"
+    },
+    {
+      "path": "src/storage/schema.rs",
+      "bytes": 22062,
+      "sha256": "20584f9758ace60cf646a27b369424c684bd82081d5d4c29f798e068b335e107"
+    },
+    {
+      "path": ".artifacts/issue-65/vector-index-2026-11-07/native-probe/report.md",
+      "bytes": 11784,
+      "sha256": "14545ba446ac21b130e1e46088b769a4291f9a6699cb9defe3d8b624062493b9"
+    },
+    {
+      "path": ".artifacts/issue-65/vector-index-2026-11-07/native-probe/summary.json",
+      "bytes": 8330,
+      "sha256": "a4ba7cf782b827d5f79cfb5f7e78ab7f074e1962b81486f61a26cfdb6722c51a"
+    },
+    {
+      "path": ".artifacts/issue-65/vector-index-2026-11-07/native-probe/control-v2-runs.json",
+      "bytes": 5130,
+      "sha256": "7df35a23f18e9bbd80611106ae6716d76ac2ebcb4b6739ad35f04a3fe285bbf5"
+    }
+  ],
+  "only_temporary_index": true
+}

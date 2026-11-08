@@ -1,0 +1,29 @@
+    Checking letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+error: item in documentation is missing backticks
+   --> src/service/mod.rs:665:81
+    |
+665 |     /// Native matching, joins, ordering and the knowledge-row limit execute in SQLite.
+    |                                                                                 ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#doc_markdown
+    = note: `-D clippy::doc-markdown` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+    |
+665 -     /// Native matching, joins, ordering and the knowledge-row limit execute in SQLite.
+665 +     /// Native matching, joins, ordering and the knowledge-row limit execute in `SQLite`.
+    |
+
+error: this lint expectation is unfulfilled
+  --> src/service/types.rs:22:5
+   |
+22 |     clippy::expect_used,
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: The fixed positive search limit constructs a nonzero value
+   = note: `-D unfulfilled-lint-expectations` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unfulfilled_lint_expectations)]`
+
+error: could not compile `letopis` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `letopis` (lib test) due to 2 previous errors

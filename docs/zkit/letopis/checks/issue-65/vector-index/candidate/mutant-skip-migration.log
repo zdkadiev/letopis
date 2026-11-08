@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/candidate/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.15s
+     Running unittests src/lib.rs (../target-build/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test storage::vector_index::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent ... FAILED
+
+failures:
+
+---- storage::vector_index::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent stdout ----
+
+thread 'storage::vector_index::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent' (545944404) panicked at src/storage/vector_index.rs:146:9:
+assertion `left == right` failed
+  left: "none"
+ right: "flat"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    storage::vector_index::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 627 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `--lib`

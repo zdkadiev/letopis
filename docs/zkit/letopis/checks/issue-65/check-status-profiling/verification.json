@@ -1,0 +1,20 @@
+{
+  "release_input_hashes_checked": 106,
+  "valid_command_records": 12,
+  "prior_evidence": [
+    {
+      "directory": "current",
+      "hashes_checked": 122
+    },
+    {
+      "directory": "2026-11-06-100k",
+      "hashes_checked": 26
+    }
+  ],
+  "launcher_syntax": "passed",
+  "git_diff_check": "passed",
+  "affected_document_links": "passed",
+  "samply_native_profiles": "none; blocked",
+  "normal_terminal_capture": "pending",
+  "root_make_verify": "not rerun; no new product Rust changes"
+}

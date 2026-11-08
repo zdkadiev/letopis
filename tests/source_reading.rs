@@ -42,7 +42,7 @@ fn observe_live_source_without_referrer_edits() {
             let identity = view.meta_get_by_id().unwrap();
 
             // When: the source is observed.
-            let first = reader.get_source(&uri).unwrap().unwrap();
+            let first = reader.get_source_by_uri(&uri).unwrap().unwrap();
             // Then: current bytes are visible without referrer edits.
             assert_eq!(first.availability, SourceAvailability::Available);
             assert_eq!(
@@ -52,7 +52,7 @@ fn observe_live_source_without_referrer_edits() {
             // Given: the live source bytes change while referrers remain untouched.
             repo.write("source.txt", b"def");
             // When: the source is observed.
-            let second = reader.get_source(&uri).unwrap().unwrap();
+            let second = reader.get_source_by_uri(&uri).unwrap().unwrap();
             // Then: current bytes are visible without referrer edits.
             assert_eq!(
                 second.metadata.hash.unwrap().to_hex(),
@@ -61,14 +61,14 @@ fn observe_live_source_without_referrer_edits() {
             // Given: the declared source file is removed.
             repo.remove("source.txt");
             // When: the source is observed.
-            let missing = reader.get_source(&uri).unwrap().unwrap();
+            let missing = reader.get_source_by_uri(&uri).unwrap().unwrap();
             // Then: the missing source has no observed content hash.
             assert_eq!(missing.availability, SourceAvailability::SourceNotFound);
             assert_eq!(missing.metadata.hash, None);
             // Given: the original source bytes are restored.
             repo.write("source.txt", b"abc");
             // When / Then: the source is observed; current bytes are visible without referrer edits.
-            assert_eq!(reader.get_source(&uri).unwrap(), Some(first));
+            assert_eq!(reader.get_source_by_uri(&uri).unwrap(), Some(first));
             assert_eq!(view.project_get_by_id().unwrap(), revision);
             assert_eq!(view.meta_get_by_id().unwrap(), identity);
             assert_eq!(view.nodes_get().unwrap(), before.nodes);
@@ -98,7 +98,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
             repo.write("source.txt", b"def");
 
             // When: source bytes change after pinning.
-            let old = reader.get_source(&uri).unwrap().unwrap();
+            let old = reader.get_source_by_uri(&uri).unwrap().unwrap();
 
             // Then: membership stays pinned while current bytes are observed.
             assert_eq!(old.metadata.created_at, 3);
@@ -113,7 +113,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
     assert_eq!(cache.with_read_tx(|| cache.project_get_by_id()).unwrap(), 2);
     assert!(
         reader
-            .get_source(&SourceUri::parse("source.txt").unwrap())
+            .get_source_by_uri(&SourceUri::parse("source.txt").unwrap())
             .unwrap()
             .is_none()
     );
@@ -145,7 +145,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
 
     // When: each declared source range is observed.
     let range = reader
-        .get_source(&SourceUri::parse("source.txt#L2-L2").unwrap())
+        .get_source_by_uri(&SourceUri::parse("source.txt#L2-L2").unwrap())
         .unwrap()
         .unwrap();
     // Then: missing, incomplete and available ranges remain distinct.
@@ -158,7 +158,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
     for address in ["source.txt#L2-L3", "missing.txt"] {
         // When: each declared source range is observed.
         let observed = reader
-            .get_source(&SourceUri::parse(address).unwrap())
+            .get_source_by_uri(&SourceUri::parse(address).unwrap())
             .unwrap()
             .unwrap();
         // Then: missing, incomplete and available ranges remain distinct.
@@ -185,7 +185,11 @@ fn nonregular_sources_are_reported_as_missing() {
 
     // When / Then: the source reader reports the nonregular entry as absent.
     assert_eq!(
-        reader.get_source(&uri).unwrap().unwrap().availability,
+        reader
+            .get_source_by_uri(&uri)
+            .unwrap()
+            .unwrap()
+            .availability,
         SourceAvailability::SourceNotFound
     );
     // Given: symlink and nonregular source entries.
@@ -193,7 +197,11 @@ fn nonregular_sources_are_reported_as_missing() {
     fs::create_dir(repo.get_root().join("source.txt")).unwrap();
     // When / Then: the source reader reports the nonregular entry as absent.
     assert_eq!(
-        reader.get_source(&uri).unwrap().unwrap().availability,
+        reader
+            .get_source_by_uri(&uri)
+            .unwrap()
+            .unwrap()
+            .availability,
         SourceAvailability::SourceNotFound
     );
 }
@@ -218,7 +226,7 @@ fn propagate_failed_storage_read_before_source_capture() {
 
     // When: the source reader requests stored metadata.
     let error = reader
-        .get_source(&SourceUri::parse("source.txt").unwrap())
+        .get_source_by_uri(&SourceUri::parse("source.txt").unwrap())
         .unwrap_err();
 
     // Then: the storage error propagates before filesystem capture.

@@ -1,0 +1,24 @@
+{
+  "captured_utc": "2026-11-06T20:15:35Z",
+  "root_product_inputs_verified": 106,
+  "captured_test_source_identical": true,
+  "binary_sha256": "bd2c79b6b3dff6858fd021ca7af521f9ceff735279844d76638f1879fa9fb0b6",
+  "root_verify_log_sha256": "5953367dc0f675b9555e24e1b874aadef4181d4f253a9d71c7ab9df0c610946b",
+  "test_result_groups": 171,
+  "passed_test_executions": 2423,
+  "failed_test_executions": 0,
+  "ignored_test_executions": 22,
+  "corpus_input_hashes_verified": 4334,
+  "historical_artifacts_unchanged": {
+    "current": 122,
+    "2026-11-06-100k": 26,
+    "check-status-profiling": 17,
+    "native-followup": 119
+  },
+  "markdown_links_checked": 140,
+  "preexisting_unrelated_diff_preserved": true,
+  "git_diff_check_exit": 0,
+  "independent_review": "review/report.md",
+  "independent_data_audit": "review/data-review.md",
+  "scope": "Final read-only consistency audit after documentation edits; make verify evidence is the completed actual-root run and unchanged product hashes, not a rerun."
+}

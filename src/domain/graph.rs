@@ -15,6 +15,9 @@ impl EdgeType {
     ///
     /// * `raw` — the candidate type name to validate.
     ///
+    /// # Returns
+    /// The parsed edge type.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidType`] unless the name starts with a lowercase
     /// ASCII letter and contains only lowercase ASCII letters, digits or `_`.
@@ -73,6 +76,9 @@ impl Edge {
     ///   address.
     /// * `edge_type` — the validated relation type that determines the allowed target kind.
     ///
+    /// # Returns
+    /// The validated edge.
+    ///
     /// # Errors
     /// Returns [`ValueError::SelfLoop`] when source and target identities match,
     /// or [`ValueError::InvalidTarget`] when `external` targets knowledge or
@@ -127,6 +133,9 @@ pub enum ElementKind {
 ///
 /// * `id` — the element whose outgoing edges are inspected.
 /// * `edges` — the full edge set searched for an outgoing includes edge from `id`.
+///
+/// # Returns
+/// The element kind.
 pub fn derive_element_kind(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
     if edges
         .iter()

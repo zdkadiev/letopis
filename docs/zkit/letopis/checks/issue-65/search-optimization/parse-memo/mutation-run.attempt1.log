@@ -1,0 +1,14 @@
+ignore-content-hash NOT CAUGHT
+ignore-path NOT CAUGHT
+ignore-binding-predicates CAUGHT
+retain-through-missing CAUGHT
+remove-byte-bound NOT CAUGHT
+remove-entry-bound NOT CAUGHT
+remove-id-bound NOT CAUGHT
+retain-search-text CAUGHT
+retain-graph CAUGHT
+skip-fresh-capture CAUGHT
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source/../mutation-check.py", line 36, in <module>
+    assert all(r['caught'] for r in results)
+AssertionError

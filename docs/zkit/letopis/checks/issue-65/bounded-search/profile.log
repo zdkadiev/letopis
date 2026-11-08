@@ -1,0 +1,100 @@
+{
+  "validation": {
+    "samples": 3323,
+    "usable_stacks": 3323,
+    "threads": 2,
+    "sha256": "484897ac4e29dc58c69235a618e6c930cd9f2978ae6b054ac0f3c49bb0ca525e",
+    "bytes": 41329,
+    "libraries": [
+      "dyld",
+      "letopis",
+      "libsystem_kernel.dylib",
+      "libsystem_pthread.dylib",
+      "libsystem_malloc.dylib",
+      "libsystem_c.dylib",
+      "libsystem_platform.dylib",
+      "libsamply_mac_preload.dylib",
+      "libdyld.dylib",
+      "LDAP"
+    ]
+  },
+  "observed_cpu_delta": 1537790,
+  "unit": "\u00b5s",
+  "functions": [
+    {
+      "function": "start",
+      "inclusive_cpu_delta": 1537716,
+      "stack_observations": 3321
+    },
+    {
+      "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+      "inclusive_cpu_delta": 1537181,
+      "stack_observations": 3322
+    },
+    {
+      "function": "std::panic::catch_unwind::<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync, i32>",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "std::panicking::catch_unwind::do_call::<std::rt::lang_start_internal::{closure#0}, isize>",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "std::panic::catch_unwind::<std::rt::lang_start_internal::{closure#0}, isize>",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "letopis::run_process_cli",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync as core::ops::function::FnOnce<()>>::call_once",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "std::panicking::catch_unwind::<i32, &dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync>",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "core::iter::traits::iterator::Iterator::collect",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "std::rt::lang_start_internal::{closure#0}",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "core::ops::function::FnOnce::call_once",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "std::panicking::catch_unwind::do_call::<&dyn core::ops::function::Fn<(), Output = i32> + core::panic::unwind_safe::RefUnwindSafe + core::marker::Sync, i32>",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "std::panicking::catch_unwind::<isize, std::rt::lang_start_internal::{closure#0}>",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    },
+    {
+      "function": "main",
+      "inclusive_cpu_delta": 1537107,
+      "stack_observations": 3320
+    }
+  ]
+}

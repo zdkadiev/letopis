@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.68s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 1 test
+test git::objects::tests::tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects ... FAILED
+
+failures:
+
+---- git::objects::tests::tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects stdout ----
+
+thread 'git::objects::tests::tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects' (526115546) panicked at src/git/objects.rs:386:13:
+assertion `left == right` failed
+  left: 0
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::objects::tests::tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 609 filtered out; finished in 12.13s
+
+error: test failed, to rerun pass `--lib`

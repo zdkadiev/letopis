@@ -1,0 +1,246 @@
+diff --git a/src/diagnostic_profile.rs b/src/diagnostic_profile.rs
+new file mode 100644
+index 0000000..98f8294
+--- /dev/null
++++ b/src/diagnostic_profile.rs
+@@ -0,0 +1,28 @@
++//! Temporary operation-local timing profiler; diagnostic build only.
++use std::{sync::atomic::{AtomicU64, Ordering}, time::Instant};
++static CALLS: [AtomicU64; 18] = [const { AtomicU64::new(0) }; 18];
++static NANOS: [AtomicU64; 18] = [const { AtomicU64::new(0) }; 18];
++const LABELS: [&str; 18] = ["src/service/inspection.rs::inspect", "src/service/inspection.rs::capture_file", "src/service/inspection.rs::capture_sources", "src/service/inspection.rs::assemble_tree", "src/git/durability.rs::new_with_cleanup", "src/git/durability.rs::object_publish", "src/git/durability.rs::object_verify_existing", "src/git/durability.rs::ref_retain_by_oid", "src/git/durability.rs::directory_sync_parent_chain", "src/git/objects.rs::tree_assemble", "src/git/objects.rs::blob_get_by_tree_oid_and_path", "src/git/refs.rs::tree_pin_by_oid", "src/git/refs.rs::tree_verify_closure_by_oid", "src/markdown/parser.rs::file_parse", "src/filesystem/file.rs::file_get_by_path", "src/service/provenance.rs::get_snapshot_hash", "src/service/provenance.rs::get_current_hash", "src/service/provenance.rs::observe_sources_batch"];
++/// Records one inclusive wall-time scope.
++#[derive(Debug)]
++pub struct Scope { index: usize, started: Instant }
++/// Starts an operation-local timer.
++pub fn enter(index: usize) -> Scope { Scope { index, started: Instant::now() } }
++impl Drop for Scope {
++    fn drop(&mut self) {
++        CALLS[self.index].fetch_add(1, Ordering::Relaxed);
++        NANOS[self.index].fetch_add(u64::try_from(self.started.elapsed().as_nanos()).unwrap_or(u64::MAX), Ordering::Relaxed);
++    }
++}
++/// Emits bounded aggregate function counts and inclusive nanoseconds on exit.
++#[derive(Debug)]
++pub struct Report;
++impl Drop for Report {
++    fn drop(&mut self) {
++        for (index, label) in LABELS.iter().enumerate() {
++            eprintln!("{}", serde_json::json!({"function": label,
++                "calls": CALLS[index].load(Ordering::Relaxed),
++                "inclusive_nanoseconds": NANOS[index].load(Ordering::Relaxed)}));
++        }
++    }
++}
+diff --git a/src/filesystem/file.rs b/src/filesystem/file.rs
+index 7a5bba2..85e2746 100644
+--- a/src/filesystem/file.rs
++++ b/src/filesystem/file.rs
+@@ -42,6 +42,8 @@ pub(super) fn file_get_by_path(
+     files: &LocalFileSystem,
+     path: &Path,
+ ) -> FileResult<Option<CapturedFile>> {
++        let _scope_profile = crate::diagnostic_profile::enter(14);
++
+     let captured = file_get_content_by_path(files, path, || {
+         let checked_at_ns = file_get_time_ns(files)?;
+         #[cfg(test)]
+diff --git a/src/git/durability.rs b/src/git/durability.rs
+index f881f03..4e9bc04 100644
+--- a/src/git/durability.rs
++++ b/src/git/durability.rs
+@@ -64,6 +64,8 @@ impl StagedObject {
+         bytes: &[u8],
+         cleanup: &Arc<GitWriteCleanup>,
+     ) -> Result<Self, SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(4);
++
+         let object_root = repo.objects.store_ref().path().to_owned();
+         let (directory, path) = cleanup.stage_create(&object_root)?;
+         let store = gix::odb::loose::Store::at(path, repo.object_hash());
+@@ -104,6 +106,8 @@ impl StagedObject {
+     /// # Errors
+     /// Fails closed on invalid existing bytes or any write/sync failure; a complete orphan may remain.
+     pub(super) fn object_publish(self) -> Result<(), SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(5);
++
+         let parent = self.destination.parent().ok_or_else(|| {
+             SnapshotError::new(
+                 SnapshotErrorKind::InternalError,
+@@ -130,6 +134,8 @@ impl StagedObject {
+     }
+ 
+     fn object_verify_existing(&self) -> Result<(), SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(6);
++
+         let store = gix::odb::loose::Store::at(&self.object_root, self.oid.kind());
+         let mut bytes = Vec::new();
+         let object = store
+@@ -174,6 +180,8 @@ pub(super) fn ref_retain_by_oid(
+     oid: ObjectId,
+     cleanup: &Arc<GitWriteCleanup>,
+ ) -> Result<(), SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(7);
++
+     let name = format!("{SNAPSHOT_REF_PREFIX}{oid}");
+     #[cfg(test)]
+     tests::publish_concurrent_ref();
+@@ -370,6 +378,8 @@ fn object_verify_identity(oid: ObjectId, kind: Kind, bytes: &[u8]) -> Result<(),
+ }
+ 
+ fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(8);
++
+     for directory in path.ancestors() {
+         File::open(directory)
+             .and_then(|file| file.sync_all())
+diff --git a/src/git/objects.rs b/src/git/objects.rs
+index 275e8e0..ef6d8dd 100644
+--- a/src/git/objects.rs
++++ b/src/git/objects.rs
+@@ -44,6 +44,8 @@ pub(super) fn tree_assemble(
+     git: &GitRepository,
+     entries: &[SnapshotEntry],
+ ) -> Result<TreeOid, SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(9);
++
+     paths_validate(
+         git.excluded_roots,
+         &entries.iter().map(|entry| &entry.path).collect::<Vec<_>>(),
+@@ -77,6 +79,8 @@ pub(super) fn blob_get_by_tree_oid_and_path(
+     oid: &TreeOid,
+     path: &RepoPath,
+ ) -> Result<Vec<u8>, SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(10);
++
+     tree_validate_by_oid(git, oid)?;
+     let mut current = oid.as_str().to_owned();
+     let mut parts = path.as_str().split('/').peekable();
+diff --git a/src/git/refs.rs b/src/git/refs.rs
+index 42a4590..13cf42a 100644
+--- a/src/git/refs.rs
++++ b/src/git/refs.rs
+@@ -26,6 +26,8 @@ pub(super) fn tree_pin_by_oid(
+     git: &GitRepository,
+     oid: &TreeOid,
+ ) -> Result<RetainedTree, SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(11);
++
+     tree_validate_by_oid(git, oid)?;
+     tree_verify_closure_by_oid(git, oid)?;
+     tree_ref_retain_by_oid(git, oid)?;
+@@ -47,6 +49,8 @@ fn tree_ref_retain_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), Snap
+ }
+ /// Verify every object reachable from `root`, ignoring gitlinks, and reject type conflicts.
+ fn tree_verify_closure_by_oid(git: &GitRepository, root: &TreeOid) -> Result<(), SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(12);
++
+     let mut reader = git.reader.borrow_mut();
+     let mut pending = vec![(root.as_str().to_owned(), TREE_KIND.to_owned())];
+     let mut visited = BTreeMap::new();
+diff --git a/src/lib.rs b/src/lib.rs
+index 7341b6d..af3550c 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1486,3 +1486,6 @@ mod database_path_tests {
+         assert!(!root.path().join("vectors.db").exists());
+     }
+ }
++
++/// Temporary diagnostic profiler, absent from product builds.
++pub mod diagnostic_profile;
+diff --git a/src/main.rs b/src/main.rs
+index fd67863..2e06663 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,5 +1,6 @@
+ use std::process::ExitCode;
+ 
+ fn main() -> ExitCode {
++    let _report = letopis::diagnostic_profile::Report;
+     ExitCode::from(letopis::run_process_cli())
+ }
+diff --git a/src/markdown/parser.rs b/src/markdown/parser.rs
+index da056db..f040e09 100644
+--- a/src/markdown/parser.rs
++++ b/src/markdown/parser.rs
+@@ -10,6 +10,8 @@ use pulldown_cmark::{Options, Parser};
+ /// Returns local diagnostics for invalid UTF-8 or invalid knowledge metadata,
+ /// anchors, element layout or declared graph links.
+ pub fn file_parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
++        let _scope_profile = crate::diagnostic_profile::enter(13);
++
+     MarkdownParser::new().file_parse(path, bytes)
+ }
+ 
+diff --git a/src/service/inspection.rs b/src/service/inspection.rs
+index 9a5ceb4..0589f5e 100644
+--- a/src/service/inspection.rs
++++ b/src/service/inspection.rs
+@@ -36,6 +36,8 @@ impl<D: Refresher, G: GitWorktreePaths + GitSnapshots, F: FileReader, M: Markdow
+     for InspectionService<D, G, F, M>
+ {
+     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
++        let _scope_profile = crate::diagnostic_profile::enter(0);
++
+         self.refresher.refresh(&[]).map_err(map_document_error)?;
+         let requested = ids
+             .iter()
+@@ -81,6 +83,8 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
+         path: RepoPath,
+         requested: &BTreeSet<&str>,
+     ) -> CommandResult<CapturedKnowledge> {
++        let _scope_profile = crate::diagnostic_profile::enter(1);
++
+         let mut captured = CapturedKnowledge::default();
+         let Some(file) =
+             map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
+@@ -115,6 +119,8 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
+         mut captured: CapturedKnowledge,
+         requested: &BTreeSet<&str>,
+     ) -> CommandResult<CapturedKnowledge> {
++        let _scope_profile = crate::diagnostic_profile::enter(2);
++
+         let corpus = self.assemble_tree(&captured)?;
+         captured.collect_remote_metadata(requested);
+         for (path, sources) in captured.group_local_sources() {
+@@ -131,6 +137,8 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
+     }
+ 
+     fn assemble_tree(&self, captured: &CapturedKnowledge) -> CommandResult<TreeOid> {
++        let _scope_profile = crate::diagnostic_profile::enter(3);
++
+         let entries = captured
+             .entries
+             .iter()
+diff --git a/src/service/provenance.rs b/src/service/provenance.rs
+index 4dcb23c..79f1a1f 100644
+--- a/src/service/provenance.rs
++++ b/src/service/provenance.rs
+@@ -52,6 +52,8 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
+         &self,
+         requests: &[ProvenanceRequest<'_>],
+     ) -> DocumentResult<Vec<ProvenanceObservation>> {
++        let _scope_profile = crate::diagnostic_profile::enter(17);
++
+         let mut observations = HistoricalObservations::new(self);
+         requests
+             .iter()
+@@ -136,6 +138,8 @@ impl<F: FileReader> ProvenanceService<F> {
+         tree: &TreeOid,
+         source: &SourceUri,
+     ) -> Result<Option<Sha256>, SnapshotError> {
++        let _scope_profile = crate::diagnostic_profile::enter(15);
++
+         let Some(local) = source.get_local() else {
+             return Ok(None);
+         };
+@@ -151,6 +155,8 @@ impl<F: FileReader> ProvenanceService<F> {
+     }
+ 
+     fn get_current_hash(&self, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
++        let _scope_profile = crate::diagnostic_profile::enter(16);
++
+         let Some(local) = source.get_local() else {
+             return Ok(None);
+         };

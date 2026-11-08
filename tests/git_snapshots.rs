@@ -247,7 +247,7 @@ fn nested_private_name_remains_valid_and_historical_private_trees_remain_readabl
             git.blob_get_by_tree_oid_and_path(&tree, &nested).unwrap(),
             b"nested"
         );
-        git.tree_pin_by_oid(&historical).unwrap();
+        git.tree_sync_by_oid(&historical).unwrap();
     }
 }
 

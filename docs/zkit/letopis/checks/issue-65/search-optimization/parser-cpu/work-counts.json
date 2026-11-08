@@ -1,0 +1,11 @@
+{
+  "input_path": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/ollama-100k/repository/knowledge/part-0000.md",
+  "input_sha256": "5cabb8f21eff4c58f10f538325f5ed9b2cf7547521498e06782bf7401da8dce2",
+  "input_bytes": 60000,
+  "sections": 30,
+  "baseline_line_counter_visited_bytes": 1799970,
+  "candidate_line_counter_visited_bytes": 59999,
+  "candidate_extra_allocations": 0,
+  "retained_full_pulldown_parse_passes_per_call": 1,
+  "projection_sha256": "57b833d020128004161c601264da19a323b5c47e96f6c34d83f5a50b70c78796"
+}

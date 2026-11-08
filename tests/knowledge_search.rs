@@ -16,6 +16,47 @@ use support::{
 };
 
 #[test]
+fn service_caps_direct_requests_at_one_hundred_results() {
+    // Given: 105 equally searchable knowledge files and a direct service caller.
+    let repo = ReadingRepo::new();
+    for index in 0..105 {
+        repo.write_knowledge(&format!("n{index:03}.md"), "sqlite");
+    }
+    // When: the caller supplies a limit above the search maximum.
+    let links = wire_searcher(repo.get_root())
+        .unwrap()
+        .search(&make_request("sqlite", 1000))
+        .unwrap();
+    // Then: the effective limit caps both retrieval and the final response at 100.
+    assert_eq!(links.len(), 100);
+    assert_eq!(links.first().unwrap().element_id.as_str(), "n000.md");
+    assert_eq!(links.last().unwrap().element_id.as_str(), "n099.md");
+}
+
+#[test]
+fn restrictive_filter_does_not_refill_outside_sql_candidates() {
+    // Given: the first lexical candidate has no sources; a lower candidate has one.
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "sqlite");
+    repo.write_knowledge(
+        "b.md",
+        "sqlite extra [source](code.rs \"letopis:type=external;path=code.rs\")",
+    );
+    let mut request = make_request("sqlite", 1);
+    request
+        .filters
+        .sources
+        .insert(letopis::domain::SourceUri::parse("code.rs").unwrap());
+    // When: a source filter excludes the single SQL-selected candidate.
+    let links = wire_searcher(repo.get_root())
+        .unwrap()
+        .search(&request)
+        .unwrap();
+    // Then: the service returns fewer hits rather than scanning/refilling the whole corpus.
+    assert!(links.is_empty());
+}
+
+#[test]
 fn search_refreshes_and_returns_only_knowledge_links() {
     // Given
     let repo = ReadingRepo::new();
@@ -352,7 +393,7 @@ fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids(
     assert_eq!(server.take_requests().len(), 1);
 }
 #[test]
-fn malformed_persisted_knowledge_uri_fails_even_beyond_final_limit() {
+fn malformed_persisted_knowledge_uri_is_decoded_only_inside_sql_limit() {
     // Given: two searchable elements with one persisted address corrupted.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite sqlite sqlite");
@@ -371,12 +412,20 @@ fn malformed_persisted_knowledge_uri_fails_even_beyond_final_limit() {
             .unwrap(),
         1
     );
-    // When: search inspects candidates beyond its final result limit.
-    let error = wire_searcher(repo.get_root())
+    // When: SQL selects the stronger valid hit with limit one.
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 1))
+        .unwrap();
+    // Then: an unselected malformed URI is not decoded as a search candidate.
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].element_id.as_str(), "a.md");
+    // When: the candidate pool includes the malformed lower-scoring hit.
+    let error = wire_searcher(repo.get_root())
+        .unwrap()
+        .search(&make_request("sqlite", 2))
         .unwrap_err();
-    // Then: the malformed persisted address produces a safe internal error.
+    // Then: selected corruption remains a safe internal error.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 #[test]
@@ -451,6 +500,7 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
                         &config.get_identity(),
                         &[1.0, 0.0],
                         2,
+                        NonZeroUsize::new(100).unwrap(),
                     ))
                 })
                 .unwrap()

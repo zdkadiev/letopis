@@ -49,6 +49,9 @@ struct ComponentSearch<'a> {
 ///
 /// * `nodes` — the existing knowledge elements that may own or receive edges.
 /// * `edges` — the declared edges to inspect.
+///
+/// # Returns
+/// The dangling targets and includes cycles.
 pub fn find_graph_problems(
     nodes: &BTreeSet<KnowledgeId>,
     edges: &BTreeSet<Edge>,

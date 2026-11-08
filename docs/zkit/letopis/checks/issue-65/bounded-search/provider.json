@@ -1,0 +1,38 @@
+{
+  "version": {
+    "version": "0.40.15"
+  },
+  "model": {
+    "name": "embeddinggemma:300m-qat-q4_0",
+    "model": "embeddinggemma:300m-qat-q4_0",
+    "modified_at": "2026-10-18T21:43:40.0375233+03:00",
+    "size": 238539501,
+    "digest": "101341d65c2ccbf23f16650b79d30b9fca94a45ffa09a9984c600157b81a58df",
+    "details": {
+      "parent_model": "embeddinggemma:300m-qat-q4_0",
+      "format": "gguf",
+      "family": "gemma3",
+      "families": [
+        "gemma3"
+      ],
+      "parameter_size": "307.58M",
+      "quantization_level": "Q4_0",
+      "context_length": 2048,
+      "embedding_length": 768,
+      "runner": "ggml"
+    },
+    "capabilities": [
+      "embedding"
+    ]
+  },
+  "request": {
+    "model": "embeddinggemma:300m-qat-q4_0",
+    "input": [
+      "case 000000"
+    ],
+    "truncate": false
+  },
+  "vector_f32_sha256": "471f33abdda366f4d979e2b04071dc4e29acd22c144c2a34dc4afc9a51b46c92",
+  "dimensions": 768,
+  "oracle_query_vector_identical": true
+}

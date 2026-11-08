@@ -613,13 +613,15 @@ pub use types::{
     Inspection, KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection,
     NeighborPageRequest, NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue,
     ProvenanceObservation, ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest,
-    RecheckFilter, RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink,
-    SearchRequest, SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
+    RecheckFilter, RefreshOutcome, SearchFilters, SearchFlag, SearchLink, SearchRequest,
+    SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
     SourceObservation, SourceRevisionComparison, SourceRevisionRequest, StatusReport, StoredNode,
     StoredVectorKey, TextMatch, TransactionRequirement, Traversal, TraversalDirection,
     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
 };
-pub(crate) use types::{GENERATED_CONFIG, MAX_DIMENSIONS, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM};
+pub(crate) use types::{
+    GENERATED_CONFIG, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM,
+};
 mod background_runner;
 mod check;
 mod configuration;
@@ -639,7 +641,7 @@ mod utils;
 pub(crate) use background_runner::BackgroundRunnerService;
 pub(crate) use check::CheckService;
 /// Read-only configuration observation over non-creating files and local provider validation.
-pub(crate) use configuration::{ConfigurationService, map_invalid_configuration};
+pub(crate) use configuration::{ConfigurationService, map_configuration_error_to_command_error};
 /// Cache refresh implementation and its caller-owned collaborator bundle.
 pub(crate) use document_refresher::DocumentRefreshService;
 pub(crate) use embedding::EmbeddingService;
@@ -702,7 +704,7 @@ pub trait SourceReader {
     /// Reports a safe document error with a private cause when storage or confined
     /// filesystem access fails; such failures never become `SourceNotFound`. Calls
     /// join a compatible active cache scope or own a fresh pinned read scope.
-    fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>>;
+    fn get_source_by_uri(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>>;
 }
 
 /// Read-only source comparison using caller-owned consistent metadata.
@@ -784,16 +786,16 @@ pub trait SourceProvenance {
 
 /// Source retention and audit before publication; the caller holds index.lock.
 /// Missing/invalid author roots remain findings; available root/ref failures are errors.
-pub trait BasisRetainer {
+pub trait SnapshotRefsUpdater {
     /// Retains direct refs for each validated root without traversing descendants.
     ///
     /// # Arguments
     ///
-    /// * `snapshots` — Unique roots whose direct refs are validated and retained.
+    /// * `snapshots` — Unique roots whose direct refs are validated and updated.
     ///
     /// # Errors
     /// Reports root corruption, policy, Git I/O and ref failures.
-    fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
+    fn snapshot_refs_update_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
 
     /// Retains each available root after auditing its complete local closure.
     ///
@@ -801,11 +803,11 @@ pub trait BasisRetainer {
     ///
     /// # Arguments
     ///
-    /// * `snapshots` — Unique roots whose complete local closures are audited and retained.
+    /// * `snapshots` — Unique roots whose complete local closures are verified and their refs updated.
     ///
     /// # Errors
     /// Reports incomplete/corrupt closures, policy, Git I/O and ref failures.
-    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
+    fn snapshot_sync_by_oids(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
 }
 
 /// Bounded graph reads from one consistent caller-owned view.
@@ -990,18 +992,22 @@ pub trait StorageRead {
     /// # Errors
     /// Reports an internal error for I/O or malformed persisted values.
     fn files_get(&self) -> StorageResult<Vec<FileRow>>;
-
-    /// Returns full-text matches for an FTS expression.
+    /// Selects at most `limit` FTS knowledge hits ordered by BM25 then identity.
     ///
-    /// The expression is executed without a candidate limit.
+    /// Only selected rows are decoded; filtering and fusion operate on this bounded pool.
     ///
     /// # Arguments
     ///
     /// * `expression` — Prepared FTS5 expression to execute.
+    /// * `limit` — Maximum number of knowledge hits to select.
     ///
     /// # Errors
     /// Reports an invalid request for malformed expressions, or an internal error for I/O.
-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>>;
+    fn text_index_get_by_expression(
+        &self,
+        expression: &str,
+        limit: NonZeroUsize,
+    ) -> StorageResult<Vec<TextMatch>>;
 
     /// Returns the vector stored under one search hash.
     ///
@@ -1020,16 +1026,17 @@ pub trait StorageRead {
         expected: &Sha256,
         search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
-
-    /// Returns native cosine matches joined to current node search hashes.
+    /// Selects at most `limit` current knowledge hits ordered by cosine distance then identity.
     ///
-    /// Returns `ConfigChanged` when the stored identity differs from `expected`.
+    /// Native matching, joins, ordering and the knowledge-row limit execute in `SQLite`.
+    /// Unreferenced vectors consume no returned slots; only selected rows are decoded.
     ///
     /// # Arguments
     ///
     /// * `expected` — Configuration identity the vector index must match.
     /// * `query` — Query vector used for native cosine search.
     /// * `dimensions` — Expected length of `query` and of the indexed vectors.
+    /// * `limit` — Maximum number of knowledge hits to select.
     ///
     /// # Errors
     /// Rejects invalid query vectors or reports database/integrity failures.
@@ -1038,6 +1045,7 @@ pub trait StorageRead {
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
+        limit: NonZeroUsize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>>;
 
     /// Returns durable attempts and the latest failure for one search hash.
@@ -1254,30 +1262,30 @@ pub trait GitSnapshots {
 
     /// Retains the direct ref of one exact root.
     ///
-    /// The root is validated, but descendants are not audited. A retained ref protects healthy
+    /// The root is validated, but descendants are not audited. An updated ref protects healthy
     /// reachable objects from normal GC, not from corruption.
     ///
     /// # Arguments
     ///
-    /// * `tree` — Exact root whose direct ref is validated and retained.
+    /// * `tree` — Exact root whose direct ref is validated and updated.
     ///
     /// # Errors
     /// Missing roots are not found; wrong types/formats are invalid requests.
     /// Root corruption, policy, Git I/O and ref conflicts are internal errors.
-    fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
+    fn ref_update_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
 
     /// Retains one root through Git GC after verifying its complete local closure.
     ///
     /// # Arguments
     ///
-    /// * `tree` — Exact root whose complete local closure is audited and retained.
+    /// * `tree` — Exact root whose complete local closure is verified and its ref updated.
     ///
     /// # Errors
     /// Returns [`SnapshotErrorKind::NotFound`] for a missing root,
     /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format or
     /// non-tree root, and [`SnapshotErrorKind::InternalError`] for an incomplete
     /// or corrupt closure, repository policy, Git I/O or ref publication failure.
-    fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
+    fn tree_sync_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
 }
 
 /// Snapshot operations and root verification for the same repository.

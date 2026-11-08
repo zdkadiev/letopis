@@ -1,7 +1,9 @@
-use super::utils::map_document_file;
+use super::utils::{
+    map_document_transaction_error_to_document_error, map_file_result_to_document_result,
+};
 use super::{
-    CacheDatabase, DocumentError, DocumentResult, FileReader, NodeMetadata, SourceAvailability,
-    SourceObservation, SourceReader, StorageRead,
+    CacheDatabase, DocumentResult, FileReader, NodeMetadata, SourceAvailability, SourceObservation,
+    SourceReader, StorageRead,
 };
 use crate::domain::{EdgeTarget, Sha256, SourceUri};
 use std::path::Path;
@@ -19,7 +21,7 @@ impl<F: FileReader, C> SourceService<F, C> {
 }
 
 impl<F: FileReader, C: CacheDatabase> SourceReader for SourceService<F, C> {
-    fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
+    fn get_source_by_uri(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
         self.cache
             .with_read_tx(|| {
                 let Some(row) = StorageRead::nodes_get_by_uri(
@@ -40,7 +42,7 @@ impl<F: FileReader, C: CacheDatabase> SourceReader for SourceService<F, C> {
                         availability: SourceAvailability::Unfetched,
                     }));
                 };
-                let file = map_document_file(
+                let file = map_file_result_to_document_result(
                     self.filesystem
                         .file_get_by_path(Path::new(local.get_path().as_str())),
                 )?;
@@ -59,10 +61,7 @@ impl<F: FileReader, C: CacheDatabase> SourceReader for SourceService<F, C> {
                     availability,
                 }))
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => DocumentError::from(error),
-            })
+            .map_err(map_document_transaction_error_to_document_error)
     }
 }
 

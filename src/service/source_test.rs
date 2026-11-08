@@ -72,8 +72,8 @@ fn skip_io_for_unknown_or_knowledge_address() {
     let knowledge = SourceUri::parse("a.md").unwrap();
 
     // When / Then: the source reader resolves those addresses; no source filesystem read occurs.
-    assert!(reader.get_source(&unknown).unwrap().is_none());
-    assert!(reader.get_source(&knowledge).unwrap().is_none());
+    assert!(reader.get_source_by_uri(&unknown).unwrap().is_none());
+    assert!(reader.get_source_by_uri(&knowledge).unwrap().is_none());
     // Then: no source filesystem read occurs.
     assert!(recorded_reads.borrow().is_empty());
 }
@@ -90,7 +90,7 @@ fn return_unfetched_remote_without_io() {
     let remote = SourceUri::parse("https://Host/a?x=1#section").unwrap();
 
     // When: the remote source is observed.
-    let observed = reader.get_source(&remote).unwrap().unwrap();
+    let observed = reader.get_source_by_uri(&remote).unwrap().unwrap();
 
     // Then: it remains unfetched without local I/O.
     assert_eq!(observed.availability, SourceAvailability::Unfetched);
@@ -112,7 +112,7 @@ fn observe_live_source_without_referrer_edits() {
     fs::write(repo.path().join("source.txt"), b"def").unwrap();
 
     // When: the live source bytes are observed.
-    let observed = reader.get_source(&uri).unwrap().unwrap();
+    let observed = reader.get_source_by_uri(&uri).unwrap().unwrap();
 
     // Then: current bytes are returned without editing referrers.
     assert_eq!(observed.availability, SourceAvailability::Available);
@@ -144,7 +144,7 @@ fn excludes_only_stable_nonregular_source_leaves() {
             .returning(move |_| Err(FileError::new(kind)));
         let reader = SourceService::new(Rc::new(open_storage(repo.path()).cache_storage), files);
         // When: the source consumer interprets the file outcome.
-        let result = reader.get_source(&SourceUri::parse("source.txt").unwrap());
+        let result = reader.get_source_by_uri(&SourceUri::parse("source.txt").unwrap());
         // Then: only a stable nonregular final entry is missing; all failures stay errors.
         if excluded {
             assert_eq!(
@@ -171,7 +171,7 @@ fn propagate_private_source_failure() {
     let uri = SourceUri::parse("source.txt").unwrap();
 
     // When: the live source is requested.
-    let error = reader.get_source(&uri).unwrap_err();
+    let error = reader.get_source_by_uri(&uri).unwrap_err();
 
     // Then: a safe typed error preserves the private cause internally.
     assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);

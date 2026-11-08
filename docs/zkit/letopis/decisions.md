@@ -109,6 +109,7 @@
 | [D-102](#D-102) | TK-12: pinned query config и базовые search/inspect | принято пользователем |
 | [D-103](#D-103) | Разработка TK-18 до завершения отложенных измерений G-1 | принято пользователем |
 | [D-104](#D-104) | Issue 61: явный init, вложенная config и disabled embeddings | принято пользователем |
+| [D-107](#D-107) | Точный packed flat/cos индекс vec1 | реализация запроса пользователя; выбор flat — инженерное решение |
 
 ## Решения
 
@@ -2301,3 +2302,63 @@ operation; переполнение пересчитывает, не откло�
 **Уточняет:** D-93 (authoring), D-95 (diagnostic publication), D-105 (full audit).
 **Связи:** [X-4](contracts/X-4-markdown.md), [MC-1/MC-7](mechanics.md),
 [upgrade](../../development.md#issue-69-обязательный-path-и-явный-reindex).
+
+
+<a id="D-107"></a>
+### D-107: Точный packed flat/cos индекс vec1
+> **Статус:** реализовано по запросу пользователя; host-проверки пройдены · **Дата:** 2026-11-07
+
+Пользователь поручил добавить ускоряющий векторный индекс SQLite. Выбор точного
+flat/cos в закреплённом vec1 — инженерное решение в рамках этого поручения;
+приблизительный ANN, top-K cap и ослабление полного eligible-channel ranking
+не согласовывались и не вводятся. D-79/D-96 описывают прежний no-index baseline.
+
+Новые базы и config reset создают flat/cos. Любая не-flat база однократно
+перестраивается в flat/cos при writable bootstrap с повторной проверкой модели
+после получения writer. Opaque model сравнивается только с factory output того же
+native module. Legacy-совместимость и проверка старого model-version/исходных
+байтов не нужны: индекс — это кеш, и несовместимая база пересоздаётся из
+существующих knowledge-файлов. Rebuild сохраняет исходные векторы, rowids,
+identity и attempts/errors; логическая schema version остаётся 1. Already-flat не
+требует writer, query-only и observational status сохраняют read-only путь.
+Consumer read views создаются после подготовки; отдельный pinned reader должен
+переживать переход.
+
+Flat хранит полный f32 payload в packed blocks, без quantization/training/bucket
+pruning. Это авторитетное хранение векторов, а не disposable secondary index.
+Полный vector channel, SQL tie order, RRF, свежие knowledge/source captures и
+ошибки кандидатов за итоговым limit сохраняются. Новых runtime, зависимостей,
+provider calls, embedding identity/config fields и повторного document embedding нет.
+
+Native SQL probe отдельно от CLI показал сохранение полного порядка/расстояний
+и всех original bytes. Это не заменяет actual-root make verify, native runner,
+paired CLI measurements или formal hardware acceptance. Итог проверки
+зафиксирован в [отчёте](checks/issue-65/vector-index/report.md).
+
+**Связи:** [design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md),
+[mechanics](mechanics.md), [D-79](#D-79), [D-96](#D-96).
+
+
+### D-108 — ограниченные SQL-кандидаты гибридного search {#D-108}
+
+**Статус:** согласовано пользователем; реализовано и проверено на host · **Дата:** 2026-11-07
+
+Пользователь согласовал ограничение выборки из БД: без limit применяется 100,
+явное положительное значение ограничивается сверху 100. FTS и nearest-vector
+matching, SQL ordering и final candidate limit выполняются в SQLite; приложение
+получает только выбранные metadata-строки. Конкретный согласованный дизайн —
+до L knowledge hits на канал, до 2L уникальных кандидатов, до L ссылок в ответе.
+Фильтры и fresh captures работают внутри этого пула, без refill; ошибки и
+изменения за его пределами не наблюдаются. Это явное изменение прежнего полного
+eligible-channel ranking и tail-error поведения D-107/MC-6.
+
+Нативный K внутри vec1 пока сохраняет полное покрытие для orphan vectors и URI
+ties, а SQL LIMIT после joins ограничивает выдачу knowledge rows. Ни полный набор
+векторов, ни все совпадения не материализуются в Rust. SQLite работает внутри
+процесса CLI и имеет собственную рабочую память; bounded output не обещает O(L)
+внутреннего сканирования. Векторное хранение/identity, синхронная модель и FTS
+fallback не меняются. Измеренный корпус — 100k знаний/100k векторов; существующее
+физическое sharing по search_hash сохраняется, новая схема дедупликации не вводится.
+
+**Связи:** [design](../../superpowers/specs/2026-11-07-bounded-search-design.md),
+[plan](../../superpowers/plans/2026-11-07-bounded-search.md), [MC-6](mechanics.md#mc-6--чтение-поиск-и-обход).

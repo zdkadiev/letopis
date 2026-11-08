@@ -1,0 +1,9 @@
+{
+  "initial_dirty_files": 1361,
+  "unchanged_bytes": 1359,
+  "changed_only_to_publish_reachable_source_basis": [
+    "letopis/architecture/search-pipeline.md",
+    "letopis/architecture/storage.md"
+  ],
+  "added_attribute": "/docs/zkit/letopis/checks/issue-65/** -text"
+}

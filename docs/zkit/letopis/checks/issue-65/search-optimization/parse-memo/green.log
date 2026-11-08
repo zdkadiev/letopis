@@ -1,0 +1,16 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.84s
+     Running unittests src/lib.rs (../target/debug/deps/letopis-43e59323f2756d14)
+
+running 8 tests
+test service::search::tests::parse_reuse::retained_projection_releases_search_and_graph_payloads ... ok
+test service::search::tests::parse_reuse::fresh_capture_errors_abort_without_retaining_state_for_retry ... ok
+test service::search::tests::parse_reuse::missing_capture_discards_the_previous_success ... ok
+test service::search::tests::parse_reuse::changed_invalid_missing_and_restored_captures_retain_their_flags ... ok
+test service::search::tests::parse_reuse::equal_bytes_at_distinct_paths_need_distinct_parses ... ok
+test service::search::tests::parse_reuse::repeated_bindings_capture_every_time_but_parse_once_per_operation ... ok
+test service::search::tests::parse_reuse::every_binding_still_checks_its_own_hash_and_lines ... ok
+test service::search::tests::parse_reuse::oversized_inputs_and_entry_sets_bypass_retention ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 610 filtered out; finished in 3.16s
+

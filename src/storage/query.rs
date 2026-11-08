@@ -110,12 +110,12 @@ pub(super) fn build_query(
     let (sql, values) = statement.build_any(&SqliteQueryBuilder);
     let parameters = values
         .into_iter()
-        .map(convert_value)
+        .map(map_sea_query_value_to_sqlite_value)
         .collect::<StorageResult<_>>()?;
     Ok((sql, parameters))
 }
 
-fn convert_value(sea_value: Value) -> StorageResult<SqliteValue> {
+fn map_sea_query_value_to_sqlite_value(sea_value: Value) -> StorageResult<SqliteValue> {
     let converted = match sea_value {
         Value::Bool(v) => v.map(|v| SqliteValue::Integer(i64::from(v))),
         Value::TinyInt(v) => v.map(|v| SqliteValue::Integer(i64::from(v))),

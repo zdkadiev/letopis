@@ -2,6 +2,7 @@ use crate::support::get_current;
 use letopis::service::StorageError;
 use letopis::service::TransactionError;
 use letopis::service::{CacheDatabase, VectorDatabase};
+use std::num::NonZeroUsize;
 use support::{Databases, open_storage};
 #[path = "support/storage.rs"]
 mod support;
@@ -10,6 +11,82 @@ use letopis::{
     service::{StorageErrorKind, StorageRead, VectorOutcome},
 };
 use tempfile::TempDir;
+
+#[test]
+fn nearest_limits_current_knowledge_after_joins_and_ties() {
+    // Given: the closest vector is orphaned; far vectors tie and one has two nodes.
+    let root = TempDir::new().unwrap();
+    let storage = build_bounded_nearest_fixture(&root);
+    let identity = Sha256::digest(b"model");
+    for (limit, expected) in [
+        (1, &["z.md"][..]),
+        (2, &["z.md", "a.md"][..]),
+        (3, &["z.md", "a.md", "b.md"][..]),
+        (10, &["z.md", "a.md", "b.md", "c.md"][..]),
+    ] {
+        // When: SQL selects bounded current knowledge hits from the full native search.
+        let hits = storage
+            .cache
+            .with_read_tx(|| {
+                storage.cache.vector_index_get_by_vector(
+                    &identity,
+                    &[1.0, 0.0],
+                    2,
+                    NonZeroUsize::new(limit).unwrap(),
+                )
+            })
+            .unwrap();
+        // Then: orphans consume no slots; tied and shared-vector nodes use URI order.
+        assert_eq!(
+            unwrap_current(hits)
+                .iter()
+                .map(|hit| hit.id.as_str())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn nearest_does_not_decode_an_unselected_malformed_uri() {
+    // Given: a lower-scoring current knowledge URI is malformed in persisted storage.
+    let root = TempDir::new().unwrap();
+    let storage = build_bounded_nearest_fixture(&root);
+    let connection = rusqlite::Connection::open(root.path().join("c")).unwrap();
+    connection
+        .execute(
+            "update nodes set uri = '../wrong.md' where uri = 'a.md'",
+            [],
+        )
+        .unwrap();
+    let identity = Sha256::digest(b"model");
+    // When: SQL selects only the nearest valid knowledge hit.
+    let hits = storage
+        .cache
+        .with_read_tx(|| {
+            storage
+                .cache
+                .vector_index_get_by_vector(&identity, &[1.0, 0.0], 2, NonZeroUsize::MIN)
+        })
+        .unwrap();
+    // Then: the malformed lower hit is never decoded into a Rust candidate.
+    assert_eq!(unwrap_current(hits)[0].id.as_str(), "z.md");
+    // When: the requested pool includes the malformed hit.
+    let error = storage
+        .cache
+        .with_read_tx(|| {
+            storage.cache.vector_index_get_by_vector(
+                &identity,
+                &[1.0, 0.0],
+                2,
+                NonZeroUsize::new(2).unwrap(),
+            )
+        })
+        .unwrap_err()
+        .into_inner();
+    // Then: selected-row corruption remains a typed error.
+    assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+}
 
 #[test]
 #[expect(
@@ -67,8 +144,13 @@ fn text_hash_shares_one_vector() {
                 Some(vec![1.0, 0.0, 0.0])
             );
             let matches = unwrap_current(
-                read.vector_index_get_by_vector(&identity, &[1.0, 0.0, 0.0], 3)
-                    .unwrap(),
+                read.vector_index_get_by_vector(
+                    &identity,
+                    &[1.0, 0.0, 0.0],
+                    3,
+                    NonZeroUsize::new(100).unwrap(),
+                )
+                .unwrap(),
             );
             assert_eq!(
                 matches.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
@@ -110,7 +192,8 @@ fn vectors_require_matching_identity() {
                 VectorOutcome::ConfigChanged
             ));
             assert!(matches!(
-                read.vector_index_get_by_vector(&m2, &[], 0).unwrap(),
+                read.vector_index_get_by_vector(&m2, &[], 0, NonZeroUsize::new(100).unwrap())
+                    .unwrap(),
                 VectorOutcome::ConfigChanged
             ));
             Ok::<_, StorageError>(())
@@ -206,8 +289,13 @@ fn current_node_hash_excludes_old_vector() {
             let read = &storage.cache;
             // When: nearest vectors are joined to the currently published node hashes.
             let matches = unwrap_current(
-                read.vector_index_get_by_vector(&m1, &[1.0, 0.0, 0.0], 3)
-                    .unwrap(),
+                read.vector_index_get_by_vector(
+                    &m1,
+                    &[1.0, 0.0, 0.0],
+                    3,
+                    NonZeroUsize::new(100).unwrap(),
+                )
+                .unwrap(),
             );
             // Then: nearest-vector results join only the current node hash.
             assert_eq!(matches.len(), 1);
@@ -377,6 +465,7 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
     let root = TempDir::new().unwrap();
     let storage = open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
+    let limit = NonZeroUsize::new(3).unwrap();
     storage.vectors.reset_vectors(None, &identity).unwrap();
     storage
         .cache
@@ -416,12 +505,12 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
             ] {
                 // When / Then: each invalid vector or dimension combination returns an error.
                 assert!(
-                    read.vector_index_get_by_vector(&identity, &query, dimensions)
+                    read.vector_index_get_by_vector(&identity, &query, dimensions, limit)
                         .is_err()
                 );
             }
             let matches = unwrap_current(
-                read.vector_index_get_by_vector(&identity, &[1.0, 0.0, 0.0], 3)
+                read.vector_index_get_by_vector(&identity, &[1.0, 0.0, 0.0], 3, limit)
                     .unwrap(),
             );
             assert_eq!(
@@ -476,8 +565,13 @@ fn publish_hash<C: CacheDatabase, V: VectorDatabase>(storage: &Databases<C, V>, 
 
 fn assert_nearest(read: &dyn StorageRead, identity: &Sha256, query: &[f32]) {
     let matches = unwrap_current(
-        read.vector_index_get_by_vector(identity, query, query.len())
-            .unwrap(),
+        read.vector_index_get_by_vector(
+            identity,
+            query,
+            query.len(),
+            NonZeroUsize::new(100).unwrap(),
+        )
+        .unwrap(),
     );
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].id.as_str(), "a.md");
@@ -490,4 +584,42 @@ fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
         VectorOutcome::Current(value) => value,
         VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
     }
+}
+
+fn build_bounded_nearest_fixture(
+    root: &TempDir,
+) -> Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>> {
+    let storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let identity = Sha256::digest(b"model");
+    storage.vectors.reset_vectors(None, &identity).unwrap();
+    storage
+        .cache
+        .with_write_tx(|| {
+            for (id, text) in [
+                ("z.md", "close"),
+                ("b.md", "far-b"),
+                ("a.md", "far-a"),
+                ("c.md", "far-b"),
+            ] {
+                storage
+                    .cache
+                    .nodes_upsert_by_id(&support::build_knowledge(id, text))?;
+            }
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
+    for (text, vector) in [
+        ("orphan", [1.0, 0.0]),
+        ("close", [1.0, 0.0]),
+        ("far-b", [0.0, 1.0]),
+        ("far-a", [0.0, 1.0]),
+    ] {
+        store(
+            &storage,
+            &identity,
+            &Sha256::digest(text.as_bytes()),
+            &vector,
+        );
+    }
+    storage
 }

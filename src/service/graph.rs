@@ -1,7 +1,7 @@
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ElementAddress, GraphNeighbor,
     GraphNodeKey, GraphRead, GraphWalk, NEIGHBOR_PAGE_QUANTUM, NeighborCursor, NeighborDirection,
-    NeighborPageRequest, TraversalDirection, TraversalRequest,
+    NeighborPageRequest, TransactionError, TraversalDirection, TraversalRequest,
 };
 use crate::domain::{Edge, EdgeTarget, Graph};
 use std::{
@@ -56,14 +56,7 @@ impl<C: CacheDatabase> GraphWalk for GraphService<C> {
                 discovery.walk(request)?;
                 Ok(discovery.into_graph())
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot read traversal graph",
-                    error,
-                ),
-            })
+            .map_err(map_transaction_error_to_traversal_graph_command_error)
     }
 }
 
@@ -89,16 +82,8 @@ impl<'a> Discovery<'a> {
             let node = state
                 .graph_read
                 .nodes_get_by_uri(id)
-                .map_err(|error| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot read traversal graph",
-                        error,
-                    )
-                })?
-                .ok_or_else(|| {
-                    CommandError::new(CommandErrorKind::NotFound, "traversal start not found")
-                })?;
+                .map_err(map_error_to_traversal_graph_command_error)?
+                .ok_or_else(build_traversal_start_not_found_error)?;
             if state.visited.insert(node.key) {
                 state.queue.push(node.key);
             }
@@ -133,7 +118,7 @@ impl<'a> Discovery<'a> {
 
     fn expand(&mut self, node: GraphNodeKey, request: &TraversalRequest) -> CommandResult<()> {
         let mut streams = NeighborStreams::new(self.graph_read, request.direction);
-        while let Some(neighbor) = streams.get_next(node, request)? {
+        while let Some(neighbor) = streams.get_next_neighbor(node, request)? {
             self.consider(neighbor, request);
             if self.elements.len() == request.limit.get() {
                 break;
@@ -191,7 +176,7 @@ impl<'a> NeighborStreams<'a> {
     ///
     /// * `node` — Node whose outgoing and incoming neighbors are merged.
     /// * `request` — Traversal mode, edge filters and bounds applied to both direction streams.
-    fn get_next(
+    fn get_next_neighbor(
         &mut self,
         node: GraphNodeKey,
         request: &TraversalRequest,
@@ -243,12 +228,8 @@ impl<'a> NeighborStream<'a> {
         if !self.buffer.is_empty() || self.is_exhausted {
             return Ok(());
         }
-        let limit = NonZeroUsize::new(NEIGHBOR_PAGE_QUANTUM).ok_or_else(|| {
-            CommandError::new(
-                CommandErrorKind::InternalError,
-                "invalid neighbor page quantum",
-            )
-        })?;
+        let limit = NonZeroUsize::new(NEIGHBOR_PAGE_QUANTUM)
+            .ok_or_else(build_invalid_neighbor_quantum_error)?;
         let page = self
             .graph_read
             .edges_get_by_row_id_and_type(&NeighborPageRequest {
@@ -259,13 +240,7 @@ impl<'a> NeighborStream<'a> {
                 after: self.after.as_ref(),
                 limit,
             })
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot read traversal graph",
-                    error,
-                )
-            })?;
+            .map_err(map_error_to_traversal_graph_command_error)?;
         self.is_exhausted = page.is_empty();
         self.buffer = page.into();
         Ok(())
@@ -298,6 +273,48 @@ fn compare_neighbors(left: &GraphNeighbor, right: &GraphNeighbor) -> Ordering {
             right.node.element.as_str(),
             &right.edge,
         ))
+}
+
+/// Converts a failure raised while reading the traversal graph to a command error.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from a graph read.
+fn map_error_to_traversal_graph_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot read traversal graph",
+        cause,
+    )
+}
+
+/// Converts a transaction failure from the graph read to a command error.
+///
+/// # Arguments
+///
+/// * `error` — Transaction failure from the pinned read.
+fn map_transaction_error_to_traversal_graph_command_error(
+    error: TransactionError<CommandError>,
+) -> CommandError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => map_error_to_traversal_graph_command_error(error),
+    }
+}
+
+/// Builds the error reported when a traversal start is absent.
+fn build_traversal_start_not_found_error() -> CommandError {
+    CommandError::new(CommandErrorKind::NotFound, "traversal start not found")
+}
+
+/// Builds the error reported for an invalid neighbor page quantum.
+fn build_invalid_neighbor_quantum_error() -> CommandError {
+    CommandError::new(
+        CommandErrorKind::InternalError,
+        "invalid neighbor page quantum",
+    )
 }
 
 #[cfg(test)]

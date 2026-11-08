@@ -2,10 +2,11 @@ use super::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, DiscoveryConfig, DocumentError,
     DocumentErrorKind, DocumentResult, FileReader, GitIgnoreMode, GitWorktreeListing,
     GraphDiagnostics, KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile,
-    ProvenanceIssue, ProvenanceRequest, SourceProvenance, StorageRead,
+    ProvenanceIssue, ProvenanceRequest, SourceProvenance, StorageError, StorageRead,
+    TransactionError,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
-use crate::service::{FileErrorKind, FileResult};
+use crate::service::{FileError, FileErrorKind, FileResult};
 use crate::utils::{CONFIG_PATH, IGNORE_PATH, SERVICE_DIRECTORY};
 use serde_json::Value;
 use std::{
@@ -81,29 +82,21 @@ impl CandidateSelection<'_> {
     ///
     /// # Errors
     /// Reports document errors for Git, file observation, framing or path failures.
-    pub(super) fn get_candidates(
+    pub(super) fn get_candidate_observation_by_paths(
         &self,
         paths: &[RepoPath],
     ) -> DocumentResult<CandidateObservation> {
-        let discovery = self.get_discovery()?;
-        let raw = self.get_raw_candidates(&discovery)?;
-        let entries = get_candidate_entries(&raw)?;
+        let discovery = self.get_discovery_observation()?;
+        let raw = self.get_raw_candidate_bytes_by_discovery(&discovery)?;
+        let entries = parse_candidate_entries(&raw)?;
         self.filesystem
             .directory_get_by_path(Path::new("."))
-            .map_err(|cause| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    CANDIDATE_LIST_MESSAGE,
-                    cause,
-                )
-            })?
-            .ok_or_else(|| {
-                DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
-            })?;
+            .map_err(map_error_to_candidate_list_document_error)?
+            .ok_or_else(build_candidate_list_error)?;
         let mut filtered = Vec::new();
         for entry in entries {
             if !paths.is_empty()
-                && !normalize_candidate_bytes(entry)
+                && !map_candidate_bytes_to_normalized_path(entry)
                     .is_some_and(|normalized| is_selected_path(&normalized, paths))
             {
                 continue;
@@ -112,13 +105,7 @@ impl CandidateSelection<'_> {
                 && self
                     .filesystem
                     .symlink_is_exist(Path::new(OsStr::from_bytes(entry)))
-                    .map_err(|cause| {
-                        DocumentError::new_with_cause(
-                            DocumentErrorKind::InternalError,
-                            CANDIDATE_LIST_MESSAGE,
-                            cause,
-                        )
-                    })?
+                    .map_err(map_error_to_candidate_list_document_error)?
             {
                 continue;
             }
@@ -141,8 +128,11 @@ impl CandidateSelection<'_> {
     ///
     /// # Errors
     /// Reports unreadable policy files or an observation that no longer matches.
-    pub(super) fn verify_discovery(&self, previous: &DiscoveryObservation) -> DocumentResult<()> {
-        if self.get_discovery()? != *previous {
+    pub(super) fn verify_discovery_unchanged(
+        &self,
+        previous: &DiscoveryObservation,
+    ) -> DocumentResult<()> {
+        if self.get_discovery_observation()? != *previous {
             return Err(DocumentError::new(
                 DocumentErrorKind::InternalError,
                 DOCUMENTS_CHANGED_MESSAGE,
@@ -161,19 +151,16 @@ impl CandidateSelection<'_> {
     ///
     /// # Errors
     /// Reports invalid discovery configuration or Git enumeration failures.
-    fn get_raw_candidates(&self, discovery: &DiscoveryObservation) -> DocumentResult<Vec<u8>> {
+    fn get_raw_candidate_bytes_by_discovery(
+        &self,
+        discovery: &DiscoveryObservation,
+    ) -> DocumentResult<Vec<u8>> {
         let configuration = discovery
             .config_bytes
             .as_deref()
             .map(DiscoveryConfig::parse)
             .transpose()
-            .map_err(|cause| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InvalidRequest,
-                    "invalid discovery configuration",
-                    cause,
-                )
-            })?
+            .map_err(map_error_to_invalid_discovery_configuration_document_error)?
             .unwrap_or_default();
         let mode = if configuration.is_gitignore_respected() {
             GitIgnoreMode::Standard
@@ -185,13 +172,7 @@ impl CandidateSelection<'_> {
                 mode,
                 discovery.ignore_bytes.as_deref().unwrap_or_default(),
             )
-            .map_err(|cause| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    CANDIDATE_LIST_MESSAGE,
-                    cause,
-                )
-            })
+            .map_err(map_error_to_candidate_list_document_error)
     }
 
     /// Reads the config and ignore bytes.
@@ -200,7 +181,7 @@ impl CandidateSelection<'_> {
     ///
     /// # Errors
     /// Reports unreadable or unsafe files; absence is not an error.
-    fn get_discovery(&self) -> DocumentResult<DiscoveryObservation> {
+    fn get_discovery_observation(&self) -> DocumentResult<DiscoveryObservation> {
         retry_changed_file_observation(|| {
             self.filesystem
                 .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
@@ -213,13 +194,7 @@ impl CandidateSelection<'_> {
                     .file_get_bytes_by_path(Path::new(IGNORE_PATH))?,
             })
         })
-        .map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                CANDIDATE_LIST_MESSAGE,
-                cause,
-            )
-        })
+        .map_err(map_error_to_candidate_list_document_error)
     }
 }
 
@@ -259,7 +234,7 @@ pub(crate) fn retry_changed_file_observation<T>(
 /// # Arguments
 ///
 /// * `entry` — raw root-relative path bytes whose `.` and `..` components are resolved.
-fn normalize_candidate_bytes(entry: &[u8]) -> Option<Vec<u8>> {
+fn map_candidate_bytes_to_normalized_path(entry: &[u8]) -> Option<Vec<u8>> {
     if entry.starts_with(b"/") {
         return None;
     }
@@ -320,20 +295,17 @@ impl CheckObservations<'_> {
     }
 
     fn find_source_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
-        let nodes = self.storage_read.nodes_get().map_err(|cause| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot read corpus for check",
-                cause,
-            )
-        })?;
+        let nodes = self
+            .storage_read
+            .nodes_get()
+            .map_err(map_storage_error_to_check_corpus_command_error)?;
         let sources = self.get_source_bindings()?;
         let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
         let empty = BTreeSet::new();
         let mut problems = Vec::new();
         let mut selected_nodes = nodes.iter().filter_map(|node| match &node.metadata {
             NodeMetadata::Knowledge(metadata)
-                if selected.is_empty() || selected.contains(get_owner_path(&metadata.id)) =>
+                if selected.is_empty() || selected.contains(get_owner_path_by_id(&metadata.id)) =>
             {
                 Some(metadata)
             }
@@ -354,16 +326,10 @@ impl CheckObservations<'_> {
                     sources: sources.get(&metadata.id).unwrap_or(&empty),
                 })
                 .collect();
-            let observations =
-                self.provenance
-                    .observe_sources_batch(&requests)
-                    .map_err(|cause| {
-                        CommandError::new_with_cause(
-                            CommandErrorKind::InternalError,
-                            "cannot observe knowledge sources",
-                            cause,
-                        )
-                    })?;
+            let observations = self
+                .provenance
+                .observe_sources_batch(&requests)
+                .map_err(map_document_error_to_observe_sources_command_error)?;
             for (metadata, observation) in batch.into_iter().zip(observations) {
                 problems.extend(
                     observation
@@ -381,13 +347,7 @@ impl CheckObservations<'_> {
         for edge in self
             .storage_read
             .edges_get_by_source_id(None)
-            .map_err(|cause| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot read corpus for check",
-                    cause,
-                )
-            })?
+            .map_err(map_storage_error_to_check_corpus_command_error)?
         {
             if let EdgeTarget::Source(source) = edge.get_target() {
                 sources
@@ -450,7 +410,7 @@ fn format_source_problem(metadata: &KnowledgeMetadata, issue: &ProvenanceIssue) 
         ),
     };
     let mut details = BTreeMap::from([
-        (PATH.into(), Value::from(get_owner_path(&metadata.id))),
+        (PATH.into(), Value::from(get_owner_path_by_id(&metadata.id))),
         (REASON.into(), Value::from(reason)),
         (ELEMENT_ID.into(), Value::from(metadata.id.as_str())),
     ]);
@@ -464,13 +424,13 @@ fn format_source_problem(metadata: &KnowledgeMetadata, issue: &ProvenanceIssue) 
     }
 }
 
-pub(super) fn get_owner_path(id: &KnowledgeId) -> &str {
+pub(super) fn get_owner_path_by_id(id: &KnowledgeId) -> &str {
     id.as_str()
         .split_once('#')
         .map_or(id.as_str(), |(path, _)| path)
 }
 
-pub(super) fn get_detail<'a>(problem: &'a CommandProblem, key: &str) -> &'a str {
+pub(super) fn get_detail_by_key<'a>(problem: &'a CommandProblem, key: &str) -> &'a str {
     problem
         .details
         .get(key)
@@ -479,7 +439,7 @@ pub(super) fn get_detail<'a>(problem: &'a CommandProblem, key: &str) -> &'a str 
 }
 
 pub(super) fn get_sort_key(problem: &CommandProblem) -> [&str; 4] {
-    [PATH, REASON, ELEMENT_ID, TARGET].map(|key| get_detail(problem, key))
+    [PATH, REASON, ELEMENT_ID, TARGET].map(|key| get_detail_by_key(problem, key))
 }
 
 /// Converts a document error to a command error.
@@ -488,7 +448,10 @@ pub(super) fn get_sort_key(problem: &CommandProblem) -> [&str; 4] {
 ///
 /// * `cause` — Document failure to convert.
 /// * `message` — Command-level message describing the operation.
-pub(super) fn map_document_error(cause: DocumentError, message: &'static str) -> CommandError {
+pub(super) fn map_document_error_to_command_error(
+    cause: DocumentError,
+    message: &'static str,
+) -> CommandError {
     let kind = match cause.get_kind() {
         DocumentErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
         DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
@@ -503,17 +466,132 @@ pub(super) fn map_document_error(cause: DocumentError, message: &'static str) ->
 /// # Arguments
 ///
 /// * `result` — File observation to convert.
-pub(super) fn map_document_file<T>(result: FileResult<Option<T>>) -> DocumentResult<Option<T>> {
+pub(super) fn map_file_result_to_document_result<T>(
+    result: FileResult<Option<T>>,
+) -> DocumentResult<Option<T>> {
     match result {
         Err(error) if error.get_kind() == FileErrorKind::NonRegular => Ok(None),
-        result => result.map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "document path changed during observation",
-                cause,
-            )
-        }),
+        result => result.map_err(map_file_error_to_document_path_changed_error),
     }
+}
+
+/// Converts a file failure observed after a change to a document error.
+///
+/// # Arguments
+///
+/// * `cause` — File failure reported during observation.
+pub(super) fn map_file_error_to_document_path_changed_error(cause: FileError) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "document path changed during observation",
+        cause,
+    )
+}
+
+/// Converts an error to a document error reported while listing candidates.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from candidate listing or Git policy application.
+pub(super) fn map_error_to_candidate_list_document_error<
+    E: std::error::Error + Send + Sync + 'static,
+>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        CANDIDATE_LIST_MESSAGE,
+        cause,
+    )
+}
+
+/// Converts an error to a request error for an unsupported document path.
+///
+/// # Arguments
+///
+/// * `cause` — Failure to decode or parse the raw candidate path.
+pub(super) fn map_error_to_unsupported_document_path_document_error<
+    E: std::error::Error + Send + Sync + 'static,
+>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InvalidRequest,
+        UNSUPPORTED_DOCUMENT_PATH,
+        cause,
+    )
+}
+
+/// Converts an error to a request error for invalid discovery configuration.
+///
+/// # Arguments
+///
+/// * `cause` — Configuration parse failure.
+pub(super) fn map_error_to_invalid_discovery_configuration_document_error<
+    E: std::error::Error + Send + Sync + 'static,
+>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InvalidRequest,
+        "invalid discovery configuration",
+        cause,
+    )
+}
+
+/// Converts a storage failure to the corpus read command error used by check.
+///
+/// # Arguments
+///
+/// * `cause` — Storage failure from a pinned read.
+pub(super) fn map_storage_error_to_check_corpus_command_error(cause: StorageError) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot read corpus for check",
+        cause,
+    )
+}
+
+/// Converts a document failure to the source observation command error.
+///
+/// # Arguments
+///
+/// * `cause` — Source observation failure.
+pub(super) fn map_document_error_to_observe_sources_command_error(
+    cause: DocumentError,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot observe knowledge sources",
+        cause,
+    )
+}
+
+/// Converts a document transaction failure to a document error.
+///
+/// # Arguments
+///
+/// * `error` — Transaction failure from a storage read.
+pub(super) fn map_document_transaction_error_to_document_error(
+    error: TransactionError<DocumentError>,
+) -> DocumentError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => DocumentError::from(error),
+    }
+}
+
+/// Converts an error to the command error for reading the embedding configuration.
+///
+/// # Arguments
+///
+/// * `cause` — Configuration read failure.
+pub(super) fn map_error_to_config_read_command_error<
+    E: std::error::Error + Send + Sync + 'static,
+>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(CommandErrorKind::InternalError, CONFIG_READ_FAILURE, cause)
 }
 
 /// Returns the decoded, normalized and deduplicated candidate paths.
@@ -523,21 +601,11 @@ pub(super) fn map_document_file<T>(result: FileResult<Option<T>>) -> DocumentRes
 /// * `raw` — NUL-terminated raw candidate paths to decode and normalize.
 pub(super) fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
     let mut candidates = BTreeSet::new();
-    for entry in get_candidate_entries(raw)? {
-        let text = std::str::from_utf8(entry).map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InvalidRequest,
-                UNSUPPORTED_DOCUMENT_PATH,
-                cause,
-            )
-        })?;
-        let path = RepoPath::parse(text).map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InvalidRequest,
-                UNSUPPORTED_DOCUMENT_PATH,
-                cause,
-            )
-        })?;
+    for entry in parse_candidate_entries(raw)? {
+        let text = std::str::from_utf8(entry)
+            .map_err(map_error_to_unsupported_document_path_document_error)?;
+        let path =
+            RepoPath::parse(text).map_err(map_error_to_unsupported_document_path_document_error)?;
         candidates.insert(path);
     }
     Ok(candidates.into_iter().collect())
@@ -561,7 +629,7 @@ fn is_safe_candidate_probe(entry: &[u8]) -> bool {
 /// # Arguments
 ///
 /// * `raw` — NUL-framed raw Git response to validate and split.
-fn get_candidate_entries(raw: &[u8]) -> DocumentResult<Vec<&[u8]>> {
+fn parse_candidate_entries(raw: &[u8]) -> DocumentResult<Vec<&[u8]>> {
     if !raw.is_empty() && !raw.ends_with(&[0]) {
         return Err(DocumentError::new(
             DocumentErrorKind::InternalError,
@@ -579,6 +647,11 @@ fn is_corpus_entry(entry: &[u8]) -> bool {
         && !entry
             .split(|byte| *byte == b'/')
             .any(|part| part == b".git" || part == crate::utils::SERVICE_DIRECTORY.as_bytes())
+}
+
+/// Builds the error reported when document candidates cannot be listed.
+fn build_candidate_list_error() -> DocumentError {
+    DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
 }
 
 #[cfg(test)]

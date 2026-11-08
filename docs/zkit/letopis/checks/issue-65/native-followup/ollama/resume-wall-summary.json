@@ -1,0 +1,13 @@
+{
+  "tool": "/usr/bin/sample",
+  "pid": 80241,
+  "duration_seconds": 3,
+  "interval_milliseconds": 1,
+  "scope": "main-thread wall stack observations; not CPU percentages or exact blocked-time accounting",
+  "main_thread_observations": 2569,
+  "http_await_observations": 1345,
+  "work_selection_observations": 954,
+  "http_observed_share_percent": 52.3550019462826,
+  "work_selection_observed_share_percent": 37.135072012456206,
+  "window_only": true
+}

@@ -39,7 +39,7 @@ fn strict_capture_preserves_input_and_os_failure_classifications() {
         // Given: an invalid entry or a verified content/identity change without an OS failure.
         let cause = FileError::new(kind);
         // When: the embedding consumer maps the generic capture failure.
-        let error = super::map_capture_error(cause);
+        let error = super::map_file_error_to_embedding_error(cause);
         // Then: the pre-migration invalid-input classification and safe message remain.
         assert_eq!(error.get_kind(), EmbeddingErrorKind::Input);
         assert_eq!(error.to_string(), "invalid embedding input");
@@ -52,7 +52,7 @@ fn strict_capture_preserves_input_and_os_failure_classifications() {
         // Given: a permission, deletion or no-follow syscall failure with its private cause.
         let cause = FileError::new_with_cause(kind, std::io::Error::other("PRIVATE_IO"));
         // When: the embedding consumer maps the failed OS operation.
-        let error = super::map_capture_error(cause);
+        let error = super::map_file_error_to_embedding_error(cause);
         // Then: the infrastructure classification and safe message remain.
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
         assert_eq!(error.to_string(), "embedding operation failed");
@@ -733,7 +733,7 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
             assert_eq!(read.project_get_by_id().unwrap(), revision);
             assert_eq!(service.file_reader.documents, documents);
             assert_eq!(
-                read.text_index_get_by_expression("knowledge")
+                read.text_index_get_by_expression("knowledge", NonZeroUsize::new(100).unwrap())
                     .unwrap()
                     .len(),
                 1

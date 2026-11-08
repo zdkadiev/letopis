@@ -1,3 +1,4 @@
+use super::utils::map_error_to_config_read_command_error;
 use super::{
     CommandError, CommandErrorKind, CommandResult, ConfigReader, Configuration, EmbeddingError,
     EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, FileReader,
@@ -25,19 +26,16 @@ impl fmt::Debug for ConfigurationService<'_> {
 
 impl ConfigReader for ConfigurationService<'_> {
     fn get_config(&self) -> CommandResult<Option<Configuration>> {
-        let Some(bytes) = self.get_config_bytes().map_err(|error| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                super::utils::CONFIG_READ_FAILURE,
-                error,
-            )
-        })?
+        let Some(bytes) = self
+            .get_config_bytes()
+            .map_err(map_error_to_config_read_command_error)?
         else {
             return Ok(None);
         };
-        let configuration = Configuration::parse(&bytes).map_err(map_invalid_configuration)?;
+        let configuration =
+            Configuration::parse(&bytes).map_err(map_configuration_error_to_command_error)?;
         self.validate_configuration(&configuration)
-            .map_err(map_invalid_configuration)?;
+            .map_err(map_configuration_error_to_command_error)?;
         Ok(Some(configuration))
     }
 }
@@ -60,7 +58,7 @@ impl ConfigurationService<'_> {
     }
 }
 
-pub(crate) fn map_invalid_configuration(cause: EmbeddingError) -> CommandError {
+pub(crate) fn map_configuration_error_to_command_error(cause: EmbeddingError) -> CommandError {
     let message = if cause.get_kind() == EmbeddingErrorKind::MigrationRequired {
         MIGRATION_REQUIRED
     } else {

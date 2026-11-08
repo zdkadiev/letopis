@@ -1,0 +1,7 @@
+{
+  "name": "control-v2-nan-after-query",
+  "exit_code": 0,
+  "wall_seconds": 0.005316999973729253,
+  "stdout": "[{\"rowid\":2,\"distance\":null,\"distance_sql_type\":\"null\",\"formatted_distance\":\"0.0\"},\n{\"rowid\":1,\"distance\":0,\"distance_sql_type\":\"real\",\"formatted_distance\":\"0.0\"},\n{\"rowid\":3,\"distance\":0.2928932188134525,\"distance_sql_type\":\"real\",\"formatted_distance\":\"0.29289321881345254\"}]\n",
+  "stderr": ""
+}

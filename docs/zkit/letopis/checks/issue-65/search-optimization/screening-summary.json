@@ -1,0 +1,25 @@
+{
+  "scope": "single post-conditioning screening sample each, not paired final medians",
+  "variants": {
+    "baseline": {
+      "seconds": 117.01996212499216,
+      "valid": true,
+      "screen_only_reduction_percent": 0.0
+    },
+    "parser": {
+      "seconds": 91.07506554108113,
+      "valid": true,
+      "screen_only_reduction_percent": 22.171342489581903
+    },
+    "memo": {
+      "seconds": 62.733120708027855,
+      "valid": true,
+      "screen_only_reduction_percent": 46.391094674068576
+    },
+    "combined": {
+      "seconds": 61.14591208402999,
+      "valid": true,
+      "screen_only_reduction_percent": 47.747451824742186
+    }
+  }
+}

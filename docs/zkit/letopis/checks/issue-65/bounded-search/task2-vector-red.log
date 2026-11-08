@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.53s
+     Running tests/storage_vectors.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_vectors-a26abeac900b6854)
+
+running 1 test
+test nearest_limits_current_knowledge_after_joins_and_ties ... FAILED
+
+failures:
+
+---- nearest_limits_current_knowledge_after_joins_and_ties stdout ----
+
+thread 'nearest_limits_current_knowledge_after_joins_and_ties' (563880562) panicked at tests/storage_vectors.rs:34:5:
+assertion `left == right` failed
+  left: ["z.md", "a.md", "b.md", "c.md"]
+ right: ["z.md"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    nearest_limits_current_knowledge_after_joins_and_ties
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.11s
+
+error: test failed, to rerun pass `--test storage_vectors`

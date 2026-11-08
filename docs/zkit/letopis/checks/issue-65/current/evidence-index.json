@@ -1,0 +1,739 @@
+{
+  "schema_version": 1,
+  "product_base": "52ed491a6688e0a4eee0cb5eceb3fc19f900465e",
+  "product_after_local_clone": "3b2e477cd2bb8bd204ab606a1566f32e713b4ac8",
+  "artifacts": [
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/0-after.json",
+      "bytes": 1883,
+      "sha256": "6e4328070855123ca855acb4554481281e507b9959d81a3a8ae2610b5424c1da",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/0-before.json",
+      "bytes": 1882,
+      "sha256": "b46a6bcb5f57d5087f17f4272fb700d7ffe6759ba1ca8d004548835a06418104",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/1-after.json",
+      "bytes": 1871,
+      "sha256": "7559110d8008fbaa06367f09c4151122c780becdff6a13f1097d4fc94f9e7d7d",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/1-before.json",
+      "bytes": 1880,
+      "sha256": "860b88a6a1cf10d5330a440d1032a76f03ba57098f87fa7fbd0388bb73a14d5d",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/2-after.json",
+      "bytes": 1868,
+      "sha256": "c9a08521b2cc3ab52065c9709a4ced9ec40e4d455b501c40ea69bf1230b524cb",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/2-before.json",
+      "bytes": 1869,
+      "sha256": "d0e910fcd85c5d8bbff92397bd1d8a39188bd0c70bf07c4ddbf5e959ce26340e",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-fresh-inspect/records.json",
+      "bytes": 11260,
+      "sha256": "21ffe33ad987514a676aa3041a6f75da147190eb0222602303db1a9bec11ee17",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/build.json",
+      "bytes": 10846,
+      "sha256": "c3cf4becd3229e728b9644591e90406aea05bde4b8c89ed595ab83853ff9f6ce",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/build.log",
+      "bytes": 183,
+      "sha256": "ae7dd19fc45c46876d13ea2a5175212e1ed6603e73fcbe810b09b980c6508658",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/build.py",
+      "bytes": 3943,
+      "sha256": "28346218428355ae5966d3d2387ceabe9cd32a8feb2863a99773fc91c58988f6",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/check.json",
+      "bytes": 6577,
+      "sha256": "d27e52586af93faf35ae5626077ecf2d74c5994a1139d1b93ee0b8e1ffc4ddb0",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/inspect.json",
+      "bytes": 7255,
+      "sha256": "9d6f94c5425a3501fa8b1dcdcc2484afecb1355b400d5be9f1b3de44e1588afd",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/profile-pairs.py",
+      "bytes": 1401,
+      "sha256": "9bbf83b61c367fe4e608137e771636f1b1a295dc588c932a58faecae9b31f292",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/refresh_bulk.json",
+      "bytes": 6801,
+      "sha256": "6f5471a44cff692ae909c17d4cc6966eba5c29c6c8f1329671cf2b0b90735800",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument/run.py",
+      "bytes": 1253,
+      "sha256": "34ab18256bb0ac63eec4f5ee8f81c4564816c957e6b18626ad5a3a0268037d9f",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-after/build.json",
+      "bytes": 10904,
+      "sha256": "67c53bc6afdf3ccbf49d741313f9d6aa46fa05bc8661fcae0d9b37458ff7072c",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-after/build.log",
+      "bytes": 190,
+      "sha256": "ef722b1a8d77079ebeed282f5848eae20f60955483616c1b98206f05e42d1bf0",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-after/build.py",
+      "bytes": 3995,
+      "sha256": "06c775ae2d75a61e23198f4f4f30614ca897068621d679132a93edd0d459d797",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs/records.json",
+      "bytes": 1876,
+      "sha256": "21857bed4c5c15fa251117fb155e9aa75261d5c47bdb784506e29e55ce7210d6",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/0-instrumented.json",
+      "bytes": 7311,
+      "sha256": "09ed71475e23461d1bf963b19a615fa6ffb0ee6c3c0defe80ae5f0237b41c21f",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/0-ordinary.json",
+      "bytes": 1872,
+      "sha256": "2b3d8fbd8b9936d181a356bb7b4d70f99ffeadddcd3ebf61cedb94b0b668fa3c",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/1-instrumented.json",
+      "bytes": 7308,
+      "sha256": "dec759c2d681e4c254c9e09087310b7391ca8531e5a60a24a2e2cd296059fa90",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/1-ordinary.json",
+      "bytes": 1882,
+      "sha256": "62a54d2cb5c8432f26323b3ccf8cb499593274ad7328203ef4f8bacd0e1d7cfc",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/2-instrumented.json",
+      "bytes": 7307,
+      "sha256": "99a76f75ec2a8a0d2a7b0743cc1c70fc1c68b281e4d2014e0acb835c368a94f9",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/2-ordinary.json",
+      "bytes": 1883,
+      "sha256": "0c37e27b082beb8f78b6179704b314c717e7493ab539bb812c8053cdad606358",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-instrument-pairs-02/records.json",
+      "bytes": 27570,
+      "sha256": "06461747fba102e105a8a15e1884aed4cff8a690add615995bb8444e4128faa3",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-optimized-build/build.json",
+      "bytes": 10374,
+      "sha256": "eff503c7a94a3647948428026f44405f1b52efcada7bcfd394f5af2838b6c049",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-optimized-build/cargo-build.log",
+      "bytes": 74,
+      "sha256": "3ca8fcda053f027e1874549d3c67b8d5af55ddd0cbbf24d0750cbb54ae966e20",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-packing-control/comparison.json",
+      "bytes": 5248,
+      "sha256": "e04f171294b3dfe10bfd6ad61ecba687b611fb89622d891564013e3e323b1da5",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-packing-control/manifest.json",
+      "bytes": 13210,
+      "sha256": "e7784b5aa9790fe2f22aefa7358744898bc7188fbb854f5981133180c408b028",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-probe/build.json",
+      "bytes": 10377,
+      "sha256": "15caf19fe90264ad54dc82a1956b61f236b2e5e211fedebc093ddc2b538a4d88",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-probe/completion.json",
+      "bytes": 10411,
+      "sha256": "eef9848c29426753542f192458ea1d56fbff83a3208f2ed19696a544d7e491b5",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-probe/manifest.json",
+      "bytes": 6202,
+      "sha256": "c58547ab78d762bb2f7ef414302dc2eba0f0d5f97eda32c19edf103f4de9ecce",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-probe/profiler.json",
+      "bytes": 108,
+      "sha256": "75c05d70061901b7daa0f67866ea6095639518b3f814f584b068327948a3d3bb",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-probe/samples.jsonl",
+      "bytes": 3210,
+      "sha256": "39af7f48a3b9027d3e61eef3e1201e43066dc2922985eaaffbf873d1bd4cc8be",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-probe/summary.json",
+      "bytes": 1168,
+      "sha256": "9c8e234165aa718c1d19311e0f81facba4b445573220b8ff2e263d8d89d81b4e",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-repeat/after-setup.json",
+      "bytes": 1791,
+      "sha256": "6e21736dba31661349728e8828cd2e72ada4912242eba318f741ac8794403e67",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-repeat/after.json",
+      "bytes": 7785,
+      "sha256": "f20d4e553212d873fc92f5fc374ec77506c0d0a7fb6a2bdfd4d10ea4d7703697",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-repeat/before-setup.json",
+      "bytes": 1780,
+      "sha256": "c484213bea9b3685c99591e27c4bcb2d10a9ad029bb3fbcc41ea51cc9da8e757",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-profile-repeat/before.json",
+      "bytes": 7253,
+      "sha256": "61b789eb175d300244940aa7b6e186e8cc115a196ad3a96d33043fc66448ea9a",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-reuse-comparison/manifest.json",
+      "bytes": 732,
+      "sha256": "6362f75b71741f336edf5854d04ebaca88819b1b3b7addffc85770f4d2fbaf8d",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-reuse-comparison/samples.jsonl",
+      "bytes": 181285,
+      "sha256": "57771371251fb2f93d043543e104a420b0a94cd1b256f6d6eb17ce5d5aa29a61",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-reuse-comparison/summary.json",
+      "bytes": 4540,
+      "sha256": "94a6afb09a5c66e911a94781ffa524fe63dae77f047b4d774c31e8bdfefb506c",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-smoke-before/completion.json",
+      "bytes": 10411,
+      "sha256": "eef9848c29426753542f192458ea1d56fbff83a3208f2ed19696a544d7e491b5",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-smoke-before/corpus.json",
+      "bytes": 1055,
+      "sha256": "d878b140b80ad45033b3cecccff10d9dd2f4739a68048cb1552d295f74c1ba61",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-smoke-before/coverage.json",
+      "bytes": 412,
+      "sha256": "4d9e0a0a51153cb20353a655c3c8ccb99cd5913a41f481f4ddc579be97ee5db9",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-smoke-before/manifest.json",
+      "bytes": 6139,
+      "sha256": "78a485c29bc9b6ac32b3200ab42ed9322230647c846bce4e3bef90873327fd2c",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-smoke-before/samples.jsonl",
+      "bytes": 54815,
+      "sha256": "90b61c7ea906559a538105b2cbffb825bcafb990e34aeb5497f3b59d1567fb05",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-smoke-before/summary.json",
+      "bytes": 9177,
+      "sha256": "06cb56d69863de1525c817a55612c0ccb6a2da4b114233851ba75426b3d90e0c",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-100k/build.json",
+      "bytes": 10377,
+      "sha256": "15caf19fe90264ad54dc82a1956b61f236b2e5e211fedebc093ddc2b538a4d88",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-100k/completion.json",
+      "bytes": 120,
+      "sha256": "d4ceffa864eb72f3ce3c5e2de7a92dc380091592bac476bfbc5da27d2d4e2a88",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-100k/corpus.json",
+      "bytes": 421539,
+      "sha256": "d8c7a988e707d54349404947eb6d216a06816b6201e34e5245d45b532df7e9d6",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-100k/manifest.json",
+      "bytes": 6140,
+      "sha256": "5ed25eca2d10c85b48282f64b634ab949e9a99f5c51b87bd98dfaae03cf33b78",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-100k/samples.jsonl",
+      "bytes": 1241,
+      "sha256": "a042f59c9bdd5558f13e9cfaba07ede83ac7961a8d143fd47611c24b742a157f",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/build.json",
+      "bytes": 10377,
+      "sha256": "15caf19fe90264ad54dc82a1956b61f236b2e5e211fedebc093ddc2b538a4d88",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/completion.json",
+      "bytes": 10411,
+      "sha256": "eef9848c29426753542f192458ea1d56fbff83a3208f2ed19696a544d7e491b5",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/corpus.json",
+      "bytes": 42930,
+      "sha256": "2cd1c04009178a877371d074ec058dd5e78b2aa6daa11d1fcc80c83738d37094",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/coverage.json",
+      "bytes": 412,
+      "sha256": "4d9e0a0a51153cb20353a655c3c8ccb99cd5913a41f481f4ddc579be97ee5db9",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/manifest.json",
+      "bytes": 6140,
+      "sha256": "46796ab777421a47f034a56503177d28570369fdeeeee3628b21237d91addeac",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/samples.jsonl",
+      "bytes": 99455,
+      "sha256": "122068d0efb0cad6100017ea17285799c65c8975e156e45ba545a85626746b33",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-10k/summary.json",
+      "bytes": 9602,
+      "sha256": "af3a890a3090b5e3e32ba6b6e1064fad34fc2aa9e3b13d1242f81e5fdc6fe489",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/build.json",
+      "bytes": 10377,
+      "sha256": "15caf19fe90264ad54dc82a1956b61f236b2e5e211fedebc093ddc2b538a4d88",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/completion.json",
+      "bytes": 10411,
+      "sha256": "eef9848c29426753542f192458ea1d56fbff83a3208f2ed19696a544d7e491b5",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/corpus.json",
+      "bytes": 5059,
+      "sha256": "28d30fd3224b059d95265f7632d102c3df8b32c1f7f07543a28accf33c95a4fc",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/coverage.json",
+      "bytes": 412,
+      "sha256": "4d9e0a0a51153cb20353a655c3c8ccb99cd5913a41f481f4ddc579be97ee5db9",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/manifest.json",
+      "bytes": 6141,
+      "sha256": "4fd1aa85e7ce839a4f67dde3458e7c99366a893bc14a6f6da483c11faa8ebc95",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/samples.jsonl",
+      "bytes": 254704,
+      "sha256": "e86fae58581d19cf155eba49660f75429f81a5a0101ad21d7e7826bb632568e8",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": ".artifacts/issue-65/2026-11-05-survey-1k/summary.json",
+      "bytes": 10968,
+      "sha256": "9ab460379587e8bb5acfdb766f12a87abde2796463ba11488082e2a827eb100f",
+      "scope": "ignored_raw_evidence"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/baseline-build.json",
+      "bytes": 10377,
+      "sha256": "15caf19fe90264ad54dc82a1956b61f236b2e5e211fedebc093ddc2b538a4d88",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/compare-fresh-inspect.py",
+      "bytes": 1506,
+      "sha256": "d1b37736b202732456b8e122cdbe051796a9cb80d7bf25bccdcf98b3705f8622",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/compare-reuse.py",
+      "bytes": 2946,
+      "sha256": "2302b29d292848e11f964ef5583728c8b06a09443adc682715369666d3021053",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/comparison-manifest.json",
+      "bytes": 732,
+      "sha256": "6362f75b71741f336edf5854d04ebaca88819b1b3b7addffc85770f4d2fbaf8d",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/comparison-samples.jsonl",
+      "bytes": 181285,
+      "sha256": "57771371251fb2f93d043543e104a420b0a94cd1b256f6d6eb17ce5d5aa29a61",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/corpus-100k.json",
+      "bytes": 458827,
+      "sha256": "cf2235261a3ed884a0721080b1da745870c274998d74fff38f7e7f254c0cdd1f",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/corpus-10k.json",
+      "bytes": 46619,
+      "sha256": "500f37d5d52f2545fe429ae7c8b03ec8a6c735156e790e69efd7f91219a7d3e6",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/corpus-1k.json",
+      "bytes": 5389,
+      "sha256": "d97a5a8f607c43cb89bd97df69b08f25a6dcf68be9f5afb6808d32457787e2d1",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/debug_git_tests.log",
+      "bytes": 5318,
+      "sha256": "f9ca6e24212642e7b380437ac0a89c8bc6f6041fd04a97b69c355b23361adcb9",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/diagnostic_red.log",
+      "bytes": 1032,
+      "sha256": "89bb7af7700e312c3d126c910c97c82e379e42c47291bb778d4d6307267f7d50",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/final-product-build.log",
+      "bytes": 134,
+      "sha256": "95d419e20ce960212576bed7a34f349b2df19716cb9c08ca4f41941b2c9f46e0",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/final-product-smoke.json",
+      "bytes": 1874,
+      "sha256": "8f9eefe872dc3b92c01aa5de70ecd07a11ae8754bab5f5344e02a2019430b63f",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/follow-ups.md",
+      "bytes": 2688,
+      "sha256": "d3b83cce3f36c30260e90518ba849598c565a980f793e1b540b02a766ccf8458",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/fresh-inspect.json",
+      "bytes": 11260,
+      "sha256": "21ffe33ad987514a676aa3041a6f75da147190eb0222602303db1a9bec11ee17",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/generator_tests.log",
+      "bytes": 98,
+      "sha256": "ccd457e74d7e4ec220e03d0c9a76db222df2f27bb20ac93ea77ae10cec601eb7",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/harness-mutations.json",
+      "bytes": 2771,
+      "sha256": "17857d2d367633fed94f5b9b42e5425d75148a3719bf97183f447c0e7ab39adf",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/index-overlap.json",
+      "bytes": 4527,
+      "sha256": "2caae023917dcbf6b28d47bd381d0a7610a83ad96182eb6358d464a1089f05fa",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/initial_reuse_red.log",
+      "bytes": 1921,
+      "sha256": "7e4e00f17ee15c03c8da0b5ef62086c5d0fe30e2448c2563f78397052404a2e9",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/make_verify_baseline.log",
+      "bytes": 73571,
+      "sha256": "5cf22b3d36ed2a30a802dc8369613ae6b0c67bbd0e571da3351d213ed3377def",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/make_verify_final.log",
+      "bytes": 74449,
+      "sha256": "65467fca8241095b4ce184f6715766dc85ab42f9a28763894f67a7509c413aca",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/make_verify_final_rebuilt.log",
+      "bytes": 75524,
+      "sha256": "bc858fbd6dd8d9f23d6b6554d7fc5ffeded2de074644a34b005bb5f1b63da10e",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/native-profiler-failure.json",
+      "bytes": 1762,
+      "sha256": "b207e40f49b1115a67f04e8f8dc1c13aea8b406c83dfb522d705f31b13578438",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/no-helper.log",
+      "bytes": 558,
+      "sha256": "863a15d0b4aa23f8a460752e0567ef07e7d730c2e91f791385656dd20a85bf81",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/optimized-build.json",
+      "bytes": 10374,
+      "sha256": "eff503c7a94a3647948428026f44405f1b52efcada7bcfd394f5af2838b6c049",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-build-after.json",
+      "bytes": 10904,
+      "sha256": "67c53bc6afdf3ccbf49d741313f9d6aa46fa05bc8661fcae0d9b37458ff7072c",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-build.json",
+      "bytes": 10846,
+      "sha256": "c3cf4becd3229e728b9644591e90406aea05bde4b8c89ed595ab83853ff9f6ce",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-check-10k.json",
+      "bytes": 6577,
+      "sha256": "d27e52586af93faf35ae5626077ecf2d74c5994a1139d1b93ee0b8e1ffc4ddb0",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-inspect-10k.json",
+      "bytes": 7255,
+      "sha256": "9d6f94c5425a3501fa8b1dcdcc2484afecb1355b400d5be9f1b3de44e1588afd",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-overhead.json",
+      "bytes": 27570,
+      "sha256": "06461747fba102e105a8a15e1884aed4cff8a690add615995bb8444e4128faa3",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-pairs.py",
+      "bytes": 1401,
+      "sha256": "9bbf83b61c367fe4e608137e771636f1b1a295dc588c932a58faecae9b31f292",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-refresh-bulk-10k.json",
+      "bytes": 6801,
+      "sha256": "6f5471a44cff692ae909c17d4cc6966eba5c29c6c8f1329671cf2b0b90735800",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-repeat-after.json",
+      "bytes": 7785,
+      "sha256": "f20d4e553212d873fc92f5fc374ec77506c0d0a7fb6a2bdfd4d10ea4d7703697",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-repeat-before.json",
+      "bytes": 7253,
+      "sha256": "61b789eb175d300244940aa7b6e186e8cc115a196ad3a96d33043fc66448ea9a",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/profile-repeat.py",
+      "bytes": 1614,
+      "sha256": "e1b8d70642e9b85efb525fea2f0e240f934be33feca8299b1b0c691f6ed02357",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/python_performance_tests.log",
+      "bytes": 15733,
+      "sha256": "8d2a6e071fcec94269d73fcc1995c30ea371b128290071b1a97d4bcacbc1466d",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/release_git_tests.log",
+      "bytes": 5425,
+      "sha256": "187e16b4dfc50bdddb54701d5cb909303849d59cee193783b1ba6b2f5d7ffd1d",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/report.md",
+      "bytes": 15071,
+      "sha256": "7c2193d48eace6302c5bbdf3d46e669db4e91c5267036c61ef9800b611d966db",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/reuse-comparison.json",
+      "bytes": 4540,
+      "sha256": "94a6afb09a5c66e911a94781ffa524fe63dae77f047b4d774c31e8bdfefb506c",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/rust-mutations.json",
+      "bytes": 4815,
+      "sha256": "f92d88ed74dcba0c2e2fc76c4eb32b01c36cfa9bc63fa90ed0d61e67e2b28f99",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/strict_rustdoc.log",
+      "bytes": 263,
+      "sha256": "807b85d000b90d7298c3d042ba3d44ab9de545b6d5687909c6a4be995d63576b",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-100k-manifest.json",
+      "bytes": 6140,
+      "sha256": "5ed25eca2d10c85b48282f64b634ab949e9a99f5c51b87bd98dfaae03cf33b78",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-100k-timeout.jsonl",
+      "bytes": 1241,
+      "sha256": "a042f59c9bdd5558f13e9cfaba07ede83ac7961a8d143fd47611c24b742a157f",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-10k-manifest.json",
+      "bytes": 6140,
+      "sha256": "46796ab777421a47f034a56503177d28570369fdeeeee3628b21237d91addeac",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-10k-samples.jsonl",
+      "bytes": 99455,
+      "sha256": "122068d0efb0cad6100017ea17285799c65c8975e156e45ba545a85626746b33",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-10k-summary.json",
+      "bytes": 9602,
+      "sha256": "af3a890a3090b5e3e32ba6b6e1064fad34fc2aa9e3b13d1242f81e5fdc6fe489",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-1k-manifest.json",
+      "bytes": 6141,
+      "sha256": "4fd1aa85e7ce839a4f67dde3458e7c99366a893bc14a6f6da483c11faa8ebc95",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-1k-samples.jsonl",
+      "bytes": 254704,
+      "sha256": "e86fae58581d19cf155eba49660f75429f81a5a0101ad21d7e7826bb632568e8",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/survey-1k-summary.json",
+      "bytes": 10968,
+      "sha256": "9ab460379587e8bb5acfdb766f12a87abde2796463ba11488082e2a827eb100f",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/sync-replay-after-rebuild.log",
+      "bytes": 431,
+      "sha256": "5b2afcc9e1ca79a3c278f374a555180e7f2c80fa459a31e7b5ad1bbdba299136",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/sync-replay-before-rebuild.log",
+      "bytes": 897,
+      "sha256": "92b8206afcd0b7aa4a77effabf33776e2a1d3f60640d5f240385cd5d49f58e7f",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/timing-instrumentation-after.patch",
+      "bytes": 11520,
+      "sha256": "eebce0facd47786921687d0b9010b2e9f3ca4204d687c8a3516ef710883a00a0",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/timing-instrumentation.patch",
+      "bytes": 10782,
+      "sha256": "702db8734e745ed569f020b3f8810270b77742b412e993fbee222fb54f9e1945",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/verification.json",
+      "bytes": 15986,
+      "sha256": "ef175215562c53389120a2a39d53be2a949fa728ee44daf39e07f015bdf89b6e",
+      "scope": "durable_receipt_or_driver"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/current/wall-profiler-failure.json",
+      "bytes": 3458,
+      "sha256": "59b7d9af1b93e7625c0e9ae2410329b1c4aaa89b52c1436fa34025d49e400d48",
+      "scope": "durable_receipt_or_driver"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+    Checking letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+   --> src/storage/cache.rs:542:20
+    |
+542 |             .query(params![expression, SOURCE_KIND, limit.get() as u64])
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `ToSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `ToSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+    = note: required for the cast from `&u64` to `&dyn ToSql`
+    = note: this error originates in the macro `params` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+   --> src/storage/vector.rs:687:13
+    |
+687 | /             params![
+688 | |                 bytes,
+689 | |                 format!("{{K:{count}}}"),
+690 | |                 SOURCE_KIND,
+691 | |                 limit.get() as u64
+692 | |             ],
+    | |_____________^ the trait `ToSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `ToSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+    = note: required for the cast from `&u64` to `&dyn ToSql`
+    = note: this error originates in the macro `params` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unused variable: `limit`
+   --> src/storage/vector.rs:642:5
+    |
+642 |     limit: NonZeroUsize,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
+    |
+    = note: `-D unused-variables` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `letopis` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/service/search.rs:1153:22
+     |
+1153 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+     |                      ^^^^^^^^^^^^^^^^^^^^^^--------------------------------------------------------- argument #3 of type `std::num::NonZero<usize>` is missing
+     |
+note: method defined here
+    --> src/service/search.rs:316:8
+     |
+ 316 |     fn find_vector_candidates(
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 320 |         limit: NonZeroUsize,
+     |         -------------------
+help: provide the argument
+     |
+1153 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query", /* std::num::NonZero<usize> */)
+     |                                                                                                    ++++++++++++++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/service/search.rs:1169:22
+     |
+1169 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+     |                      ^^^^^^^^^^^^^^^^^^^^^^--------------------------------------------------------- argument #3 of type `std::num::NonZero<usize>` is missing
+     |
+note: method defined here
+    --> src/service/search.rs:316:8
+     |
+ 316 |     fn find_vector_candidates(
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 320 |         limit: NonZeroUsize,
+     |         -------------------
+help: provide the argument
+     |
+1169 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query", /* std::num::NonZero<usize> */)
+     |                                                                                                    ++++++++++++++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/service/search.rs:1198:22
+     |
+1198 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+     |                      ^^^^^^^^^^^^^^^^^^^^^^--------------------------------------------------------- argument #3 of type `std::num::NonZero<usize>` is missing
+     |
+note: method defined here
+    --> src/service/search.rs:316:8
+     |
+ 316 |     fn find_vector_candidates(
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 320 |         limit: NonZeroUsize,
+     |         -------------------
+help: provide the argument
+     |
+1198 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query", /* std::num::NonZero<usize> */)
+     |                                                                                                    ++++++++++++++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/service/search.rs:1210:22
+     |
+1210 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+     |                      ^^^^^^^^^^^^^^^^^^^^^^--------------------------------------------------------- argument #3 of type `std::num::NonZero<usize>` is missing
+     |
+note: method defined here
+    --> src/service/search.rs:316:8
+     |
+ 316 |     fn find_vector_candidates(
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 320 |         limit: NonZeroUsize,
+     |         -------------------
+help: provide the argument
+     |
+1210 |                     .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query", /* std::num::NonZero<usize> */)
+     |                                                                                                    ++++++++++++++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/service/search.rs:1222:22
+     |
+1222 |                     .find_vector_candidates(None, "query")
+     |                      ^^^^^^^^^^^^^^^^^^^^^^--------------- argument #3 of type `std::num::NonZero<usize>` is missing
+     |
+note: method defined here
+    --> src/service/search.rs:316:8
+     |
+ 316 |     fn find_vector_candidates(
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 320 |         limit: NonZeroUsize,
+     |         -------------------
+help: provide the argument
+     |
+1222 |                     .find_vector_candidates(None, "query", /* std::num::NonZero<usize> */)
+     |                                                          ++++++++++++++++++++++++++++++++
+
+error: unused variable: `limit`
+    --> src/service/traversal.rs:1228:17
+     |
+1228 |                 limit: std::num::NonZeroUsize,
+     |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
+
+error: unused variable: `limit`
+    --> src/service/traversal.rs:1264:17
+     |
+1264 |                 limit: std::num::NonZeroUsize,
+     |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
+
+Some errors have detailed explanations: E0061, E0277.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `letopis` (lib test) due to 10 previous errors

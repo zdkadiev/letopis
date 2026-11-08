@@ -1,0 +1,32 @@
+
+running 9 tests
+test storage::cache::tests::caught_sql_failure_restores_metadata_and_the_fts_schema ... ok
+test service::document_refresher::tests::basis::preflight_read_failure_never_opens_sql_write ... ok
+test service::document_refresher::tests::basis::unchanged_basis_retention_skips_sql_write_and_body_parse ... ok
+test service::document_refresher::tests::basis::observation_failure_never_opens_sql_write ... ok
+test service::document_refresher::tests::basis::verified_unchanged_refresh_audits_without_sql_write ... ok
+test service::document_refresher::tests::basis::pin_failure_never_opens_sql_write ... ok
+test service::document_refresher::tests::basis::retain_under_index_lock_before_sql_publication ... ok
+test service::search::tests::scoped::revisions::sql_pool_limits_fresh_candidate_observations ... FAILED
+test service::document_refresher::tests::process::reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock ... ok
+
+failures:
+
+---- service::search::tests::scoped::revisions::sql_pool_limits_fresh_candidate_observations stdout ----
+
+thread 'service::search::tests::scoped::revisions::sql_pool_limits_fresh_candidate_observations' (564235953) panicked at src/service/search.rs:1376:17:
+assertion `left == right` failed
+  left: ["validate", "compare", "observe", "observe"]
+ right: ["validate", "compare", "observe"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    service::search::tests::scoped::revisions::sql_pool_limits_fresh_candidate_observations
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 622 filtered out; finished in 0.52s
+
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.74s
+     Running unittests src/lib.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/letopis-43e59323f2756d14)
+error: test failed, to rerun pass `--lib`

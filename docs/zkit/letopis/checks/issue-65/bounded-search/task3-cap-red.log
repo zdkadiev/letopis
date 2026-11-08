@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.74s
+     Running tests/knowledge_search.rs (target/debug/deps/knowledge_search-3fe0a649623e3b57)
+
+running 1 test
+test service_caps_direct_requests_at_one_hundred_results ... FAILED
+
+failures:
+
+---- service_caps_direct_requests_at_one_hundred_results stdout ----
+
+thread 'service_caps_direct_requests_at_one_hundred_results' (563953520) panicked at tests/knowledge_search.rs:28:5:
+assertion `left == right` failed
+  left: 105
+ right: 100
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    service_caps_direct_requests_at_one_hundred_results
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `--test knowledge_search`

@@ -1,0 +1,141 @@
+{
+  "tree": "9942751be3da3e64918d7aa755b995d443cf7f36",
+  "sources": [
+    {
+      "path": "src/storage/cache.sql",
+      "sha256": "a8caf0fa4da5c0291838348c8b3d5a535b70feb9bb8918b39d538c574a7072ae",
+      "bytes": 4094
+    },
+    {
+      "path": "src/storage/vectors.sql",
+      "sha256": "3a934553394c296ee5dfe680440c1b61c16eb288121f935f72739bb951d321a5",
+      "bytes": 534
+    },
+    {
+      "path": "src/storage/connection.rs",
+      "sha256": "0001ba4b71609cb5ecd618110f2675fdc8ea2d9e84e4fcd61384647f7efa7ad9",
+      "bytes": 22816
+    },
+    {
+      "path": "src/storage/cache.rs",
+      "sha256": "88126a47843b1627c3149f7499a75fb766e759e75bec4b801862ae21026482d0",
+      "bytes": 110448
+    },
+    {
+      "path": "src/storage/transaction.rs",
+      "sha256": "66f8ab6de96ca68a63353b478ce46ba22637cf78fd4c96770cf5c2ec07bae0e4",
+      "bytes": 9185
+    },
+    {
+      "path": "src/storage/vector.rs",
+      "sha256": "fbfac32e414f8d7818e78c4fe6a31623aaa3c1329fd62b3ff82f27e835aeaa84",
+      "bytes": 49290
+    },
+    {
+      "path": "tests/storage_read_scope_failures.rs",
+      "sha256": "db9bc78cd6d81ebd59a9623bf8b65c419c458dc48d3c6d3d2f2b60ae9136e305",
+      "bytes": 3019
+    },
+    {
+      "path": "src/filesystem/file.rs",
+      "sha256": "dede73e3b1216c1a07a339ffe0df6f468b3a59e8dc2c32c1e0a7fc2c036e34df",
+      "bytes": 8525
+    },
+    {
+      "path": "src/filesystem/path.rs",
+      "sha256": "e56e8a27ae997c7e1c88eb502754211f4fb544df5f762bd49c2728d91eebbf09",
+      "bytes": 14247
+    },
+    {
+      "path": "src/filesystem/local.rs",
+      "sha256": "0bf819fd5cc1afd7c14676d825226fcd4505f76203efcb4ae97690d4dff347d6",
+      "bytes": 8278
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "276cfa2816f1ae84bc877c4621b4a17fe210abf4719a9d8cc86ad366e1409696",
+      "bytes": 59865
+    },
+    {
+      "path": "src/service/status.rs",
+      "sha256": "753bd152c533492092181b94a354b136b69188b13439f715c512f20cdbec8152",
+      "bytes": 72248
+    },
+    {
+      "path": "src/service/mod.rs",
+      "sha256": "572ab0eb134df1d3b32c1094ebdad579c1b888638a867c8c19b66cb3b623936c",
+      "bytes": 48907
+    },
+    {
+      "path": "vendor/vec1/vec1.c",
+      "sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+      "bytes": 378128
+    },
+    {
+      "path": "src/storage/schema.rs",
+      "sha256": "d440844eaaf1d36c99eb6740206022cc4eec9527eaefd359113beb4a9f2dd481",
+      "bytes": 22141
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md",
+      "sha256": "14545ba446ac21b130e1e46088b769a4291f9a6699cb9defe3d8b624062493b9",
+      "bytes": 11784
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/summary.json",
+      "sha256": "a4ba7cf782b827d5f79cfb5f7e78ab7f074e1962b81486f61a26cfdb6722c51a",
+      "bytes": 8330
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/control-v2-runs.json",
+      "sha256": "7df35a23f18e9bbd80611106ae6716d76ac2ebcb4b6739ad35f04a3fe285bbf5",
+      "bytes": 5130
+    },
+    {
+      "path": "src/storage/vector_index.rs",
+      "sha256": "caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a",
+      "bytes": 21638
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/verification.json",
+      "sha256": "0e210be0e441f25b2eed2838029060de9b669929809e1ea9172eb6eaf6e20561",
+      "bytes": 468
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/host-storage/manifest.json",
+      "sha256": "e80402c50cfe1180ec441440892de0b06b32e58420bf15944385ce5727a185b7",
+      "bytes": 31336
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json",
+      "sha256": "e6ae9a75d1c26551c9b9c3d04e908f03faafe8a19625cd18975880c169b0eb49",
+      "bytes": 824
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/first-upgrade-init.json",
+      "sha256": "cb9a40bdadafc040cc4e334ee05f9a662676b8f1afcb9fce71f34f211b4e60a7",
+      "bytes": 1399
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/profile/validation.json",
+      "sha256": "cc6e3f46abbe3bc6ebb89661310e9f35a48051d6af7a90862f2f42efa53b3642",
+      "bytes": 395
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json",
+      "sha256": "15f28e21c747e76ab9d674311defd26a7513024cd86cfceb01da55ecbc17ad3f",
+      "bytes": 226858
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/profile/receipt.json",
+      "sha256": "b1abd594de57ba6f48a6f0da7fee6c2a9c83abdc0082779e105e190646e67ebf",
+      "bytes": 3127
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/candidate/mutations.json",
+      "sha256": "01123b367a961401f5694ac015e3631ede399b2c6c7e8fcd15f7275513fc18d6",
+      "bytes": 983
+    }
+  ],
+  "temporary_index_only": true
+}

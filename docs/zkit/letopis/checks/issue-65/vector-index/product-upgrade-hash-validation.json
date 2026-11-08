@@ -1,0 +1,7 @@
+{
+  "accepted": true,
+  "uses_exact_baseline_SQL": true,
+  "payload_hash_unchanged": true,
+  "source_sql": "native-probe/vector-hash-none.sql",
+  "first_attempt": "upgrade-hash-first-attempt.json"
+}

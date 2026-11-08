@@ -1,0 +1,36 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.46s
+     Running unittests src/lib.rs (target/debug/deps/letopis-43e59323f2756d14)
+
+running 3 tests
+test git::durability::tests::existing_object_reuse_requires_verified_bytes_and_no_stage ... FAILED
+test git::durability::tests::existing_object_reuse_must_sync_object_and_parent_directories ... FAILED
+test git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation ... FAILED
+
+failures:
+
+---- git::durability::tests::existing_object_reuse_requires_verified_bytes_and_no_stage stdout ----
+
+thread 'git::durability::tests::existing_object_reuse_requires_verified_bytes_and_no_stage' (501046488) panicked at src/git/durability.rs:640:31:
+called `Option::unwrap()` on a `None` value
+
+---- git::durability::tests::existing_object_reuse_must_sync_object_and_parent_directories stdout ----
+
+thread 'git::durability::tests::existing_object_reuse_must_sync_object_and_parent_directories' (501046486) panicked at src/git/durability.rs:679:13:
+ObjectSync
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation stdout ----
+
+thread 'git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation' (501046487) panicked at src/git/durability.rs:661:9:
+assertion failed: corrupt.is_err()
+
+
+failures:
+    git::durability::tests::existing_object_reuse_must_sync_object_and_parent_directories
+    git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation
+    git::durability::tests::existing_object_reuse_requires_verified_bytes_and_no_stage
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 600 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `--lib`

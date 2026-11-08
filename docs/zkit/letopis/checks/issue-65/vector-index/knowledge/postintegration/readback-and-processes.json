@@ -1,0 +1,30 @@
+{
+  "snapshot": "5e6aee4700c271f271e20d26508e694ba0b60c1e",
+  "source_snapshot": "846d0684054c989a798b06b46ddbfbabcd99c8e9",
+  "knowledge_and_sources_read_from_same_tree": true,
+  "verified_elements": [
+    {
+      "id": "letopis/architecture/storage.md",
+      "sha256": "33222990c676e619991ad724b35220bdea8378b27c32af95f9937599ca4e8673"
+    },
+    {
+      "id": "src/storage/schema.rs",
+      "sha256": "d440844eaaf1d36c99eb6740206022cc4eec9527eaefd359113beb4a9f2dd481"
+    },
+    {
+      "id": "src/storage/vector.rs",
+      "sha256": "fbfac32e414f8d7818e78c4fe6a31623aaa3c1329fd62b3ff82f27e835aeaa84"
+    },
+    {
+      "id": "src/storage/vector_index.rs",
+      "sha256": "caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a"
+    },
+    {
+      "id": "src/storage/vectors.sql",
+      "sha256": "3a934553394c296ee5dfe680440c1b61c16eb288121f935f72739bb951d321a5"
+    }
+  ],
+  "all_19_sources_match_author_basis": true,
+  "owned_background_drains_present": [],
+  "search_not_rerun": true
+}

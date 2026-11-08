@@ -1,0 +1,14 @@
+{
+  "request": {
+    "element_ids": [
+      "letopis/architecture/storage.md",
+      "vendor/vec1/vec1.c",
+      ".artifacts/issue-65/vector-index-2026-11-07/native-probe/report.md",
+      ".artifacts/issue-65/vector-index-2026-11-07/native-probe/summary.json",
+      ".artifacts/issue-65/vector-index-2026-11-07/native-probe/control-v2-runs.json"
+    ]
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"snapshot\":\"d17b76446f0dcc21e910c1b6167823405d10e1b9\",\"elements\":{\".artifacts/issue-65/vector-index-2026-11-07/native-probe/control-v2-runs.json\":{\"path\":\".artifacts/issue-65/vector-index-2026-11-07/native-probe/control-v2-runs.json\",\"hash\":\"7df35a23f18e9bbd80611106ae6716d76ac2ebcb4b6739ad35f04a3fe285bbf5\"},\".artifacts/issue-65/vector-index-2026-11-07/native-probe/report.md\":{\"path\":\".artifacts/issue-65/vector-index-2026-11-07/native-probe/report.md\",\"hash\":\"14545ba446ac21b130e1e46088b769a4291f9a6699cb9defe3d8b624062493b9\"},\".artifacts/issue-65/vector-index-2026-11-07/native-probe/summary.json\":{\"path\":\".artifacts/issue-65/vector-index-2026-11-07/native-probe/summary.json\",\"hash\":\"a4ba7cf782b827d5f79cfb5f7e78ab7f074e1962b81486f61a26cfdb6722c51a\"},\"letopis/architecture/storage.md\":{\"path\":\"letopis/architecture/storage.md\",\"lines\":[1,142],\"hash\":\"620fb4fd74330ed51e663ca6aa9cba3930c5e49e3ae06c3da6c2ff7157da992f\"},\"vendor/vec1/vec1.c\":{\"path\":\"vendor/vec1/vec1.c\",\"hash\":\"a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9\"}}}}\n",
+  "stderr": ""
+}

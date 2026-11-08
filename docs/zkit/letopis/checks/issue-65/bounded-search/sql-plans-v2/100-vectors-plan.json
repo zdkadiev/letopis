@@ -1,0 +1,4 @@
+[{"id":8,"parent":0,"notused":3280,"detail":"SCAN v VIRTUAL TABLE INDEX 5:P"},
+{"id":14,"parent":0,"notused":45,"detail":"SEARCH k USING INTEGER PRIMARY KEY (rowid=?)"},
+{"id":17,"parent":0,"notused":61,"detail":"SEARCH n USING INDEX nodes_search_hash (search_hash=?)"},
+{"id":36,"parent":0,"notused":0,"detail":"USE TEMP B-TREE FOR ORDER BY"}]

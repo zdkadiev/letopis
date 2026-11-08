@@ -1,0 +1,17 @@
+{
+  "product_inputs": 107,
+  "host_inputs": 269,
+  "unrelated_captured_files_preserved": 3264,
+  "intended_existing_paths": 39,
+  "unchanged_head": "52ed491a6688e0a4eee0cb5eceb3fc19f900465e",
+  "index_has_no_staged_changes": true,
+  "knowledge_revision": 106,
+  "knowledge_sources": {
+    "letopis/architecture/search-pipeline.md": 9,
+    "letopis/architecture/storage.md": 30
+  },
+  "knowledge_verified_addresses": 37,
+  "binary_sha256": "117bee3d746af4946c0a3a52f2aa6e8bd972e06ba25d2e982b1fe27a73af53ba",
+  "profile_sha256": "484897ac4e29dc58c69235a618e6c930cd9f2978ae6b054ac0f3c49bb0ca525e",
+  "all_checks": true
+}

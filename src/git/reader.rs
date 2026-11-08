@@ -2,6 +2,7 @@ use super::{
     constants::{BLOB_KIND, HASH_CHUNK_BYTES, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
     error::SafeIo,
     hashing::ObjectHasher,
+    validation::tree_bytes_validate,
 };
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use gix::{
@@ -13,8 +14,9 @@ use gix::{
         store::{Handle, init::Options},
     },
 };
-use std::{fmt, io, rc::Rc};
+use std::{collections::BTreeSet, fmt, io, rc::Rc};
 
+const MAX_VALIDATED_TREES: usize = 4096;
 const MAX_REUSABLE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Keep only the current verified tree body; blob payloads are discarded after hashing.
@@ -29,6 +31,7 @@ pub(super) struct ObjectReader {
     objects: Handle<Rc<Store>>,
     oid_len: usize,
     buffer: Vec<u8>,
+    validated_trees: BTreeSet<String>,
     #[cfg(test)]
     object_reads: usize,
 }
@@ -39,6 +42,7 @@ impl fmt::Debug for ObjectReader {
             .debug_struct("ObjectReader")
             .field("oid_len", &self.oid_len)
             .field("buffer_capacity", &self.buffer.capacity())
+            .field("validated_trees", &self.validated_trees.len())
             .finish_non_exhaustive()
     }
 }
@@ -71,13 +75,12 @@ impl ObjectReader {
                 ..Options::default()
             },
         )
-        .map_err(|error| {
-            SnapshotError::new_with_cause("Git object store open failed", SafeIo(error))
-        })?;
+        .map_err(map_io_error_to_snapshot_object_store_error)?;
         Ok(Self {
             objects: Rc::new(store).to_handle(),
             oid_len,
             buffer: Vec::new(),
+            validated_trees: BTreeSet::new(),
             #[cfg(test)]
             object_reads: 0,
         })
@@ -129,6 +132,35 @@ impl ObjectReader {
     #[cfg(test)]
     pub(super) fn object_get_read_count(&self) -> usize {
         self.object_reads
+    }
+
+    /// Read fresh verified tree bytes, reusing only successful structural validation.
+    /// The bounded memo retains identities, never payloads, for this reader's lifetime.
+    ///
+    /// # Arguments
+    ///
+    /// * `oid` — hexadecimal object ID of the tree to read.
+    /// * `missing` — error kind reported when the object is absent.
+    /// * `wrong_type` — error kind reported when the object is not a tree.
+    ///
+    /// # Errors
+    /// Uses caller-selected missing/type errors; decoding, identity and structure failures are internal.
+    pub(super) fn tree_bytes_get_by_oid(
+        &mut self,
+        oid: &str,
+        missing: SnapshotErrorKind,
+        wrong_type: SnapshotErrorKind,
+    ) -> Result<Vec<u8>, SnapshotError> {
+        let bytes = self.object_bytes_get_by_oid(oid, TREE_KIND, missing, wrong_type)?;
+        // Consult metadata only after verifying current bytes, so replacement or
+        // disappearance cannot hide behind an earlier structural success.
+        if !self.validated_trees.contains(oid) {
+            tree_bytes_validate(&bytes, self.oid_len)?;
+            if self.validated_trees.len() < MAX_VALIDATED_TREES {
+                self.validated_trees.insert(oid.to_owned());
+            }
+        }
+        Ok(bytes)
     }
 
     /// Returns verified bytes for an addressed object; no payload survives in a cache.
@@ -185,7 +217,7 @@ impl ObjectReader {
         let (object, _) = self
             .objects
             .try_find_cached(&id, &mut self.buffer, &mut Never)
-            .map_err(|error| make_decode_error(&error))?
+            .map_err(make_decode_error)?
             .ok_or_else(|| SnapshotError::new(missing, "Git object is missing"))?;
         let kind = std::str::from_utf8(object.kind.as_bytes()).map_err(|_| {
             SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
@@ -213,11 +245,24 @@ impl ObjectReader {
     }
 }
 
-fn make_decode_error(error: &gix::Error) -> SnapshotError {
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "map_err passes the error by value to the mapper"
+)]
+fn make_decode_error(error: gix::Error) -> SnapshotError {
     let kind = error
         .downcast_any_ref::<io::Error>()
         .map_or(io::ErrorKind::InvalidData, io::Error::kind);
     SnapshotError::new_with_cause("Git object decode failed", SafeIo(io::Error::from(kind)))
+}
+
+/// Maps an I/O failure into an object-store snapshot error.
+///
+/// # Arguments
+///
+/// * `error` — I/O failure from opening the object store.
+fn map_io_error_to_snapshot_object_store_error(error: io::Error) -> SnapshotError {
+    SnapshotError::new_with_cause("Git object store open failed", SafeIo(error))
 }
 
 #[cfg(test)]

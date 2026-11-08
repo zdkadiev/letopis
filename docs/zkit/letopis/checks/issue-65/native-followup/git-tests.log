@@ -1,0 +1,65 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.66s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 57 tests
+test git::cleanup::tests::cancellation_releases_both_confirmation_markers_but_preserves_foreign_lock ... ok
+test git::cleanup::tests::cancelled_stage_cannot_be_recreated_or_published_by_resumed_writer ... ok
+test git::cleanup::tests::cancelled_ref_writer_cannot_publish_or_touch_successor_lock ... ok
+test git::cleanup::tests::handled_sigint_cleans_actual_resources_before_process_exit ... ok
+test git::cleanup::tests::resolved_parent_operations_remain_confined_to_detached_stage ... ok
+test git::cleanup::tests::failed_stage_cleanup_preserves_owner_and_releases_other_resources ... ok
+test git::durability::tests::confirmation::loose_confirmation_syncs_the_existing_backing_without_renaming_it ... ok
+test git::durability::tests::existing_object_reuse_propagates_object_and_directory_sync_failures ... ok
+test git::durability::tests::existing_object_reuse_rechecks_decodable_content_identity ... ok
+test git::durability::tests::existing_object_reuse_refuses_corruption_and_cancellation ... ok
+test git::durability::tests::confirmation::concurrent_confirmation_syncs_the_visible_winner_before_success ... ok
+test git::durability::tests::confirmation::packed_confirmation_rejects_a_symlink_backing_instead_of_syncing_the_wrong_parent ... ok
+test git::durability::tests::confirmation::packed_confirmation_does_not_touch_a_foreign_packing_lock ... ok
+test git::durability::tests::confirmation::retry_of_visible_ref_must_complete_sync_before_success ... ok
+test git::durability::tests::confirmation::packed_confirmation_holds_both_locks_during_backing_sync ... ok
+test git::durability::tests::confirmation::packed_confirmation_syncs_the_existing_backing_without_creating_a_loose_ref ... ok
+test git::durability::tests::confirmation::packed_confirmation_requires_backing_file_and_parent_sync ... ok
+test git::durability::tests::concurrent_creators_and_packed_refs_preserve_exact_target ... ok
+test git::hashing::tests::rejects_sha1_collision ... ok
+test git::durability::tests::existing_object_reuse_requires_verified_bytes_without_residual_entries ... ok
+test git::durability::tests::rejects_filesystem_symlink_refs_without_touching_the_referent ... ok
+test git::durability::tests::refuses_corrupt_existing_objects_and_cleans_private_staging ... ok
+test git::durability::tests::reports_directory_sync_failure_after_ref_publication ... ok
+test git::durability::tests::respects_foreign_locks_and_equal_ref_noops ... ok
+test git::durability::tests::confirmation::concurrent_confirmation_cannot_bypass_sync_or_steal_a_lock ... ok
+test git::reader::tests::run_owned_reader ... ok
+test git::durability::tests::linked_worktrees_publish_in_common_store_with_shared_permissions ... ok
+test git::reader::tests::raw_reads_ignore_configured_allocation_caps_replacements_and_payload_caches ... ok
+test git::objects::tests::full_audits_validate_tree_structure_despite_addressed_read_memoization ... ok
+test git::durability::tests::writes_canonical_tree_objects_in_both_formats ... ok
+test git::durability::tests::existing_object_reuse_supports_trees_and_defers_packed_objects ... ok
+test git::durability::tests::stages_syncs_publishes_and_retains_git_compatible_objects ... ok
+test git::durability::tests::leaves_private_reflogs_untouched_under_all_policies ... ok
+test git::objects::tests::tree_reads_reuse_structure_only_within_the_owned_reader ... ok
+test git::repository::tests::discovers_root_from_subdirectory ... ok
+test git::objects::tests::invalid_tree_bodies_are_validated_on_every_demand ... ok
+test git::durability::tests::rejects_symbolic_malformed_and_conflicting_refs_without_replacing_them ... ok
+test git::repository::tests::discovery_rejects_git_metadata_as_a_working_directory ... ok
+test git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration ... ok
+test git::repository::tests::repository_open_counter_excludes_clones ... ok
+test git::repository::tests::rejects_non_absence_errors_when_inspecting_object_alternates ... ok
+test git::repository::tests::open_rejects_non_repository_and_bare ... ok
+test git::repository::tests::assembly_checks_unique_oids_once_without_weakening_supplied_or_final_validation ... ok
+test git::repository::tests::worktree_paths_preserve_raw_names_and_non_document_entries ... ok
+test git::repository::tests::root_verification_and_addressed_reads_reject_malformed_tree_structure ... ok
+test git::durability::tests::injected_failures_preserve_publication_order_and_report_post_link_errors ... ok
+test git::validation::tests::validates_entry_boundaries_like_hash_object ... ok
+test git::validation::tests::validates_order_and_nonadjacent_duplicates_like_hash_object ... ok
+test git::validation::tests::validates_hfs_noncharacter_termination_like_hash_object ... ok
+test git::validation::tests::validates_hfs_noncharacter_termination_for_symlinks_like_hash_object ... ok
+test git::validation::tests::validates_raw_modes_like_hash_object ... ok
+test git::validation::tests::validates_special_symlink_names_like_hash_object ... ok
+test git::validation::tests::validates_names_like_hash_object ... ok
+test git::repository::tests::discovers_trailing_newline_repository_without_touching_sibling ... ok
+test git::repository::tests::snapshots_work_without_git_executable ... ok
+test git::repository::tests::strong_pin_rejects_malformed_nested_trees_like_git ... ok
+test git::objects::tests::tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects ... ok
+
+test result: ok. 57 passed; 0 failed; 0 ignored; 0 measured; 553 filtered out; finished in 16.46s
+

@@ -1,7 +1,7 @@
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandProblem, CommandResult, Configuration,
     EmbeddingFailure, EmbeddingProvider, FileReader, GraphDiagnostics, SourceProvenance,
-    StatusReader, StatusReport, StorageError, StorageErrorKind, StorageResult,
+    StatusReader, StatusReport, StorageError, StorageErrorKind, StorageResult, TransactionError,
     utils::{CheckObservations, REASON, TARGET, sort_problems},
 };
 use super::{HeldLock, LockName};
@@ -61,7 +61,7 @@ impl<C> fmt::Debug for StatusService<'_, C> {
 
 impl<C: CacheDatabase> StatusReader for StatusService<'_, C> {
     fn get_status(&mut self) -> CommandResult<StatusReport> {
-        let (policy, config_problem) = self.get_config_policy();
+        let (policy, config_problem) = self.get_embedding_status_policy();
         let published = self
             .cache
             .with_status_read_tx(|| {
@@ -71,16 +71,9 @@ impl<C: CacheDatabase> StatusReader for StatusService<'_, C> {
                     provenance: self.provenance,
                 };
                 let problems = observations.collect_check_problems(&[])?;
-                self.get_published(&policy, problems)
+                self.get_published_status_by_policy(&policy, problems)
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot read published status",
-                    error,
-                ),
-            })?;
+            .map_err(map_transaction_error_to_published_status_command_error)?;
         let mut report = published.unwrap_or(StatusReport {
             revision: None,
             embedding_backlog: 0,
@@ -98,11 +91,11 @@ impl<C: CacheDatabase> StatusReader for StatusService<'_, C> {
 }
 
 impl<C: CacheDatabase> StatusService<'_, C> {
-    fn get_config_policy(&self) -> (EmbeddingStatusPolicy, Option<CommandProblem>) {
+    fn get_embedding_status_policy(&self) -> (EmbeddingStatusPolicy, Option<CommandProblem>) {
         let Ok(bytes) = self.get_config_bytes() else {
             return (
                 EmbeddingStatusPolicy::Unavailable,
-                Some(invalid_config_problem()),
+                Some(build_invalid_config_problem()),
             );
         };
         let Some(bytes) = bytes else {
@@ -111,7 +104,7 @@ impl<C: CacheDatabase> StatusService<'_, C> {
         let Ok(configuration) = Configuration::parse(&bytes) else {
             return (
                 EmbeddingStatusPolicy::Unavailable,
-                Some(invalid_config_problem()),
+                Some(build_invalid_config_problem()),
             );
         };
         if let Some(config) = configuration.get_embedding_config()
@@ -119,7 +112,7 @@ impl<C: CacheDatabase> StatusService<'_, C> {
         {
             return (
                 EmbeddingStatusPolicy::Unavailable,
-                Some(invalid_config_problem()),
+                Some(build_invalid_config_problem()),
             );
         }
         if !configuration.is_enabled() {
@@ -144,37 +137,24 @@ impl<C: CacheDatabase> StatusService<'_, C> {
             .file_get_bytes_by_path(Path::new(CONFIG_PATH))
     }
 
-    fn get_published(
+    fn get_published_status_by_policy(
         &self,
         policy: &EmbeddingStatusPolicy,
         mut problems: Vec<CommandProblem>,
     ) -> CommandResult<StatusReport> {
-        let revision = self.cache.project_get_by_id().map_err(|cause| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot read published status",
-                cause,
-            )
-        })?;
-        let summary = self.get_embedding_status(policy).map_err(|cause| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot read published status",
-                cause,
-            )
-        })?;
+        let revision = self
+            .cache
+            .project_get_by_id()
+            .map_err(map_error_to_published_status_command_error)?;
+        let summary = self
+            .get_embedding_status_by_policy(policy)
+            .map_err(map_error_to_published_status_command_error)?;
         if !matches!(policy, EmbeddingStatusPolicy::Disabled) {
             problems.extend(collect_exhausted(&summary));
             if self
                 .cache
                 .query_error_get_by_id()
-                .map_err(|cause| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot read published status",
-                        cause,
-                    )
-                })?
+                .map_err(map_error_to_published_status_command_error)?
                 .is_some()
             {
                 problems.push(build_problem(
@@ -194,7 +174,7 @@ impl<C: CacheDatabase> StatusService<'_, C> {
         })
     }
 
-    fn get_embedding_status(
+    fn get_embedding_status_by_policy(
         &self,
         policy: &EmbeddingStatusPolicy,
     ) -> StorageResult<EmbeddingStatusSummary> {
@@ -230,10 +210,10 @@ impl<C: CacheDatabase> StatusService<'_, C> {
                 exhausted: vec![],
             });
         }
-        self.get_matching_embedding_status(total, *max_attempts)
+        self.get_embedding_status_summary_by_total_and_max_attempts(total, *max_attempts)
     }
 
-    fn get_matching_embedding_status(
+    fn get_embedding_status_summary_by_total_and_max_attempts(
         &self,
         total: u64,
         max_attempts: u64,
@@ -242,22 +222,12 @@ impl<C: CacheDatabase> StatusService<'_, C> {
         let exhausted = self
             .cache
             .embed_failures_get_by_kind_and_search_hash_and_attempts(max_attempts)?;
-        let failed = u64::try_from(exhausted.len()).map_err(|cause| {
-            StorageError::new_with_cause(
-                StorageErrorKind::InternalError,
-                "invalid persisted storage value",
-                cause,
-            )
-        })?;
+        let failed =
+            u64::try_from(exhausted.len()).map_err(map_error_to_persisted_storage_value_error)?;
         let backlog = total
             .checked_sub(covered)
             .and_then(|missing| missing.checked_sub(failed))
-            .ok_or_else(|| {
-                StorageError::new(
-                    StorageErrorKind::InternalError,
-                    "invalid embedding status counts",
-                )
-            })?;
+            .ok_or_else(build_invalid_embedding_status_counts_error)?;
         Ok(EmbeddingStatusSummary {
             backlog,
             failed,
@@ -274,13 +244,7 @@ impl<C: CacheDatabase> StatusService<'_, C> {
             let owner = self
                 .file_reader
                 .lock_get_owner_by_path(Path::new(path))
-                .map_err(|cause| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot observe coordination lock owner",
-                        cause,
-                    )
-                })?;
+                .map_err(map_error_to_coordination_lock_command_error)?;
             if let Some(pid) = owner {
                 locks.push(HeldLock { name, pid });
             }
@@ -304,7 +268,7 @@ fn collect_exhausted(summary: &EmbeddingStatusSummary) -> Vec<CommandProblem> {
         .collect()
 }
 
-fn invalid_config_problem() -> CommandProblem {
+fn build_invalid_config_problem() -> CommandProblem {
     build_problem(
         CommandErrorKind::ValidationFailed,
         "invalid embedding configuration",
@@ -328,6 +292,73 @@ fn build_problem(
         message,
         details,
     }
+}
+
+/// Converts a failure raised while reading the published status to a command error.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from a status step.
+fn map_error_to_published_status_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot read published status",
+        cause,
+    )
+}
+
+/// Converts a transaction failure from the status read to a command error.
+///
+/// # Arguments
+///
+/// * `error` — Transaction failure from the pinned read.
+fn map_transaction_error_to_published_status_command_error(
+    error: TransactionError<CommandError>,
+) -> CommandError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => map_error_to_published_status_command_error(error),
+    }
+}
+
+/// Converts an error to the storage error for an invalid persisted value.
+///
+/// # Arguments
+///
+/// * `cause` — Conversion or validation failure.
+fn map_error_to_persisted_storage_value_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> StorageError {
+    StorageError::new_with_cause(
+        StorageErrorKind::InternalError,
+        "invalid persisted storage value",
+        cause,
+    )
+}
+
+/// Converts a file failure observed while reading a coordination lock to a command error.
+///
+/// # Arguments
+///
+/// * `cause` — File failure from the lock owner read.
+fn map_error_to_coordination_lock_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot observe coordination lock owner",
+        cause,
+    )
+}
+
+/// Builds the error reported for inconsistent embedding status counts.
+fn build_invalid_embedding_status_counts_error() -> StorageError {
+    StorageError::new(
+        StorageErrorKind::InternalError,
+        "invalid embedding status counts",
+    )
 }
 
 #[cfg(test)]

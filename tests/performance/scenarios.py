@@ -119,7 +119,8 @@ def prepare_scenario(fixture: dict, name: str, output: Path) -> dict:
         expected.update(build_traversal_oracle())
     if command == "inspect":
         expected["inspection"] = build_inspection_oracle(output, FIRST_ID)
-    return {"repository": output, "argv": [command], "stdin": encode_json(request),
+    argv = ["index", "--full"] if command == "index" else [command]
+    return {"repository": output, "argv": argv, "stdin": encode_json(request),
             "expected": expected,
             "setup_seconds": time.monotonic() - started, "state_hashes": hashes,
             "cache_label": "initialized_projection_os_cache_uncontrolled",
@@ -163,7 +164,9 @@ def build_request(name: str) -> tuple[str, dict]:
     if name == "traverse":
         return name, {"element_ids": [FIRST_ID], "mode": "both", "direction": "outgoing",
                       "depth": 2, "limit": 20, "edge_limit": 40}
-    if name in ("check", "status", "reindex"):
+    if name == "reindex":
+        return "index", {}
+    if name in ("check", "status"):
         return name, {}
     return "search", {"query": '"case 000000"' if not name.startswith("refresh")
                        else '"Altered___case 000000"', "limit": 10}

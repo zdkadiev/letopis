@@ -1,0 +1,17 @@
+{
+  "revision": 99,
+  "snapshot": "6868ba7403ab7e20e785e99b160e7b148e7950b9",
+  "source_snapshot": "9942751be3da3e64918d7aa755b995d443cf7f36",
+  "source_count": 27,
+  "all_sources_match_author_basis": true,
+  "same_snapshot_read_elements": [
+    "docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json",
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json",
+    "docs/zkit/letopis/checks/issue-65/vector-index/verification.json",
+    "letopis/architecture/storage.md",
+    "src/storage/vector_index.rs"
+  ],
+  "owned_drains": [],
+  "reported_lock_pid_23078_has_exited": true,
+  "search_or_provider_query_not_run": true
+}

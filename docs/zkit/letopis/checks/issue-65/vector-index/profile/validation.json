@@ -1,0 +1,17 @@
+{
+  "samples": 79244,
+  "usable_stacks": 79244,
+  "threads": 2,
+  "sha256": "bc7a3c5166b7c1ef03257e2d597f2ac1900b574bbbb5607ee040b738cf983125",
+  "bytes": 853519,
+  "libraries": [
+    "dyld",
+    "letopis",
+    "libsystem_pthread.dylib",
+    "libsystem_kernel.dylib",
+    "libsystem_platform.dylib",
+    "libsystem_malloc.dylib",
+    "libsystem_c.dylib",
+    "libsamply_mac_preload.dylib"
+  ]
+}

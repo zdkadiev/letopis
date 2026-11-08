@@ -1,0 +1,41 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/candidate/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.76s
+     Running unittests src/lib.rs (../target-build/debug/deps/letopis-43e59323f2756d14)
+
+running 4 tests
+test storage::schema::tests::exact_flat_query_only_bootstrap_preserves_legacy_observation ... ok
+test storage::schema::tests::exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors ... FAILED
+test storage::schema::tests::exact_flat_upgrade_preserves_a_separate_pinned_reader ... FAILED
+test storage::schema::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent ... FAILED
+
+failures:
+
+---- storage::schema::tests::exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors stdout ----
+
+thread 'storage::schema::tests::exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors' (545426390) panicked at src/storage/schema.rs:626:13:
+assertion failed: result.is_err()
+
+---- storage::schema::tests::exact_flat_upgrade_preserves_a_separate_pinned_reader stdout ----
+
+thread 'storage::schema::tests::exact_flat_upgrade_preserves_a_separate_pinned_reader' (545426393) panicked at src/storage/schema.rs:611:9:
+assertion `left == right` failed
+  left: "none"
+ right: "flat"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- storage::schema::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent stdout ----
+
+thread 'storage::schema::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent' (545426391) panicked at src/storage/schema.rs:589:9:
+assertion `left == right` failed
+  left: "none"
+ right: "flat"
+
+
+failures:
+    storage::schema::tests::exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors
+    storage::schema::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent
+    storage::schema::tests::exact_flat_upgrade_preserves_a_separate_pinned_reader
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 618 filtered out; finished in 0.13s
+
+error: test failed, to rerun pass `--lib`

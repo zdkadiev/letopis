@@ -1,0 +1,225 @@
+{
+  "reading_snapshot": "a0d6f03ac70a54eefdbaca0e7d84e4d0c780c36a",
+  "author_basis": "220d1ff2be3be8d5ba3ea387a8e155ce091defab",
+  "updated_knowledge": [
+    {
+      "element_id": "letopis/architecture/search-pipeline.md",
+      "path": "letopis/architecture/search-pipeline.md",
+      "lines": [
+        1,
+        45
+      ],
+      "revision": 106,
+      "flags": []
+    },
+    {
+      "element_id": "letopis/architecture/storage.md",
+      "path": "letopis/architecture/storage.md",
+      "lines": [
+        1,
+        214
+      ],
+      "revision": 106,
+      "flags": []
+    }
+  ],
+  "source_bindings": {
+    "letopis/architecture/search-pipeline.md": 9,
+    "letopis/architecture/storage.md": 30
+  },
+  "verified_addresses": 37,
+  "readback": {
+    "docs/superpowers/specs/2026-11-07-bounded-search-design.md": {
+      "path": "docs/superpowers/specs/2026-11-07-bounded-search-design.md",
+      "lines": null,
+      "hash": "4db27182e424f241ad9b8076faba94712e963d6cf6d6dd7ea4adfeba85d3373e"
+    },
+    "docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json",
+      "lines": null,
+      "hash": "276cfbae4e12c7fff42089e113fa4e84eaff4285bba1a49950061bc176dbc656"
+    },
+    "docs/zkit/letopis/checks/issue-65/bounded-search/host-storage/manifest.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/bounded-search/host-storage/manifest.json",
+      "lines": null,
+      "hash": "c6aa6cacf4bcb40f7a3e7978c0a1d425831247658d91f942a846ba709c0507a2"
+    },
+    "docs/zkit/letopis/checks/issue-65/bounded-search/profile/stacks.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/bounded-search/profile/stacks.json",
+      "lines": null,
+      "hash": "a4682ee272b7f3fab09614240d050d42de81ec5043246ae281fc02515942d182"
+    },
+    "docs/zkit/letopis/checks/issue-65/bounded-search/vector-preservation/summary.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/bounded-search/vector-preservation/summary.json",
+      "lines": null,
+      "hash": "f621e4d37d6f255d56ab5e2fc017ca81dec5740cd03f1d8d206489ad0c085c81"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/candidate/mutations.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/candidate/mutations.json",
+      "lines": null,
+      "hash": "01123b367a961401f5694ac015e3631ede399b2c6c7e8fcd15f7275513fc18d6"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json",
+      "lines": null,
+      "hash": "e6ae9a75d1c26551c9b9c3d04e908f03faafe8a19625cd18975880c169b0eb49"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/first-upgrade-init.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/first-upgrade-init.json",
+      "lines": null,
+      "hash": "cb9a40bdadafc040cc4e334ee05f9a662676b8f1afcb9fce71f34f211b4e60a7"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/host-storage/manifest.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/host-storage/manifest.json",
+      "lines": null,
+      "hash": "e80402c50cfe1180ec441440892de0b06b32e58420bf15944385ce5727a185b7"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/control-v2-runs.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/control-v2-runs.json",
+      "lines": null,
+      "hash": "7df35a23f18e9bbd80611106ae6716d76ac2ebcb4b6739ad35f04a3fe285bbf5"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md",
+      "lines": null,
+      "hash": "14545ba446ac21b130e1e46088b769a4291f9a6699cb9defe3d8b624062493b9"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/summary.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/summary.json",
+      "lines": null,
+      "hash": "a4ba7cf782b827d5f79cfb5f7e78ab7f074e1962b81486f61a26cfdb6722c51a"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/receipt.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/profile/receipt.json",
+      "lines": null,
+      "hash": "b1abd594de57ba6f48a6f0da7fee6c2a9c83abdc0082779e105e190646e67ebf"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json",
+      "lines": null,
+      "hash": "15f28e21c747e76ab9d674311defd26a7513024cd86cfceb01da55ecbc17ad3f"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/validation.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/profile/validation.json",
+      "lines": null,
+      "hash": "cc6e3f46abbe3bc6ebb89661310e9f35a48051d6af7a90862f2f42efa53b3642"
+    },
+    "docs/zkit/letopis/checks/issue-65/vector-index/verification.json": {
+      "path": "docs/zkit/letopis/checks/issue-65/vector-index/verification.json",
+      "lines": null,
+      "hash": "0e210be0e441f25b2eed2838029060de9b669929809e1ea9172eb6eaf6e20561"
+    },
+    "letopis/architecture/search-pipeline.md": {
+      "path": "letopis/architecture/search-pipeline.md",
+      "lines": [
+        1,
+        45
+      ],
+      "hash": "71b4c8369027b898334a5ca9b41be3b9551836e6a73dc124f7fa45252bcc5507"
+    },
+    "letopis/architecture/storage.md": {
+      "path": "letopis/architecture/storage.md",
+      "lines": [
+        1,
+        214
+      ],
+      "hash": "4021fe919bb326c29938728b0d74846fc4c9eff07dfcf2896573f5c715deac2d"
+    },
+    "src/cli/input.rs": {
+      "path": "src/cli/input.rs",
+      "lines": null,
+      "hash": "0d1b3db355087d2b2a18e015ca8dae69a646a6c91b97fb9e014798df70449e67"
+    },
+    "src/filesystem/file.rs": {
+      "path": "src/filesystem/file.rs",
+      "lines": null,
+      "hash": "dede73e3b1216c1a07a339ffe0df6f468b3a59e8dc2c32c1e0a7fc2c036e34df"
+    },
+    "src/filesystem/local.rs": {
+      "path": "src/filesystem/local.rs",
+      "lines": null,
+      "hash": "0bf819fd5cc1afd7c14676d825226fcd4505f76203efcb4ae97690d4dff347d6"
+    },
+    "src/filesystem/path.rs": {
+      "path": "src/filesystem/path.rs",
+      "lines": null,
+      "hash": "e56e8a27ae997c7e1c88eb502754211f4fb544df5f762bd49c2728d91eebbf09"
+    },
+    "src/lib.rs": {
+      "path": "src/lib.rs",
+      "lines": null,
+      "hash": "276cfa2816f1ae84bc877c4621b4a17fe210abf4719a9d8cc86ad366e1409696"
+    },
+    "src/service/mod.rs": {
+      "path": "src/service/mod.rs",
+      "lines": null,
+      "hash": "edc8a6cd1db0f23b404b28922138d9b0c77533ba70a793cd52462478ab99d031"
+    },
+    "src/service/search.rs": {
+      "path": "src/service/search.rs",
+      "lines": null,
+      "hash": "822f3e82763b4a503a40b389f07396c5bceedd7fdb0ecc9edae0a511a755d61c"
+    },
+    "src/service/status.rs": {
+      "path": "src/service/status.rs",
+      "lines": null,
+      "hash": "d6911db6c251bdc82b73242ec1c184dcdf899cbaa33ded9acf1035fc00406214"
+    },
+    "src/service/types.rs": {
+      "path": "src/service/types.rs",
+      "lines": null,
+      "hash": "31aea31fcf4d3e508eedd619900d719ce991031f6c767a06ad49a7a66bf504ea"
+    },
+    "src/storage/cache.rs": {
+      "path": "src/storage/cache.rs",
+      "lines": null,
+      "hash": "bdd6390aedda4a2be1cf701a691f790514d7c2348797ce47b271ac52d6a260fb"
+    },
+    "src/storage/cache.sql": {
+      "path": "src/storage/cache.sql",
+      "lines": null,
+      "hash": "a8caf0fa4da5c0291838348c8b3d5a535b70feb9bb8918b39d538c574a7072ae"
+    },
+    "src/storage/connection.rs": {
+      "path": "src/storage/connection.rs",
+      "lines": null,
+      "hash": "0001ba4b71609cb5ecd618110f2675fdc8ea2d9e84e4fcd61384647f7efa7ad9"
+    },
+    "src/storage/schema.rs": {
+      "path": "src/storage/schema.rs",
+      "lines": null,
+      "hash": "d440844eaaf1d36c99eb6740206022cc4eec9527eaefd359113beb4a9f2dd481"
+    },
+    "src/storage/transaction.rs": {
+      "path": "src/storage/transaction.rs",
+      "lines": null,
+      "hash": "66f8ab6de96ca68a63353b478ce46ba22637cf78fd4c96770cf5c2ec07bae0e4"
+    },
+    "src/storage/vector.rs": {
+      "path": "src/storage/vector.rs",
+      "lines": null,
+      "hash": "be4f02a0b788c4e12667218d44247f74a930449f09f445763371db6caeb1267f"
+    },
+    "src/storage/vector_index.rs": {
+      "path": "src/storage/vector_index.rs",
+      "lines": null,
+      "hash": "caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a"
+    },
+    "src/storage/vectors.sql": {
+      "path": "src/storage/vectors.sql",
+      "lines": null,
+      "hash": "3a934553394c296ee5dfe680440c1b61c16eb288121f935f72739bb951d321a5"
+    },
+    "tests/storage_read_scope_failures.rs": {
+      "path": "tests/storage_read_scope_failures.rs",
+      "lines": null,
+      "hash": "db9bc78cd6d81ebd59a9623bf8b65c419c458dc48d3c6d3d2f2b60ae9136e305"
+    },
+    "vendor/vec1/vec1.c": {
+      "path": "vendor/vec1/vec1.c",
+      "lines": null,
+      "hash": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9"
+    }
+  },
+  "scope": "Compatible installed letopis0.2.0 on preserved cache schema2. Scoped check, refreshed FTS/source publication and same-tree byte readback; no new knowledge vector-readiness claim."
+}

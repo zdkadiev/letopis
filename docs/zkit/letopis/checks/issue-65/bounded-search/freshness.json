@@ -1,0 +1,717 @@
+{
+  "scope": "Independent canonical file pins, cached knowledge range SHA-256/anchor and source binding lookup, plus exact Git-basis/current source byte equality. No product parser/provenance/hash helper used. Valid for this unchanged owned synthetic fixture, not a concurrent-edit guarantee.",
+  "canonical_manifest_sha256": "cf2235261a3ed884a0721080b1da745870c274998d74fff38f7e7f254c0cdd1f",
+  "canonical_files": 4334,
+  "historical_source_files": 1000,
+  "verified_knowledge": 101,
+  "verified_bindings": 101,
+  "records": [
+    {
+      "knowledge": "knowledge/part-0000.md#node-000000",
+      "knowledge_hash": "bc298768a28b8a2d99d812487b7e355b6fbc6fe3f0d4d30249476e46c5f14b10",
+      "source": "sources/shard-0000.txt#L1-L1",
+      "source_sha256": "a79c031cdf23dd6896ba3b497e4b7d3e281e90ebf75c6cb06bd3d439b07bd019",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0033.md#node-000999",
+      "knowledge_hash": "d33a02418a269ea78ab4121a75d18b65093148b557883fc92ee75f875303eb65",
+      "source": "sources/shard-0009.txt#L100-L100",
+      "source_sha256": "b54b48c0467e33ab5c0e983859d255dee701c3673dc85e1518afefb89913b06a",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0053.md#node-001600",
+      "knowledge_hash": "b3f784fdae9e6b5ef610a330fba43c3d232acdc58338811abf69b49a92adcdbe",
+      "source": "sources/shard-0016.txt#L1-L1",
+      "source_sha256": "0be4efa0c92b15bc9496fd5fe2c1545be251f8d6b46721e0fab3d357b6b42499",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0060.md#node-001800",
+      "knowledge_hash": "16e636905ce6937d881c857572dc6c3639167ecd91dab9bd386a77e225702875",
+      "source": "sources/shard-0018.txt#L1-L1",
+      "source_sha256": "d13961d2585c46ef9eca4b7dbee3001245b1b7aa770326ca6cfcbb295d1888b5",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0066.md#node-001999",
+      "knowledge_hash": "846b06820de8a956dbe07a1ab8568adbdd6a6a28210a5293825a149e5f6a6335",
+      "source": "sources/shard-0019.txt#L100-L100",
+      "source_sha256": "bb740e2543c78bd0c36e8ee85cd0f3889205c565813ee1136cc8220b9a903366",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0066.md#node-002000",
+      "knowledge_hash": "7dcc71a295e382210bc177ac5d899fa5756171fd71a03048878348a433a6737f",
+      "source": "sources/shard-0020.txt#L1-L1",
+      "source_sha256": "1d0b81d5c42107ca19fe72c26c88c31306ef2fe997854661644f049dacea6d19",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0073.md#node-002200",
+      "knowledge_hash": "bea9bfabd48936c105926f2c166d6b0989380dc22202d1c94f4984eec3bcbbff",
+      "source": "sources/shard-0022.txt#L1-L1",
+      "source_sha256": "b9acbbd925740d1e4022a27a4b916b5a3bf22e6f0cbeb603c080d09aff7d7ac5",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0096.md#node-002900",
+      "knowledge_hash": "fa8850c255cd468eb548c7aad0426f9be2433d54e9675b3aab1f1c2b3fd6eb7d",
+      "source": "sources/shard-0029.txt#L1-L1",
+      "source_sha256": "a7841057a4f973c86311a8485d3e29476f116eaad4e46a86520eb368f7025956",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0099.md#node-002999",
+      "knowledge_hash": "fa5e49833e6426520d7f821c4127b3cefc4f6bd6c95164449cfb15dd6df3eb5c",
+      "source": "sources/shard-0029.txt#L100-L100",
+      "source_sha256": "5d0d971a9894b31b6cd67dfc4c657d8c456d45b33a29c6bda9a2f5d53a32cf68",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0100.md#node-003000",
+      "knowledge_hash": "583f4f7caf516e34e95f3ae80e74c095e2216bc582e0d74a1af7d12d2f33c276",
+      "source": "sources/shard-0030.txt#L1-L1",
+      "source_sha256": "78f6ff541e458fe5dd0e95de3c1d91ad30fa53bb6a55d92fed5a6dbf46f60800",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0133.md#node-004000",
+      "knowledge_hash": "19b50d0bcc019a0962b700fb67af3aa19d0d2502bf7f103493f9ea70d205ee6b",
+      "source": "sources/shard-0040.txt#L1-L1",
+      "source_sha256": "908ae5d27f019b94765368b8d772b006a2717928ce242ee68b933fed5f6a2cc2",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0146.md#node-004400",
+      "knowledge_hash": "9ac556d2b65ee423b69b21d24b3d0bd787c45212c6370eaf8c4d2f625bf54cda",
+      "source": "sources/shard-0044.txt#L1-L1",
+      "source_sha256": "def429652cb5e107b4da03615954ce3a252f59a83e64af5dcf03b82b2fafaea5",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0166.md#node-005000",
+      "knowledge_hash": "8a2c4afd174a172e621c7ee9552ed23bf0173985c9fc2713e5f5ebd0a72b718b",
+      "source": "sources/shard-0050.txt#L1-L1",
+      "source_sha256": "fc6c7fc62de304ca83bfb7084928fda0d02a375d6eb5b827cb6e3e8a19612f27",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0233.md#node-007000",
+      "knowledge_hash": "7904e7633b917193073aa664f30d118cc3f7ef88863cd3b49698d44622785597",
+      "source": "sources/shard-0070.txt#L1-L1",
+      "source_sha256": "dc8e86973f7964008566d34eac4eb2bb1e5dcab4d1a496feadb3662956b36b82",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0256.md#node-007700",
+      "knowledge_hash": "36b6667130e2be223caeef0641bffc38ef561929af0d9a89959c8e7b117daaac",
+      "source": "sources/shard-0077.txt#L1-L1",
+      "source_sha256": "ec636d25adfa231988e0be48585f8528b312de8f9fa7b88d6fb4d480b2462bb2",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0263.md#node-007900",
+      "knowledge_hash": "5f76553288cebc787755b8dec2d8b2a9b99dfb113faa23ca4cd54e61d5383838",
+      "source": "sources/shard-0079.txt#L1-L1",
+      "source_sha256": "f00956f850eff058c5426cb86146fe37c2b5a6fefd173030f0c1e5b5522dcaa4",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0266.md#node-007999",
+      "knowledge_hash": "6695b81c531407aa73d73f9fca20f287aa28016349b9012efcc2b18f8e24d971",
+      "source": "sources/shard-0079.txt#L100-L100",
+      "source_sha256": "35adaeebf9b3c249af2425b7b2d4ebf89352ee65adb608329cdea797fea2f002",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0266.md#node-008000",
+      "knowledge_hash": "d857abc37d7b5e482fd2ceb8c15872db284d41838f79aa524b282eba9c1b2b6b",
+      "source": "sources/shard-0080.txt#L1-L1",
+      "source_sha256": "bb8078f4f79a894fb81b3d3186fe447679124b9cd3be59857b546d3ab4dd1fc9",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0300.md#node-009000",
+      "knowledge_hash": "98cadf3a674ee6a93605bd6517741b3b3a357c4c36c3f02d9dee6577aef33270",
+      "source": "sources/shard-0090.txt#L1-L1",
+      "source_sha256": "06d7c7a7abd274e186148e70ead6375c7fd591734b8cbab98ddc2aa610beedcc",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0326.md#node-009800",
+      "knowledge_hash": "a48e4176334d20506694d58b29432da64612659d14a7b70f064b49f5a6c245bd",
+      "source": "sources/shard-0098.txt#L1-L1",
+      "source_sha256": "3b6c34878389839ccfc2e55817de6ab93884c5761407846342f1ddad3b646266",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0330.md#node-009900",
+      "knowledge_hash": "201438e2558b37ef2732de0db0b1e0e66111bf2dfdfe8294db1d5eb59a15f0a0",
+      "source": "sources/shard-0099.txt#L1-L1",
+      "source_sha256": "72aa57136cc3b2b550b37311fe7eb29b98a9df4fe839da7cc5bcf6e52a4f784c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0333.md#node-009990",
+      "knowledge_hash": "5a658073a7865976b442aeebb2e762d18b461f52e6eaf7758f364ded02a72cb6",
+      "source": "sources/shard-0099.txt#L91-L91",
+      "source_sha256": "c14bff14aeb3d65aae73e2be11ad073b7be503682edfb688a35d260fa95f7f51",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0333.md#node-009991",
+      "knowledge_hash": "30f3587458e39fed97904143661cb4c8f8bfcc66521345f9e4b2fdbb867d1949",
+      "source": "sources/shard-0099.txt#L92-L92",
+      "source_sha256": "18d55cdf504c33fdbab2b6ea1561c7f9289805bee905561eb4196a22011c2114",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0333.md#node-009998",
+      "knowledge_hash": "f1cf958bc694c52673d1cda39312fd716f4adb3b736f58584faa725fdd11795b",
+      "source": "sources/shard-0099.txt#L99-L99",
+      "source_sha256": "cbc5ef9d087ae11e1a42fd78cc4016a4a47d56451529c82e2c89cdeaa7d1ace6",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0333.md#node-009999",
+      "knowledge_hash": "39df3305004b49e35afae63083097d7419a35d2d668520b0f8484deae0f9f75b",
+      "source": "sources/shard-0099.txt#L100-L100",
+      "source_sha256": "81c4336020f6bdd029b6117b426ed623b5cfe09f60a11ba5649ae59cec9dcab5",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0333.md#node-010000",
+      "knowledge_hash": "6aef5b8b421f7d0af325239cea065a6d6f6ffb08abd9c915e29df6172a0e29b7",
+      "source": "sources/shard-0100.txt#L1-L1",
+      "source_sha256": "c5f6b2222fc206a1391d0be81df975278dbf666404e561d893652cb356b3678c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0336.md#node-010099",
+      "knowledge_hash": "b1fb7494ac242023682a4ce8af66cc5594ed121e3679a717636f9671b6365608",
+      "source": "sources/shard-0100.txt#L100-L100",
+      "source_sha256": "e7e088d97c4586fb2dd220e2f83a3b6f9c52a2b917247dea6703ad287a2ea740",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0366.md#node-011000",
+      "knowledge_hash": "61540f1902d68edad6672d3a1882598f5768b0fb6be85c012c655b9477ef87a9",
+      "source": "sources/shard-0110.txt#L1-L1",
+      "source_sha256": "1ecee306001653e76f19b242c4e80df2c6d3574dcd25a3d70fcca527fe66e202",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0399.md#node-011999",
+      "knowledge_hash": "bea5b001f60e16b2f09f25f4b493937b789e528b6c0d8d7a119b9d695d456aa9",
+      "source": "sources/shard-0119.txt#L100-L100",
+      "source_sha256": "4e7b001d28ef46d153488ac1c27e37743cd650ff54a64ca3ff704cf97f47ae8c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0400.md#node-012000",
+      "knowledge_hash": "4b02417d63c513ba01143c6f99ddf375844168f677bdc4951a35225835680928",
+      "source": "sources/shard-0120.txt#L1-L1",
+      "source_sha256": "8a5195a9c926293869b280d8cd973185bd0a7f3b97093703080ae26430cd1c72",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0433.md#node-013000",
+      "knowledge_hash": "b3ee0593e0b17dc10f9716ffe96293441030ab85c4043a31b780c689828338d4",
+      "source": "sources/shard-0130.txt#L1-L1",
+      "source_sha256": "3f3ceb36a133055c4bf5c65653598a8d35be5c2cd8682838f1fd99d3af9ac103",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0466.md#node-014000",
+      "knowledge_hash": "ebe2e654a6bbe56a8104c5f95ecf02981dd5a4209a7c4af8e5c02906d7e72370",
+      "source": "sources/shard-0140.txt#L1-L1",
+      "source_sha256": "c9464f6eb896af34f061d749b318ec8d8671b8c56966508daea1484e4616f758",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0499.md#node-014999",
+      "knowledge_hash": "9fd397eab0260866e7c1ed7494d7fd391a94ffca45e50ec6f459580969ef23fa",
+      "source": "sources/shard-0149.txt#L100-L100",
+      "source_sha256": "7b2d4f239ca0619004fb77742549a9e160c3ecb2c80c7a7e9823328be2824f70",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0500.md#node-015000",
+      "knowledge_hash": "ee2465bcfe23e0a588f40afd79a55b8b2a1f0556346e9930814f35195816a8d4",
+      "source": "sources/shard-0150.txt#L1-L1",
+      "source_sha256": "2ef013cfd5f8f77b0a00fb669231b854b66e4ed49beb779277eb5a39d2506f5f",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0533.md#node-016000",
+      "knowledge_hash": "82ad89f97d78c66cd75ca7843da73857977c6c48a08af6ba82087204996a50f9",
+      "source": "sources/shard-0160.txt#L1-L1",
+      "source_sha256": "fbfea11ab2d009daac23c3267f6ae15254b5d9468a38f67d68a50f64773daf88",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0563.md#node-016900",
+      "knowledge_hash": "9edfe11b66746e4c13892f7b6352e8c9efe0c03f376708afc72ba5d8067554b0",
+      "source": "sources/shard-0169.txt#L1-L1",
+      "source_sha256": "3e270d9eb636f764a91a5fa6ef5e49443026356e1f821ab574bab87ad2c5d349",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0566.md#node-017000",
+      "knowledge_hash": "6f2e21b0197888033e8cb1749ab6a99e13b905c19ea4477822aa7018596910cc",
+      "source": "sources/shard-0170.txt#L1-L1",
+      "source_sha256": "2a3253642dc9bca1a472db1bcbfa702e0e44837b34b18b0054a936e74ec4e3f5",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0600.md#node-018000",
+      "knowledge_hash": "ec6f111782ffdf0f669248d7df552a8e92f287733a2d53b87d3d9d865515724b",
+      "source": "sources/shard-0180.txt#L1-L1",
+      "source_sha256": "274565c52a74f2e8a407ca24883bfb1c540cfd44444ca83033985e868e1f9666",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0633.md#node-019000",
+      "knowledge_hash": "19a80877ae5600ac950be0c0de6131da2d806d349c08c9f7931375351005b0cf",
+      "source": "sources/shard-0190.txt#L1-L1",
+      "source_sha256": "75b79c67d22ed60232b9d14eefe35c499c6a67d1356e521331b855ff61995730",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0663.md#node-019900",
+      "knowledge_hash": "f30f020a26c2341cce731ff3fb37507f90816b064729cd9f599a5f3efc3e0c23",
+      "source": "sources/shard-0199.txt#L1-L1",
+      "source_sha256": "f3ba1b01583da1d3974ad3889b4308add619aead5d89aa49ed445e183ddb76e3",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0666.md#node-019990",
+      "knowledge_hash": "ea1ed8ce4072740645372afff19fce42ff681e5cdf4822f22044e3e2bf55c329",
+      "source": "sources/shard-0199.txt#L91-L91",
+      "source_sha256": "d93fb1c283decdd2041dae8116aca5c5859c18a1d75a6dbad3674eb2d37be0d7",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0666.md#node-019997",
+      "knowledge_hash": "11ad56efb7313e8821813beac58026ca551da16720d978ba9933e7223eea7f50",
+      "source": "sources/shard-0199.txt#L98-L98",
+      "source_sha256": "ff76ca5fec7f63ed092ec0430dae37b75e53a1ffb3000cfa9edd6a22a44f3dca",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0666.md#node-019998",
+      "knowledge_hash": "e8c534474765f8c7e8b10af3949c6006574a510aa12427197cf87887ca8966e4",
+      "source": "sources/shard-0199.txt#L99-L99",
+      "source_sha256": "2e5b32a1ba858121ba779656a7bce69a16f0210f38da22bf08ffbc19b490b6be",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0666.md#node-019999",
+      "knowledge_hash": "45946e0174d7fb969921acc5bbe970c9e785a284e601b3a2e169c8608748d1ce",
+      "source": "sources/shard-0199.txt#L100-L100",
+      "source_sha256": "3a9010a9f7aba12b28ea5f962f5c58b231e3ec287005e17910be85a59491f01c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0666.md#node-020000",
+      "knowledge_hash": "797739fc5522693bd0d4b99f89c8ca3b7a6e5b85effa7d6e828f5521b5f762af",
+      "source": "sources/shard-0200.txt#L1-L1",
+      "source_sha256": "22ef2186f5348baf2527768ec3ecd1803ed00b91e9c7c9c24210097d02446ba4",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0700.md#node-021000",
+      "knowledge_hash": "6bed4aa9e65f1f45cd0e355415faa563480aebc363d2518230b40c34aee5b738",
+      "source": "sources/shard-0210.txt#L1-L1",
+      "source_sha256": "d81f1715b8da74c27acd7f90a574482ab2686109d5712d4eb744ea9277618e59",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0733.md#node-022000",
+      "knowledge_hash": "164b0927b4a845f63eb00fb519f393ac8e33520ce94f5edd96b6c5209416bfb2",
+      "source": "sources/shard-0220.txt#L1-L1",
+      "source_sha256": "ff914886a008e916a12a03edc43e9dfffc0d33d04dfef4f20e99a7c75caa563a",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0766.md#node-023000",
+      "knowledge_hash": "04d3d1a3b5b7a96138cd96b79129f050c534f59198f1857c9ca19bdfd58b9140",
+      "source": "sources/shard-0230.txt#L1-L1",
+      "source_sha256": "fbaa7fbf28df868c52735ba3d04e07e4657bc61df8a22f937fc3cd0e466dcae8",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0796.md#node-023900",
+      "knowledge_hash": "c214934f47a73470b98cb81ac05df04677fc513b2b0991c8704383ab62419874",
+      "source": "sources/shard-0239.txt#L1-L1",
+      "source_sha256": "ea69686d9d7ce3e465922285984c2ea33ab26db24495fcc95061b955e7d75d2c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0933.md#node-028000",
+      "knowledge_hash": "7b0a9de25f7dcdd7520a200ada5f230298f8a3f10fee310e19493401a627db98",
+      "source": "sources/shard-0280.txt#L1-L1",
+      "source_sha256": "dfb41a5e8a1b73b55a864cefcf334c2373bade8fd4c3f53e8b205774f8eed500",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0966.md#node-029000",
+      "knowledge_hash": "a34017a221690e90853ef2efac31c8d52590a5b04d17656821ee6015d8572337",
+      "source": "sources/shard-0290.txt#L1-L1",
+      "source_sha256": "4fc9e3ce9dce71d0a2bde6dc352f2bebebf320184869bfd471a5de245669d329",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0996.md#node-029900",
+      "knowledge_hash": "7046d17f0afc9ac57d9b5438a572e296251c05fa8c73a651f087131d56b7efe3",
+      "source": "sources/shard-0299.txt#L1-L1",
+      "source_sha256": "68bee89da16b93f791f7fd81fcd1c53e58c27c8af08034123adca4680b40e914",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0999.md#node-029990",
+      "knowledge_hash": "145f452af228847bed9a413777a45ae1a08e10f5f9e1933a06dc9ca1b2d9c177",
+      "source": "sources/shard-0299.txt#L91-L91",
+      "source_sha256": "56dab6d1e70769cfa06fede8cbd9b40b727ab3b1cde9e294cb75c670bee1ac0c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-0999.md#node-029999",
+      "knowledge_hash": "84bfa4a3cd0144cdeafdc193a48d7a3ad833a6ce3490558995edcf605d0765e3",
+      "source": "sources/shard-0299.txt#L100-L100",
+      "source_sha256": "a2160d970f43e04f358f9f83c63a5774d1e0447691ebc557d6c2069d36817942",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1000.md#node-030000",
+      "knowledge_hash": "30c520c9ca6b693fe3ad28247f9460e41f2302cbf1fbf1a5de6faa4107767657",
+      "source": "sources/shard-0300.txt#L1-L1",
+      "source_sha256": "2dede3cabe199fff01af54b304a7a1d57f0f619fe1c6188fc2d44107d0990270",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1033.md#node-031000",
+      "knowledge_hash": "5fbc4593196ec19c028e010fd0288b614ef3c61a7305fc05b20cc5f9ad82251d",
+      "source": "sources/shard-0310.txt#L1-L1",
+      "source_sha256": "6e774985f8e005ab0e26e8a1ffe8f0f0ee7185e61ccddcbf3e45131e6b16984b",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1066.md#node-032000",
+      "knowledge_hash": "dfdd0064099195f476a7acdfe92366a38cd8ad26fd6a2b91db9931ede3d0b38a",
+      "source": "sources/shard-0320.txt#L1-L1",
+      "source_sha256": "e3b44ab1e234b661e1537af61f50ff771b7592c3c806fd2a87065c2984716472",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1100.md#node-033000",
+      "knowledge_hash": "677da17c76e821cbe21968187dd62b70d5307ed5ed67f4a0dcc7b29170eba5f7",
+      "source": "sources/shard-0330.txt#L1-L1",
+      "source_sha256": "dfa715ac77209b7756bdae64eacf5e2e598d6100750b5fd061e5ca7ec338f1f2",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1330.md#node-039900",
+      "knowledge_hash": "8ad69cb9f427f6e27ab1e3f3f0b1da6e845c2dd466e97fd5e6a65a47512340c4",
+      "source": "sources/shard-0399.txt#L1-L1",
+      "source_sha256": "1c1d2223f54713591f32e51006a629942a90a73b7bb11e8435f5a22bc252ba12",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1333.md#node-039999",
+      "knowledge_hash": "762e13c7400f2f57e8982cf5e443b0051b106aa6fd54b535d36defe78668befb",
+      "source": "sources/shard-0399.txt#L100-L100",
+      "source_sha256": "efe357fa84f2c905c5b9cc8a4887543a4365409fecc93e00967b1c808f512420",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1333.md#node-040000",
+      "knowledge_hash": "f6461de655735ddc4a813718a9e876cab25dfe82614264c52c1ae3d54ec51e14",
+      "source": "sources/shard-0400.txt#L1-L1",
+      "source_sha256": "e3177167c0a385ca5162442d3ba165f9c727d69257f9e71bc9c6825136d1c55c",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1466.md#node-044000",
+      "knowledge_hash": "1bf84d8e0e0e533a2b75224b38cbc6bc8485c658c4169e9f252479728cc49458",
+      "source": "sources/shard-0440.txt#L1-L1",
+      "source_sha256": "7a346cec98ef8093be11b935aaf5b507aca55673c7987d05a509fbc0bf40a9bb",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1600.md#node-048000",
+      "knowledge_hash": "7525e3bdecf5ad738e8aacc5bdcae504642a3063f901d564997ee78e0481e467",
+      "source": "sources/shard-0480.txt#L1-L1",
+      "source_sha256": "1bab85ed4c92f4a3f99a8fa61ef36ea09060b79ae62ab552dc6b1e708e7922a5",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1663.md#node-049900",
+      "knowledge_hash": "6313f107595cfec961d9028f1c8f8db749a47a5b1c061fad6160935f7b536eaa",
+      "source": "sources/shard-0499.txt#L1-L1",
+      "source_sha256": "8acf3baa1ec2df5d98d6ec58aee0133d21a45960529eeaf758747f3c8c7d802a",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1700.md#node-051000",
+      "knowledge_hash": "dafa0e7cc065858aad8584e5361e6e8ede1cf0c8b4bd5260ac398c1b6fcd59a5",
+      "source": "sources/shard-0510.txt#L1-L1",
+      "source_sha256": "99ab1b3d4be4af8a99a5b5b3228f704657966dd5b498a9991de40de46dc4e44b",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1900.md#node-057000",
+      "knowledge_hash": "78a581141e737a1cc7e253110355821e6b2dac63fb1b37e69bd5ea6e5de45db8",
+      "source": "sources/shard-0570.txt#L1-L1",
+      "source_sha256": "d9c44ba85c0188605e8402197744d920bf36fdf5257a7cc3301edd5248f1db78",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1966.md#node-059000",
+      "knowledge_hash": "52a85f1ddee73c0197c250092fc7e8f421f176e08b1b04255727e17599988c2e",
+      "source": "sources/shard-0590.txt#L1-L1",
+      "source_sha256": "bdadb5272fcd35ad0fbbf8430d87b5eeadfdc799548afbb087dd9f9a003b4551",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-1999.md#node-059999",
+      "knowledge_hash": "a67913d00f4da2ecb228810bb6e9210209ea7a72f5142bfad9288fd5de9a3ccc",
+      "source": "sources/shard-0599.txt#L100-L100",
+      "source_sha256": "936a5bcde77fda15053cb30239951840b15c3a23a9fbd57e0691934f287b7733",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2000.md#node-060000",
+      "knowledge_hash": "a3d2a41a50d34b8a7dbeef5f9a5d5b95cb08be7a049323cf2aa6977c030bc451",
+      "source": "sources/shard-0600.txt#L1-L1",
+      "source_sha256": "f2190a199b1a6b29eea49c0426277339db9d8ad77d341329ce5896ff82d4cb46",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2300.md#node-069000",
+      "knowledge_hash": "eac3dff2616c25bd045cd040c636d6e8a043d2dfa8a5ff90a91c9112200fdd50",
+      "source": "sources/shard-0690.txt#L1-L1",
+      "source_sha256": "5e0204799b1af65890b374840549d54cb162388d2e78ffbc0efe7d841c45d199",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2330.md#node-069900",
+      "knowledge_hash": "a9d405773b11a7f57a5bf883b2eeb44daea79c632e81fd511616aba85ce60de9",
+      "source": "sources/shard-0699.txt#L1-L1",
+      "source_sha256": "2ddf6aa05d27c8bc351815df925ae62dfe81b02e552fa9125ce53c6fd46b3904",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2333.md#node-069999",
+      "knowledge_hash": "c305d83629f44386d73f81f84f5328e670f627f08ef9f3fd2a72497e47457ac0",
+      "source": "sources/shard-0699.txt#L100-L100",
+      "source_sha256": "c363d7ccac25f13fe0405b7f7c2230c5745e0467b6cfdbbec65d38b513392f20",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2333.md#node-070000",
+      "knowledge_hash": "da91fdcfd803bca881f2b84893439c64f2f77c8589df8aba0741845582d51341",
+      "source": "sources/shard-0700.txt#L1-L1",
+      "source_sha256": "b691a430957b3c69e35aa50180cbe728a12a5c2c0a4e321e8294966becf7891d",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2366.md#node-071000",
+      "knowledge_hash": "cc840f4b0af8172fbb27ef41094c618baacce11ab41a314bc6e5cc9c57518035",
+      "source": "sources/shard-0710.txt#L1-L1",
+      "source_sha256": "3cf8830852287241f3b01da44e3cfcff485e24cb825c414fd6259380a12a8bdf",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2400.md#node-072000",
+      "knowledge_hash": "21bdae91da0022f454c8ac13baeb008c4669fce4fac54523d88e80880cf14ed9",
+      "source": "sources/shard-0720.txt#L1-L1",
+      "source_sha256": "181bf233f3c36bdb43713aebd3dac7c4c72921ea614df7f897f0c3055ff822a7",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2433.md#node-073000",
+      "knowledge_hash": "eb0a3869e058877eb8eefa9cb9f4c28bbad0f204dd68ae61c26802c16db29e3c",
+      "source": "sources/shard-0730.txt#L1-L1",
+      "source_sha256": "c29e907a70ccfa909c58748f8d70f75a91dc232d8adb2371899e269025575c8b",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2466.md#node-074000",
+      "knowledge_hash": "9a5b9ce566485101e9ed74e2a329a2ea0326ea693bb4fd0c3f2c328d060c46e5",
+      "source": "sources/shard-0740.txt#L1-L1",
+      "source_sha256": "1444549a48c6b2d28e172df9fad02077ba239a47985ec2e27bf3761ffeebae97",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2533.md#node-076000",
+      "knowledge_hash": "d29884a9631339df5486e97790343585087e0f44304013712e553ba9304fc861",
+      "source": "sources/shard-0760.txt#L1-L1",
+      "source_sha256": "89a90da0de5b8af4abacb774c5fac0ed381ce37475d02b90ecd8c833fedf4822",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2566.md#node-077000",
+      "knowledge_hash": "c7557008b5bbde300dde2f2dbb7709b106697aa66e31605ad4de757bb2b86458",
+      "source": "sources/shard-0770.txt#L1-L1",
+      "source_sha256": "77b6a8e268ce16c8c261dc2aabb4e94e8a248236ddacf7091c5d6906d486bc91",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2600.md#node-078000",
+      "knowledge_hash": "35f7d3bac15f72f3e8ca10ebe89f941f36dde4af1a51d470e0c433b03d2daf77",
+      "source": "sources/shard-0780.txt#L1-L1",
+      "source_sha256": "77fba6cd7a7007475aa2fc92705f0390430a5510991000c28ea43fc67796f933",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2633.md#node-079000",
+      "knowledge_hash": "8c3d9753f6b24afb44e20eb9bc1ab455443f6e2ed6e4fdc9ea34789610ea31db",
+      "source": "sources/shard-0790.txt#L1-L1",
+      "source_sha256": "f46974fbec202c7aa7ed756a5d2489b09248291fec9aa72bcf1ec5ffff264e86",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2663.md#node-079900",
+      "knowledge_hash": "1c5da515d917047439c6b8c8ee5c748410e66c769056204eccf4c168196aa57b",
+      "source": "sources/shard-0799.txt#L1-L1",
+      "source_sha256": "103b495e9a0fa1eed42091e9494cbbf804b35e9c05db27666c638bea9db6d27e",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2666.md#node-079999",
+      "knowledge_hash": "253cd0257540f2dc2e8fe31becef804616b9558a0c465bc25681f993c5a891e4",
+      "source": "sources/shard-0799.txt#L100-L100",
+      "source_sha256": "b1f30d68c0db35042253827188dbd7d4c2930b46f446b67e0bbe3dde13c71193",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2666.md#node-080000",
+      "knowledge_hash": "4a202061d8a71e0a14db4d3082dd43345f20593b224239b01a331036f97525b2",
+      "source": "sources/shard-0800.txt#L1-L1",
+      "source_sha256": "9abe27392e6d514dd19cdf684ead38318b6899bce3b91345d46017bfaf4759e6",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2733.md#node-082000",
+      "knowledge_hash": "24277cd9053cea4ad81ca9210caab1dd798f69b9f8cc4e4344a5a662894226f4",
+      "source": "sources/shard-0820.txt#L1-L1",
+      "source_sha256": "02a27f69dacbc71ec1f2314a93f4ab2f72e3b6426f99c2978548e08c63dc82e8",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2766.md#node-083000",
+      "knowledge_hash": "56da601fcbe43986fb843577bee4c10073d8e0ec99e3927733de2f6f1e8cdf05",
+      "source": "sources/shard-0830.txt#L1-L1",
+      "source_sha256": "473560545d12c49c5537804fc62c241358bf966bfc51a91bccb4f9fd6fa959ba",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2800.md#node-084000",
+      "knowledge_hash": "9e5190b2c25a30c4782f84141370ce2b1d2bfe290d88d217885204812ac7d721",
+      "source": "sources/shard-0840.txt#L1-L1",
+      "source_sha256": "a733901b43aaa1dcb9cb2fd51a5451f770adb3029273f70aacc29baa99670786",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2900.md#node-087000",
+      "knowledge_hash": "a381dc451cc062143eeec6e60ee527cd0f257b0b220a88fa232210662cf56787",
+      "source": "sources/shard-0870.txt#L1-L1",
+      "source_sha256": "921f874cc91b1f3a6f95683473844d1aa3deca051e2f2edfeb511ec78ca8020d",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2933.md#node-088000",
+      "knowledge_hash": "ccdcab4bc358528978a3668fe2e8b62cc1336b8a91051d19fb65bd4d542f92ac",
+      "source": "sources/shard-0880.txt#L1-L1",
+      "source_sha256": "55c2b6c2f09c1064cacd799421fd8c79eca0074f6856abbba12856fcaacc360b",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2966.md#node-089000",
+      "knowledge_hash": "af298cce6017bef816508d570cbe8a58dda5d553279bff31a23a0a92d1e0ce95",
+      "source": "sources/shard-0890.txt#L1-L1",
+      "source_sha256": "f778ec2aada1f46776e4882c72af0d8e38631d359662f76cfe8c5f999c7444a1",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2996.md#node-089900",
+      "knowledge_hash": "7f4eef23cc9ad2de1105c863accf5e0eb3e3fa0259f6f4ee56dd8cfa2d3daebb",
+      "source": "sources/shard-0899.txt#L1-L1",
+      "source_sha256": "65df44f06cde45f8ec4960c8dfb1db44e1534c4da0272466a1ae38411e8f1035",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2999.md#node-089990",
+      "knowledge_hash": "10960979018d92bd201fe8c9e25cdb6e9b4bbdacfd085ece42f191a69728850e",
+      "source": "sources/shard-0899.txt#L91-L91",
+      "source_sha256": "5181dfd3e38ca047caedfcbdc782eea0d1dad0a0248a368310e6ddf11e22c887",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2999.md#node-089998",
+      "knowledge_hash": "89ddb18fa2b29d5f9afc03702e8e1a66c7adc42592b4730e521c6c979f715bbe",
+      "source": "sources/shard-0899.txt#L99-L99",
+      "source_sha256": "89ef2ee2d01a511a296c4c4912e1a414aa41652947b8b6bb7f57e81015ef94c3",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-2999.md#node-089999",
+      "knowledge_hash": "af34177998f618804aad05068b43b4dc17d498b88b320711051a12574d10344f",
+      "source": "sources/shard-0899.txt#L100-L100",
+      "source_sha256": "0e6a52942d5b44b356d8805fb03931671d7ebb6e5d29b1503fd3f234fc75989b",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3000.md#node-090000",
+      "knowledge_hash": "7d1d717d3c26e725951bbf838a870eb56d0a72505c1ffdcf71f38916e0cd53f4",
+      "source": "sources/shard-0900.txt#L1-L1",
+      "source_sha256": "f137989b9dadb23d33cd510a7e26b3139cfe02ef8ad26349a659395070942f59",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3133.md#node-094000",
+      "knowledge_hash": "11951595bf9fe44d23a8c93494df3c5a2a0e94f63d847dd38a9c38ac7a3be43f",
+      "source": "sources/shard-0940.txt#L1-L1",
+      "source_sha256": "3bb7b9d07459a2add31e40110318ee951e215bc6653b34a81be515553d4340ac",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3266.md#node-098000",
+      "knowledge_hash": "12bd8231c62145f6d95e167593ce0fdaa9838210a006611295360c1647614c1c",
+      "source": "sources/shard-0980.txt#L1-L1",
+      "source_sha256": "ca6b092242815d2ee534ea7115d5decd8d5865715833cf280329813854b31b26",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3300.md#node-099000",
+      "knowledge_hash": "7d36ae0fb5e2d6c7a0eb34d662080e6b49e62dcb959890c87812b227be03ba19",
+      "source": "sources/shard-0990.txt#L1-L1",
+      "source_sha256": "73e69f72a5e25c11982678b86cfefa84338063afe8a17bbc1023af64dcc6b2e0",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3330.md#node-099900",
+      "knowledge_hash": "25ebf45fb926fd224999e1f55f791820b71dd30078ff2b07f6a543cb9f931eff",
+      "source": "sources/shard-0999.txt#L1-L1",
+      "source_sha256": "8e9b79f3f8f16ad7ab7bbd264f209bc0cffaa24c7fa6daae950d135828be8607",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3333.md#node-099990",
+      "knowledge_hash": "35e419fdf13323537d13f927bbfed5b31b59879b1f80a5d75b1d6ee2a10769cb",
+      "source": "sources/shard-0999.txt#L91-L91",
+      "source_sha256": "ed70bb291dc7d21ce86b5c70a209fd5f6135a948dbb7a04c0ae95f6f4abccb63",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    },
+    {
+      "knowledge": "knowledge/part-3333.md#node-099999",
+      "knowledge_hash": "02bffaf4c5fac648ac1eacb6f6040408f11e953ff8068f77da30d7146a21e764",
+      "source": "sources/shard-0999.txt#L100-L100",
+      "source_sha256": "b6902860a7d226d1ac51c5bf957015fcb133a4822278dd8eb61fd7aa9c1b094d",
+      "source_snapshot": "e8587e34d2b2aab8e5dd4230fe4000d4e110c07f"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{"scenario": "search", "phase": "measured", "index": 0, "seconds": 0.7343, "valid": true}
+{"scenario": "inspect", "phase": "measured", "index": 0, "seconds": 52.5217, "valid": true}
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source/tests/performance/run.py", line 228, in <module>
+    main()
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source/tests/performance/run.py", line 39, in main
+    run_survey(args, build, evidence)
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source/tests/performance/run.py", line 148, in run_survey
+    run_series(args, build, fixture, evidence, stream, name, deadline)
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source/tests/performance/run.py", line 164, in run_series
+    scenario = prepare_scenario(fixture, name, evidence / f"case-{name}-{index}")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source/tests/performance/scenarios.py", line 107, in prepare_scenario
+    initialize_projection(output, binary, full_audit=False)
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-05-optimized-source/tests/performance/scenarios.py", line 179, in initialize_projection
+    output = subprocess.run([binary, command], input=request, cwd=repository,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 550, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 2128, in _communicate
+    data = os.read(key.fd, 32768)
+           ^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

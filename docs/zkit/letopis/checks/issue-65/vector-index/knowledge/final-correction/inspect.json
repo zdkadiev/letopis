@@ -1,0 +1,11 @@
+{
+  "request": {
+    "element_ids": [
+      "letopis/architecture/storage.md",
+      "src/storage/cache.sql"
+    ]
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"snapshot\":\"492ac2d345d9a835d30c613c8d0c09b2e347958d\",\"elements\":{\"letopis/architecture/storage.md\":{\"path\":\"letopis/architecture/storage.md\",\"lines\":[1,197],\"hash\":\"0fee114e3f85382f50ed3728d6891da2c38548071dab846e883472d541a1aabb\"},\"src/storage/cache.sql\":{\"path\":\"src/storage/cache.sql\",\"hash\":\"a8caf0fa4da5c0291838348c8b3d5a535b70feb9bb8918b39d538c574a7072ae\"}}}}\n",
+  "stderr": ""
+}

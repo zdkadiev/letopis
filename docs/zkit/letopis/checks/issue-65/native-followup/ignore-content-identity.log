@@ -1,0 +1,22 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.07s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 1 test
+test git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration ... FAILED
+
+failures:
+
+---- git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration stdout ----
+
+thread 'git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration' (526090047) panicked at src/git/objects.rs:310:50:
+called `Result::unwrap_err()` on an `Ok` value: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::objects::tests::memoized_tree_reads_reject_replacements_and_recover_after_restoration
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 609 filtered out; finished in 0.45s
+
+error: test failed, to rerun pass `--lib`

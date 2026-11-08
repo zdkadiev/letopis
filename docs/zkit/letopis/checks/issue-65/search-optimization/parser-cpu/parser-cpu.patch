@@ -1,0 +1,70 @@
+diff --git a/src/markdown/scan.rs b/src/markdown/scan.rs
+index 9d2b688..a571395 100644
+--- a/src/markdown/scan.rs
++++ b/src/markdown/scan.rs
+@@ -105,6 +105,8 @@ fn layout_build(
+ ) -> Result<Layout, Diagnostic> {
+     let mut elements: Vec<Element> = Vec::new();
+     let mut metadata_ranges = Vec::new();
++    let mut line_offset = 0;
++    let mut line_number = 1;
+     for range in comments {
+         let start = line_start_calculate(text, range.start);
+         let after = line_end_calculate(text, start);
+@@ -129,12 +131,13 @@ fn layout_build(
+             reason = "element_bounds_calculate returns ordered ranges"
+         )]
+         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
++        // Validated elements never overlap, so preceding bytes need no second line scan.
++        let line_start = line_number + line_breaks_count(&text.as_bytes()[line_offset..begin]);
++        line_offset = end.saturating_sub(1);
++        line_number = line_start + line_breaks_count(&text.as_bytes()[begin..line_offset]);
+         #[expect(clippy::expect_used, reason = "a nonempty element spans ordered lines")]
+-        let lines = LineRange::new(
+-            line_number_calculate(text, begin),
+-            line_number_calculate(text, end.saturating_sub(1)),
+-        )
+-        .expect("nonempty element lines are ordered");
++        let lines =
++            LineRange::new(line_start, line_number).expect("nonempty element lines are ordered");
+         elements.push(Element {
+             id,
+             metadata,
+@@ -183,10 +186,6 @@ fn line_end_calculate(text: &str, offset: usize) -> usize {
+         .map_or(text.len(), |position| offset + position + 1)
+ }
+ 
+-fn line_number_calculate(text: &str, at: usize) -> u64 {
+-    text.as_bytes()[..at]
+-        .iter()
+-        .filter(|&&c| c == b'\n')
+-        .count() as u64
+-        + 1
++fn line_breaks_count(bytes: &[u8]) -> u64 {
++    bytes.iter().filter(|&&c| c == b'\n').count() as u64
+ }
+diff --git a/tests/markdown_elements.rs b/tests/markdown_elements.rs
+index 99598d5..eab96ff 100644
+--- a/tests/markdown_elements.rs
++++ b/tests/markdown_elements.rs
+@@ -267,6 +267,20 @@ fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
+     }
+ }
+ 
++#[test]
++fn adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings() {
++    // Given: uneven sections include CRLF, a fenced fake heading, a gap and no final LF.
++    let text = "前文\r\n\r\n## A {#a}\r\n<!-- letopis: {\"created_at\":1} -->\r\nА\r\n\r\n```md\r\n## Fake {#fake}\r\n```\r\n# Outside\r\nGap\r\n\r\n## B {#b}\r\n<!-- letopis: {\"created_at\":2} -->\r\nБ";
++    // When: parse both non-overlapping elements with their complete document context.
++    let parsed = parse_file("a.md", text);
++    // Then: both section line ranges retain independent literal coordinates.
++    assert_eq!(parsed.elements.len(), 2);
++    assert_eq!(parsed.elements[0].element.lines.get_start(), 3);
++    assert_eq!(parsed.elements[0].element.lines.get_end(), 9);
++    assert_eq!(parsed.elements[1].element.lines.get_start(), 13);
++    assert_eq!(parsed.elements[1].element.lines.get_end(), 15);
++}
++
+ fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
+     let got = &parsed.element;
+     assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");

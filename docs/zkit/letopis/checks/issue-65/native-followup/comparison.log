@@ -1,0 +1,54 @@
+check 0 before 45.9451 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+check 0 after 33.4821 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+status 0 before 42.2183 {'valid': True, 'observed': {'revision': 3, 'backlog': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+status 0 after 31.5661 {'valid': True, 'observed': {'revision': 3, 'backlog': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+check 1 after 31.8561 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+check 1 before 42.452 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+status 1 after 31.4764 {'valid': True, 'observed': {'revision': 3, 'backlog': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+status 1 before 41.9027 {'valid': True, 'observed': {'revision': 3, 'backlog': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+check 2 before 42.3875 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+check 2 after 32.0379 {'valid': True, 'observed': {'errors': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+status 2 before 42.2836 {'valid': True, 'observed': {'revision': 3, 'backlog': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+status 2 after 31.661 {'valid': True, 'observed': {'revision': 3, 'backlog': 0, 'projection_counts': {'knowledge': 100000, 'source': 100000, 'edges': 500000}}}
+{
+  "check": {
+    "samples": {
+      "before": [
+        45.945068791974336,
+        42.45197237492539,
+        42.387532375054434
+      ],
+      "after": [
+        33.48214712482877,
+        31.85609016707167,
+        32.03787958389148
+      ]
+    },
+    "median_seconds": {
+      "before": 42.45197237492539,
+      "after": 32.03787958389148
+    },
+    "speedup": 1.325055619357221,
+    "latency_reduction_percent": 24.53146981972757
+  },
+  "status": {
+    "samples": {
+      "before": [
+        42.21825670800172,
+        41.90268504200503,
+        42.28359499992803
+      ],
+      "after": [
+        31.566076874965802,
+        31.47639275016263,
+        31.661012792028487
+      ]
+    },
+    "median_seconds": {
+      "before": 42.21825670800172,
+      "after": 31.566076874965802
+    },
+    "speedup": 1.3374565637418145,
+    "latency_reduction_percent": 25.231216690709513
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "method": "SQLite online backup using Homebrew sqlite3 .backup, source opened -readonly; committed WAL frames included by SQLite backup API",
+  "source": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/ollama-100k/repository/.letopis/vectors.db",
+  "none_copy": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db",
+  "flat_copy": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db",
+  "source_backup_command": "sqlite3 -readonly <source> then .load <oracle-vec1.dylib> sqlite3_extension_init and .backup <none.db>",
+  "flat_backup_command": "sqlite3 -readonly <none.db> then .load <oracle-vec1.dylib> sqlite3_extension_init and .backup <flat.db>",
+  "backup_elapsed_seconds": null,
+  "timing_limit": "backup elapsed was not recorded separately; only rebuild/query timings are claimed",
+  "wal_bytes_observed_before_backup": 0,
+  "source_db_bytes": 426409984,
+  "none_db_bytes": 426409984,
+  "flat_db_bytes": 426409984,
+  "none_wal_bytes": 0,
+  "flat_wal_bytes": 0,
+  "owned_directory_bytes": 884453327,
+  "query": {
+    "source": "virtual-table vector read from own none.db before rebuild, min vector_keys.row_id=1",
+    "query_rowid": 1,
+    "dimensions": 768,
+    "bytes": 3072,
+    "sha256": "e33d6addade4f84c9c906edd41d2e8897046845b5453121dcdc370333341829a",
+    "provider_called": false
+  },
+  "inputs_sha256": {
+    "/Users/zdkadiev/Repos/letopis/vendor/vec1/vec1.c": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/oracle-vec1.dylib": "55f6998b76bccd89261578c2abe359e7dbf468dcb9a9e17d820351f0f2c6828e"
+  }
+}

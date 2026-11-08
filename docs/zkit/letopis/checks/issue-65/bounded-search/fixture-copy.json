@@ -1,0 +1,15 @@
+{
+  "original": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/repository",
+  "owned": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/repository",
+  "databases": {
+    "cache.db": {
+      "bytes": 125353984,
+      "integrity": "ok"
+    },
+    "vectors.db": {
+      "bytes": 427413504,
+      "integrity": "ok"
+    }
+  },
+  "source_mode": "immutable: source has no WAL and no owned writer; initial mode=ro refused WAL access; failed empty destination retried without touching original"
+}

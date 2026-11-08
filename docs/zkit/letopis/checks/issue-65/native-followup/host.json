@@ -1,0 +1,18 @@
+{
+  "cpu": "Apple M4 Pro",
+  "ram_bytes": "51539607552",
+  "logical_cpus": "14",
+  "os": "26.6.2",
+  "arch": "arm64",
+  "rust": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "git": "git version 2.56.0",
+  "python": "Python 3.12.0",
+  "samply": "samply 0.13.1",
+  "disk": {
+    "MediaName": "APPLE SSD AP0512Z",
+    "TotalSize": 500277792768,
+    "BusProtocol": "Apple Fabric",
+    "SolidState": true
+  },
+  "captured_utc": "2026-11-06T10:35:31Z"
+}

@@ -1,6 +1,7 @@
 use letopis::service::StorageError;
 use letopis::service::TransactionError;
 use letopis::service::{CacheDatabase, StorageRead};
+use std::num::NonZeroUsize;
 #[expect(
     dead_code,
     reason = "Shared cancellation fixtures expose unrelated wait observers"
@@ -204,6 +205,7 @@ fn late_drain_vector_does_not_represent_changed_text() {
         },
     ]);
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
+    let identity = config.get_identity();
     let old_hash = get_search_hash(&repo);
     let mut drain = spawn_drain(&repo);
     barrier.wait_until_entered();
@@ -223,10 +225,6 @@ fn late_drain_vector_does_not_represent_changed_text() {
         get_vector_by_search_hash(&repo, &config, &new_hash),
         Some(vec![0., 1.])
     );
-    assert_ne!(
-        get_vector_by_search_hash(&repo, &config, &new_hash),
-        Some(vec![1., 0.])
-    );
     let old = get_vector_by_search_hash(&repo, &config, &old_hash);
     assert!(old.is_none() || old == Some(vec![1., 0.]), "{old:?}");
     let second = http.take_requests();
@@ -238,7 +236,7 @@ fn late_drain_vector_does_not_represent_changed_text() {
         .with_read_tx(|| {
             let read = &storage.cache;
             let matches = match read
-                .vector_index_get_by_vector(&config.get_identity(), &[0., 1.], 2)
+                .vector_index_get_by_vector(&identity, &[0., 1.], 2, NonZeroUsize::MIN)
                 .expect("vector query")
             {
                 VectorOutcome::Current(matches) => matches,

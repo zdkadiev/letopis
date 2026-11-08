@@ -1,0 +1,22 @@
+{
+  "name": "rebuild-flat",
+  "mode": "flat",
+  "argv": [
+    "/opt/homebrew/opt/sqlite/bin/sqlite3",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/flat.db"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 2.240598167059943,
+  "process_user_seconds": 0.31495,
+  "process_system_seconds": 0.93102,
+  "stdout": "Run Time: real 2.174718 user 0.313094 sys 0.917522\n",
+  "stderr": "",
+  "sqlite_timers": [
+    {
+      "wall_seconds": 2.174718,
+      "user_seconds": 0.313094,
+      "system_seconds": 0.917522,
+      "cpu_seconds": 1.230616
+    }
+  ]
+}

@@ -74,7 +74,7 @@ fn failed_stage_cleanup_preserves_owner_and_releases_other_resources() {
     let inode = fs::metadata(&foreign).unwrap().ino();
     fs::rename(&stages, &moved).unwrap();
     // When: the first stage fails cleanup, without skipping later lock owners.
-    assert!(cleanup.writes_cancel_and_cleanup().is_err());
+    assert!(cleanup.shutdown().is_err());
     // Then: residual ownership is retained, other owned locks are gone, foreign ownership survives.
     assert_eq!(cleanup.state_lock().resources.len(), 1);
     assert!(!root.join("snapshot.lock").exists());
@@ -86,8 +86,8 @@ fn failed_stage_cleanup_preserves_owner_and_releases_other_resources() {
     fs::rename(&moved, &stages).unwrap();
     assert_eq!(fs::read(path.join("payload")).unwrap(), b"owned bytes");
     // When: retry cleanup, then repeat it after all resources have gone.
-    cleanup.writes_cancel_and_cleanup().unwrap();
-    cleanup.writes_cancel_and_cleanup().unwrap();
+    cleanup.shutdown().unwrap();
+    cleanup.shutdown().unwrap();
     // Then: the terminal owner is empty and no spool or foreign-lock damage remains.
     assert!(cleanup.state_lock().resources.is_empty());
     assert_eq!(fs::read_dir(&stages).unwrap().count(), 0);
@@ -115,7 +115,7 @@ fn cancelled_ref_writer_cannot_publish_or_touch_successor_lock() {
         lease.ref_commit().is_err()
     });
     // When: cleanup runs before the active writer resumes; another owner acquires the name.
-    cleanup.writes_cancel_and_cleanup().unwrap();
+    cleanup.shutdown().unwrap();
     fs::write(path.with_extension("lock"), b"successor").unwrap();
     let successor_inode = fs::metadata(path.with_extension("lock")).unwrap().ino();
     resume.send(()).unwrap();
@@ -154,7 +154,7 @@ fn cancelled_stage_cannot_be_recreated_or_published_by_resumed_writer() {
     ready.recv().unwrap();
     assert_eq!(fs::read_dir(&stage).unwrap().count(), 1);
     // When: cleanup detaches/removes while the writer remains live, then writing resumes.
-    cleanup.writes_cancel_and_cleanup().unwrap();
+    cleanup.shutdown().unwrap();
     resume.send(()).unwrap();
     let rejected = active.join().unwrap();
     let published = lease.object_publish(
@@ -185,7 +185,7 @@ fn resolved_parent_operations_remain_confined_to_detached_stage() {
     let (ref_lease, mut old_writer) = cleanup.ref_acquire_by_path(&reference, root, 0).unwrap();
     let (detached, resume) = register_namespace_checkpoint(&cleanup);
     let cancelling = Arc::clone(&cleanup);
-    let worker = thread::spawn(move || cancelling.writes_cancel_and_cleanup());
+    let worker = thread::spawn(move || cancelling.shutdown());
     // When: cancellation detaches the parent inode, then the pending mkdir/persist operations finish.
     let detached = detached.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(!stage.exists(), "active pathname is not isolated");
@@ -237,7 +237,7 @@ fn cancellation_releases_both_confirmation_markers_but_preserves_foreign_lock() 
         .unwrap();
     fs::write(directory.path().join("foreign.lock"), b"foreign").unwrap();
     // When: cancellation closes every actual owned marker.
-    cleanup.writes_cancel_and_cleanup().unwrap();
+    cleanup.shutdown().unwrap();
     // Then: new admission fails, owned markers disappear and foreign bytes survive.
     assert!(cleanup.writes_is_cancelled());
     assert!(!loose.with_extension("lock").exists());

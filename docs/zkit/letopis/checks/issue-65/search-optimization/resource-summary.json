@@ -1,0 +1,12 @@
+{
+  "before": {
+    "cpu_median_seconds": 106.628184,
+    "rss_max_mib": 186.953125,
+    "rss_median_mib": 180.5625
+  },
+  "after": {
+    "cpu_median_seconds": 57.269202,
+    "rss_max_mib": 180.640625,
+    "rss_median_mib": 177.796875
+  }
+}

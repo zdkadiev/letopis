@@ -1,0 +1,134 @@
+from pathlib import Path
+import json,os,subprocess,hashlib,shutil
+root=Path.cwd();out=root/'.artifacts/issue-65/2026-11-06-check-status';source=out/'source'
+hooks={
+'src/service/check.rs':['check'],
+'src/service/status.rs':['get_status','get_published','get_embedding_status'],
+'src/service/utils.rs':['collect_check_problems','find_source_problems','get_source_bindings'],
+'src/service/graph_diagnostics.rs':['find_problems'],
+'src/service/provenance.rs':['observe_sources_batch','get_snapshot_hash','get_current_hash'],
+'src/git/objects.rs':['blob_get_by_tree_oid_and_path','tree_validate_by_oid','tree_get_by_oid','tree_entry_get_by_name'],
+'src/git/reader.rs':['object_verify_by_oid'],
+'src/git/validation.rs':['tree_bytes_validate'],
+'src/git/refs.rs':['tree_pin_by_oid','tree_verify_closure_by_oid'],
+'src/filesystem/file.rs':['file_get_by_path'],
+'src/domain/source.rs':['select_bytes'],
+}
+labels=[]
+for name in hooks:
+ (source/name).write_bytes(subprocess.check_output(['git','show',f'HEAD:{name}'],cwd=source))
+for name,functions in hooks.items():
+ p=source/name;s=p.read_text()
+ for function in functions:
+  marker='fn '+function
+  start=s.index(marker);body=s.index('{',start)+1
+  assert start<s.find('#[cfg(test)]\nmod tests') if '#[cfg(test)]\nmod tests' in s else True
+  mutable=function in ('tree_bytes_validate','object_verify_by_oid','file_get_by_path')
+  identifier=len(labels);labels.append(name+'::'+function)
+  s=s[:body]+f'\n        let {"mut " if mutable else ""}_cpu_scope = crate::diagnostic_cpu::enter({identifier});\n'+s[body:]
+ p.write_text(s)
+p=source/'src/git/validation.rs';s=p.read_text();needle='    let mut names = BTreeSet::new();';s=s.replace(needle,'    _cpu_scope.add_bytes(bytes.len());\n'+needle,1)
+s=s.replace('    while !bytes.is_empty() {','    while !bytes.is_empty() {\n        _cpu_scope.add_items(1);',1);p.write_text(s)
+p=source/'src/git/reader.rs';s=p.read_text();start=s.index('        let (object, _) = self\n');end=s.index('        let kind = std::str::from_utf8(object.kind.as_bytes())',start)
+identifier=len(labels);labels.append('src/git/reader.rs::raw_object_decode')
+old=s[start:end];expr=old[len('        let (object, _) = '):].strip();assert expr.endswith(';')
+s=s[:start]+f'        let (object, _) = {{\n            let _decode_scope = crate::diagnostic_cpu::enter({identifier});\n            '+expr[:-1]+'\n        };\n        _cpu_scope.add_bytes(object.data.len());\n'+s[end:]
+start=s.index('        let mut hash = ObjectHasher::new',s.index('fn object_verify_by_oid'))
+end=s.index('        Ok(())\n',start)
+identifier=len(labels);labels.append('src/git/reader.rs::object_content_hash')
+s=s[:start]+f'        {{\n            let _hash_scope = crate::diagnostic_cpu::enter({identifier});\n'+s[start:end]+'        }\n'+s[end:];p.write_text(s)
+p=source/'src/filesystem/file.rs';s=p.read_text();needle='    Ok(Some(CapturedFile {\n';s=s.replace(needle,'    _cpu_scope.add_bytes(bytes.len());\n'+needle,1);p.write_text(s)
+module=r'''//! Temporary in-process Rust CPU/wall profiler, absent from shipping code.
+use std::{cell::RefCell,collections::BTreeMap,sync::{Mutex,atomic::{AtomicBool,Ordering}},time::Instant};
+const LABELS: [&str; LABEL_COUNT] = LABEL_VALUES;
+static DATA: Mutex<BTreeMap<Vec<usize>, Record>> = Mutex::new(BTreeMap::new());
+static CPU_AVAILABLE: AtomicBool = AtomicBool::new(true);
+thread_local! { static STACK: RefCell<Vec<usize>> = const { RefCell::new(Vec::new()) }; }
+#[derive(Debug,Default)]
+struct Record { calls:u64,wall_ns:u64,cpu_ns:u64,items:u64,bytes:u64 }
+/// Own one scoped instrumented observation.
+#[derive(Debug)]
+pub struct Scope { path:Vec<usize>,wall:Instant,cpu:Option<u64>,items:u64,bytes:u64 }
+/// Start a nested CPU/wall observation.
+pub fn enter(index:usize)->Scope {
+    let wall=Instant::now();let cpu=get_cpu_ns();
+    let path=STACK.with(|s| { let mut path=s.borrow_mut();path.push(index);path.clone() });
+    Scope {path,wall,cpu,items:0,bytes:0}
+}
+impl Scope {
+    /// Count processed tree entries without per-entry atomic or clock overhead.
+    pub fn add_items(&mut self,count:u64){self.items+=count;}
+    /// Count verified/captured bytes in this operation.
+    pub fn add_bytes(&mut self,count:usize){self.bytes+=u64::try_from(count).unwrap_or(u64::MAX);}
+}
+impl Drop for Scope {
+    fn drop(&mut self){
+        let cpu=get_cpu_ns().zip(self.cpu).map(|(end,start)|end.saturating_sub(start));
+        let wall=u64::try_from(self.wall.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        STACK.with(|s| {s.borrow_mut().pop();});
+        if cpu.is_none(){CPU_AVAILABLE.store(false,Ordering::Relaxed);}
+        let mut data=DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let record=data.entry(std::mem::take(&mut self.path)).or_default();
+        record.calls+=1;record.wall_ns+=wall;record.cpu_ns+=cpu.unwrap_or(0);
+        record.items+=self.items;record.bytes+=self.bytes;
+    }
+}
+fn get_cpu_ns()->Option<u64>{
+    let mut value=std::mem::MaybeUninit::<libc::timespec>::uninit();
+    // SAFETY: clock_gettime writes one correctly sized timespec on success.
+    if unsafe {libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID,value.as_mut_ptr())}!=0{return None;}
+    // SAFETY: the successful call above initialized both fields.
+    let value=unsafe {value.assume_init()};
+    Some(u64::try_from(value.tv_sec).ok()?.saturating_mul(1_000_000_000)+u64::try_from(value.tv_nsec).ok()?)
+}
+/// Emit bounded aggregate call paths on normal diagnostic-build exit.
+#[derive(Debug)]
+pub struct Report;
+impl Drop for Report {
+    fn drop(&mut self){
+        let data=DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let rows:Vec<_>=data.iter().map(|(path,row)|{
+            let children_cpu:u64=data.iter().filter(|(p,_)|p.len()==path.len()+1&&p.starts_with(path)).map(|(_,r)|r.cpu_ns).sum();
+            let children_wall:u64=data.iter().filter(|(p,_)|p.len()==path.len()+1&&p.starts_with(path)).map(|(_,r)|r.wall_ns).sum();
+            serde_json::json!({"path":path,"calls":row.calls,"wall_ns":row.wall_ns,"cpu_ns":row.cpu_ns,
+                "self_cpu_ns":row.cpu_ns.saturating_sub(children_cpu),"self_wall_ns":row.wall_ns.saturating_sub(children_wall),"items":row.items,"bytes":row.bytes})
+        }).collect();
+        eprintln!("{}",serde_json::json!({"method":"Rust scoped instrumentation; inclusive wall/thread CPU, exact call/entry/byte counters","cpu_available":CPU_AVAILABLE.load(Ordering::Relaxed),"labels":LABELS,"rows":rows}));
+    }
+}
+#[cfg(test)]
+mod tests{
+    use super::*;
+    #[test]
+    fn separates_sleep_from_cpu_and_records_nested_counts(){
+        // Given: a per-thread CPU clock and no prior recorded observations.
+        let wall=Instant::now();let cpu=get_cpu_ns().unwrap();
+        // When: the thread sleeps rather than running computations.
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        let slept_cpu=get_cpu_ns().unwrap()-cpu;
+        // Then: elapsed wall time does not get mislabeled as CPU time.
+        assert!(slept_cpu<u64::try_from(wall.elapsed().as_nanos()).unwrap()/2);
+        // Given: a parent and child scope with independently known counters.
+        let parent=enter(0);let mut child=enter(1);child.add_items(7);child.add_bytes(11);
+        // When: real CPU work executes inside the nested scopes.
+        let before=get_cpu_ns().unwrap();let mut value=1u64;
+        for _ in 0..1_000_000 {value=std::hint::black_box(value.wrapping_mul(3).wrapping_add(1));}
+        std::hint::black_box(value);assert!(get_cpu_ns().unwrap()>before);
+        drop(child);drop(parent);
+        // Then: literal counts and nested CPU relationships are retained.
+        let data=DATA.lock().unwrap();let leaf=data.get(&vec![0,1]).unwrap();
+        assert_eq!((leaf.calls,leaf.items,leaf.bytes),(1,7,11));
+        assert_eq!(data.get(&vec![0]).unwrap().calls,1);
+        assert!(leaf.cpu_ns>0&&leaf.cpu_ns<=data.get(&vec![0]).unwrap().cpu_ns);
+    }
+}
+'''.replace('LABEL_COUNT',str(len(labels))).replace('LABEL_VALUES',json.dumps(labels))
+(source/'src/diagnostic_cpu.rs').write_text(module)
+p=source/'src/lib.rs';p.write_text(p.read_text()+'\n/// Diagnostic CPU profiler; separate research build only.\npub mod diagnostic_cpu;\n')
+p=source/'src/main.rs';p.write_text(p.read_text().replace('fn main() -> ExitCode {','fn main() -> ExitCode {\n    let _profile_report = letopis::diagnostic_cpu::Report;'))
+env=dict(os.environ,CARGO_TARGET_DIR=str(out/'target'),CARGO_PROFILE_RELEASE_DEBUG='1')
+with (out/'build.log').open('w') as log:subprocess.run(['cargo','build','--release','--locked','--offline'],cwd=source,env=env,stdout=log,stderr=log,check=True)
+binary=out/'letopis-cpu-profiled';shutil.copy2(out/'target/release/letopis',binary)
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+(out/'cpu-build.json').write_text(json.dumps({'executable':str(binary),'sha256':sha(binary),'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip(),'labels':labels,'inputs':{str(p.relative_to(source)):sha(p) for p in (source/'src').rglob('*.rs')},'method':'Temporary Rust instrumented CPU/wall/call-path profiler; isolated target, no changes to shipping source'},indent=2)+'\n')
+print(binary)

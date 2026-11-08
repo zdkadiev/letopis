@@ -1,0 +1,10 @@
+{
+  "command": "CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=1 make verify V=1",
+  "exit_code": 0,
+  "log_sha256": "5953367dc0f675b9555e24e1b874aadef4181d4f253a9d71c7ab9df0c610946b",
+  "test_groups": 171,
+  "passed_executions": 2423,
+  "ignored_executions": 22,
+  "counts_scope": "executions including debug/release repeats and example; not unique tests",
+  "source_inputs_verified": 106
+}

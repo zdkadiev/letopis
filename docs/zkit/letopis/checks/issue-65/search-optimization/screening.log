@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/measure-search.py", line 40, in <module>
+    write_json(output/'measurement.json',r);print(json.dumps({'label':args.label,'phase':args.phase,'mode':args.mode,'seconds':r['duration_seconds'],'valid':True,'cpu':r['resources']['cpu_seconds']['value'],'rss':r['resources']['peak_rss']['value']}),flush=True)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/scenarios.py", line 249, in write_json
+    with path.open("xb") as stream:
+         ^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/pathlib.py", line 1014, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileExistsError: [Errno 17] File exists: '/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/screening/conditioning/measurement.json'
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/run-screening.py", line 12, in <module>
+    label,binary,source=variants[0];invoke(label,binary,source,'conditioning',p/'screening/conditioning')
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/run-screening.py", line 11, in invoke
+    subprocess.run([sys.executable,'-B',str(p/'measure-search.py'),'--binary',str(binary),'--source',str(source),'--output',str(output),'--label',label,'--phase',phase],cwd=root,check=True)
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/bin/python3.12', '-B', '/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/measure-search.py', '--binary', '/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/product/letopis', '--source', '/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source', '--output', '/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/screening/conditioning', '--label', 'baseline', '--phase', 'conditioning']' returned non-zero exit status 1.

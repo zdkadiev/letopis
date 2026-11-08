@@ -1,0 +1,16 @@
+   Compiling rustix v1.1.5
+   Compiling tempfile v3.27.0
+   Compiling gix-tempfile v26.0.1
+   Compiling gix-odb v0.87.0
+   Compiling gix-lock v26.0.1
+   Compiling gix-ref v0.69.1
+   Compiling gix-index v0.58.0
+   Compiling gix-worktree v0.59.0
+   Compiling gix-discover v0.57.1
+   Compiling gix-shallow v0.15.1
+   Compiling gix-protocol v0.68.0
+   Compiling gix-config v0.62.2
+   Compiling gix-dir v0.32.0
+   Compiling gix v0.90.0
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/source)
+    Finished `release` profile [optimized + debuginfo] target(s) in 30.08s

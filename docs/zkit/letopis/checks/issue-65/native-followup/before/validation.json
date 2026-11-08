@@ -1,0 +1,36 @@
+{
+  "check": {
+    "samples": 41436,
+    "usable_stacks": 41436,
+    "threads": 2,
+    "sha256": "4e38a13e90441d49f4a3bcc91926c28c05401f40c25925fd2e984670c0c10969",
+    "bytes": 398772,
+    "libraries": [
+      "dyld",
+      "letopis",
+      "libsystem_kernel.dylib",
+      "libsystem_pthread.dylib",
+      "libsystem_c.dylib",
+      "libsystem_platform.dylib",
+      "libsystem_malloc.dylib",
+      "libsamply_mac_preload.dylib"
+    ]
+  },
+  "status": {
+    "samples": 38915,
+    "usable_stacks": 38915,
+    "threads": 1,
+    "sha256": "5304f9e77f2b3cea5c86226f54f5faf7cba25972531533a7ce2c0759f9f953ac",
+    "bytes": 368761,
+    "libraries": [
+      "dyld",
+      "letopis",
+      "libsystem_c.dylib",
+      "libsystem_kernel.dylib",
+      "libsystem_malloc.dylib",
+      "libsystem_platform.dylib",
+      "libsystem_pthread.dylib",
+      "libsamply_mac_preload.dylib"
+    ]
+  }
+}

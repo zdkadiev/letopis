@@ -1,0 +1,17 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/candidate/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.57s
+     Running unittests src/lib.rs (../target-build/debug/deps/letopis-43e59323f2756d14)
+
+running 9 tests
+test storage::schema::tests::exact_flat_bootstrap_preserves_populated_state_and_is_idempotent ... ok
+test storage::schema::tests::exact_flat_competing_opener_rechecks_the_committed_model ... ok
+test storage::schema::tests::exact_flat_upgrade_preserves_a_separate_pinned_reader ... ok
+test storage::schema::tests::exact_flat_query_only_bootstrap_preserves_legacy_observation ... ok
+test storage::schema::tests::exact_flat_bootstrap_rejects_an_unrecognized_metric ... ok
+test storage::schema::tests::exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog ... ok
+test storage::schema::tests::exact_flat_failed_native_rebuild_rolls_back_model_and_retries_cleanly ... ok
+test storage::schema::tests::exact_flat_fresh_query_only_and_empty_retained_dimensions_are_compatible ... ok
+test storage::schema::tests::exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 618 filtered out; finished in 0.39s
+

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "scope": "check/status provisional CPU instrumentation and blocked Samply; no native recording",
+  "artifacts": [
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/analysis.json",
+      "bytes": 10681,
+      "sha256": "656f73f9e7f34a55f8badbb2d62213b864c4493c799b6fe1a285d7517387ab97"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/calibration-mutations.json",
+      "bytes": 1568,
+      "sha256": "93f558a97522bcc4b4f768f7b2b09e0854b102b894df621e9dc9a7e06ac0822c"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/calibration.log",
+      "bytes": 182,
+      "sha256": "bb604a460d74fe5e04e7548cb3f687c99bdb6dca9a252e8ce557b148ab2db009"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/campaign.json",
+      "bytes": 21490,
+      "sha256": "068c78d746c36a860aaf20de594b7f443ecff32eb9dee01621445cd7dccde765"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/completion.json",
+      "bytes": 24,
+      "sha256": "3234581e301b1aff7cefeb6e2383f275771c8db9a4770e667294fa94f1ec0588"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/cpu-build.json",
+      "bytes": 11197,
+      "sha256": "b5db9c7f5b3af16334ba11f209d0cf02ce365e53191421ee8d238661399f0680"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/diagnostic_cpu.rs.txt",
+      "bytes": 5951,
+      "sha256": "d06e8d77f6eabf5fe9fa1d4d959dc75e0affa65139a196fa07dc2103032556de"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/instrument.py",
+      "bytes": 9227,
+      "sha256": "c52115bc9c14527dd66efc023bccb6a852be288ca4133c516b64994e120fd0ca"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/profiles.jsonl",
+      "bytes": 153801,
+      "sha256": "1f1f8dc0d41b7fc263aab5afc866f9c22972722ebf067f23fe98ed2df1b91f5b"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/report.md",
+      "bytes": 8301,
+      "sha256": "24b2a6487eca2383647469555c07c793b2d8d3e8eebae5b4aad7061f7dda4f4d"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/run-profiles.py",
+      "bytes": 2190,
+      "sha256": "694950e05e1a5a4352d884802127903b7a700981c5cd8e0c448ece7dc6172a0f"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/run-samply.zsh",
+      "bytes": 2986,
+      "sha256": "2788eb617f8c6b00e66cc025df6788c86f54cf603bca99cd2507da11a706e695"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/samply-attach-receipt.json",
+      "bytes": 457,
+      "sha256": "71daebcc1342ffdf3d28fcf2abcafcfaaf090c554f98a97c0f09313218a51161"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/samply-diagnosis.json",
+      "bytes": 1730,
+      "sha256": "95c2b60a6ba982853919c1cc0f14447a0f4ab8100fe6b411e5885e53482cb29e"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/samply-launch-receipt.json",
+      "bytes": 1744,
+      "sha256": "b25489513f7dad8bea0565b0459743c0475540f0b43ed61ed0b63f2c353d6192"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/samply-launcher-error.log",
+      "bytes": 53,
+      "sha256": "79941b7910106e7c5232416a5e6cb3d00469d18b293b11db6a83d3047919b130"
+    },
+    {
+      "path": "docs/zkit/letopis/checks/issue-65/check-status-profiling/verification.json",
+      "bytes": 497,
+      "sha256": "3b19bf3960ff64fc7f06aab3f10b977c36766e2550a5f9f04b68bfeeaf1b471d"
+    }
+  ]
+}

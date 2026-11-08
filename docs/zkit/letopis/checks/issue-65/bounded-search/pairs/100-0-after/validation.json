@@ -1,0 +1,16 @@
+{
+  "name": "100-0-after",
+  "label": "after",
+  "limit": 100,
+  "request": {
+    "query": "case 000000",
+    "limit": 100
+  },
+  "seconds": 1.866692375158891,
+  "cpu_seconds": 1.447997,
+  "peak_rss_bytes": 36798464,
+  "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+  "validated": true,
+  "matching_tool_processes_before_call": [],
+  "config_and_vector_metadata_unchanged": true
+}

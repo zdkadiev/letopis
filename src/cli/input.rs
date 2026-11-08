@@ -1,8 +1,8 @@
 use super::help::help_get_by_args;
 use crate::domain::{EdgeType, RepoPath, SourceUri, TreeOid};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
-    SearchRequest, TraversalDirection, TraversalMode, TraversalRequest,
+    CommandError, CommandErrorKind, CommandResult, ElementAddress, MAX_SEARCH_LIMIT, RecheckFilter,
+    SearchFilters, SearchRequest, TraversalDirection, TraversalMode, TraversalRequest,
 };
 use serde::{
     Deserialize, Deserializer,
@@ -63,7 +63,8 @@ struct InspectInput {
 #[serde(deny_unknown_fields)]
 struct SearchInput {
     query: String,
-    limit: u64,
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
+    limit: Option<u64>,
     #[serde(default, deserialize_with = "non_null_option_deserialize")]
     filters: Option<SearchFiltersInput>,
 }
@@ -306,7 +307,8 @@ fn traversal_request_parse(input: impl Read) -> CommandResult<TraversalRequest> 
 
 fn search_request_parse(input: impl Read) -> CommandResult<SearchRequest> {
     let dto: SearchInput = object_parse(input)?;
-    let limit = positive_limit_parse(dto.limit)?;
+    let requested = dto.limit.unwrap_or(MAX_SEARCH_LIMIT.get() as u64);
+    let limit = positive_limit_parse(requested.min(MAX_SEARCH_LIMIT.get() as u64))?;
     let filters = dto
         .filters
         .as_ref()

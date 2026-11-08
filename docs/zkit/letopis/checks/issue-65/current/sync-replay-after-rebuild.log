@@ -1,0 +1,9 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.18s
+     Running unittests src/lib.rs (target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test git::durability::tests::existing_object_reuse_propagates_object_and_directory_sync_failures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 604 filtered out; finished in 0.08s
+

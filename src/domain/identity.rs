@@ -11,6 +11,9 @@ impl RepoPath {
     ///
     /// * `raw` — the candidate root-relative path to normalize.
     ///
+    /// # Returns
+    /// The parsed root-relative path.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for absolute paths, C0 control characters,
     /// `#`, root escapes, or a path that normalizes to an empty string.
@@ -51,6 +54,9 @@ impl Anchor {
     ///
     /// * `raw` — the candidate anchor text without the hash separator.
     ///
+    /// # Returns
+    /// The parsed anchor.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidAnchor`] unless the anchor starts with an
     /// ASCII letter and contains only ASCII letters, digits, `_` or `-`.
@@ -88,6 +94,9 @@ impl KnowledgeId {
     ///
     /// * `raw` — the identity text, optionally containing a `#` and explicit anchor.
     ///
+    /// # Returns
+    /// The parsed knowledge identity.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for an invalid path or a path without
     /// a `.md` or `.markdown` suffix, and [`ValueError::InvalidAnchor`] for an
@@ -106,6 +115,9 @@ impl KnowledgeId {
     ///
     /// * `path` — the validated root-relative Markdown path.
     /// * `anchor` — the validated optional heading anchor to append.
+    ///
+    /// # Returns
+    /// The validated knowledge identity.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] when the path does not end in `.md`

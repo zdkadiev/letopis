@@ -1,0 +1,20 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source)
+error: unused variable: `id_bytes`
+   --> src/service/search.rs:287:13
+    |
+287 |         let id_bytes = parsed
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_id_bytes`
+    |
+    = note: `-D unused-variables` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: constant `MAX_REUSED_ID_BYTES` is never used
+  --> src/service/search.rs:25:7
+   |
+25 | const MAX_REUSED_ID_BYTES: usize = 256 * 1024;
+   |       ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: could not compile `letopis` (lib test) due to 2 previous errors

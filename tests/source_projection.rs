@@ -1,5 +1,6 @@
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead};
+use std::num::NonZeroUsize;
 mod support;
 
 use letopis::{
@@ -188,7 +189,7 @@ fn get_repaired_projection(repo: &ReadingRepo) -> (usize, usize, usize) {
                 storage.cache.edges_get_by_source_id(None)?.len(),
                 storage
                     .cache
-                    .text_index_get_by_expression("RepairedToken")?
+                    .text_index_get_by_expression("RepairedToken", NonZeroUsize::new(100).unwrap())?
                     .len(),
             ))
         })

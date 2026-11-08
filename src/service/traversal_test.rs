@@ -699,7 +699,7 @@ mod scoped {
     }
 
     impl SourceReader for Sources {
-        fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
+        fn get_source_by_uri(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
             self.events
                 .borrow_mut()
                 .push(format!("source:{}", uri.as_str()));
@@ -710,7 +710,7 @@ mod scoped {
                     std::io::Error::other("PRIVATE_OBSERVATION"),
                 ));
             }
-            self.inner.get_source(uri)
+            self.inner.get_source_by_uri(uri)
         }
     }
 
@@ -981,7 +981,11 @@ mod traced_storage {
             self.inner.files_get()
         }
 
-        fn text_index_get_by_expression(&self, _: &str) -> StorageResult<Vec<TextMatch>> {
+        fn text_index_get_by_expression(
+            &self,
+            _: &str,
+            _limit: NonZeroUsize,
+        ) -> StorageResult<Vec<TextMatch>> {
             panic!("query text")
         }
 
@@ -1020,6 +1024,7 @@ mod traced_storage {
             _: &Sha256,
             _: &[f32],
             _: usize,
+            _limit: NonZeroUsize,
         ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
             panic!("query vectors")
         }

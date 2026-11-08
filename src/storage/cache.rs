@@ -297,7 +297,7 @@ impl CacheDatabase for CacheStorage {
                 .to_owned();
             let (sql, values) = build_query(&query)?;
             db.query_row(&sql, params_from_iter(values), |row| row.get(0))
-                .map_err(map_mutation)
+                .map_err(map_mutation_error_to_storage_error)
         })();
         self.record(result)
     }
@@ -339,7 +339,7 @@ impl CacheDatabase for CacheStorage {
                     .and_where(Expr::col(TextIndex::Rowid).eq(row)),
             )?;
             db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
+                .map_err(map_mutation_error_to_storage_error)?;
             let (sql, values) = build_query(
                 Query::insert()
                     .into_table(TextIndex::Table)
@@ -354,7 +354,7 @@ impl CacheDatabase for CacheStorage {
                     })?,
             )?;
             db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
+                .map_err(map_mutation_error_to_storage_error)?;
             Ok(())
         })();
         self.record(result)
@@ -392,7 +392,7 @@ impl CacheDatabase for CacheStorage {
                     ),
             )?;
             db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
+                .map_err(map_mutation_error_to_storage_error)?;
             Ok(())
         })();
         self.record(result)
@@ -407,7 +407,7 @@ impl CacheDatabase for CacheStorage {
                     .and_where(Expr::col(Files::Path).eq(path.as_str())),
             )?;
             db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
+                .map_err(map_mutation_error_to_storage_error)?;
             Ok(())
         })();
         self.record(result)
@@ -546,20 +546,35 @@ impl StorageRead for CacheStorage {
         Ok(files)
     }
 
-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
+    fn text_index_get_by_expression(
+        &self,
+        expression: &str,
+        limit: NonZeroUsize,
+    ) -> StorageResult<Vec<TextMatch>> {
         let db = self.get_connection()?;
         let mut stmt = db.prepare(
             "select nodes.uri, nodes.id, bm25(text_index) as score
                  from text_index
                  join nodes on nodes.id = text_index.rowid
                  where text_index match ?1 and nodes.kind <> ?2
-                 order by score, nodes.uri",
+                 order by score, nodes.uri
+                 limit ?3",
         )?;
         let mut rows = stmt
-            .query(params![expression, SOURCE_KIND])
-            .map_err(map_match)?;
+            .query(params![
+                expression,
+                SOURCE_KIND,
+                i64::try_from(limit.get()).map_err(|error| {
+                    StorageError::new_with_cause(
+                        StorageErrorKind::InternalError,
+                        "invalid persisted storage value",
+                        error,
+                    )
+                })?
+            ])
+            .map_err(map_fts_error_to_storage_error)?;
         let mut found = Vec::new();
-        while let Some(row) = rows.next().map_err(map_match)? {
+        while let Some(row) = rows.next().map_err(map_fts_error_to_storage_error)? {
             let id: String = row.get(0)?;
             found.push(TextMatch {
                 id: KnowledgeId::parse(&id).map_err(|error| {
@@ -593,11 +608,12 @@ impl StorageRead for CacheStorage {
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
+        limit: NonZeroUsize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
         if self.meta_get_by_id()? != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        vector_index_get_nearest_by_vector(self.get_connection()?, query, dimensions)
+        vector_index_get_nearest_by_vector(self.get_connection()?, query, dimensions, limit)
             .map(VectorOutcome::Current)
     }
 
@@ -970,7 +986,7 @@ fn insert_edge(db: &Connection, edge: &Edge) -> StorageResult<()> {
     }
     let (sql, values) = build_query(&query)?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     Ok(())
 }
 
@@ -1031,14 +1047,14 @@ fn delete_outgoing(db: &Connection, source: &KnowledgeId) -> StorageResult<()> {
             .and_where(Expr::col(Edges::SourceId).eq(source_id)),
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     let (sql, values) = build_query(
         Query::delete()
             .from_table(UnresolvedEdges::Table)
             .and_where(Expr::col(UnresolvedEdges::SourceId).eq(source_id)),
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     Ok(())
 }
 
@@ -1110,14 +1126,14 @@ fn demote_incoming_edges(db: &Connection, target_id: i64, target_uri: &str) -> S
             })?,
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     let (sql, values) = build_query(
         Query::delete()
             .from_table(Edges::Table)
             .and_where(Expr::col(Edges::TargetId).eq(target_id)),
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     Ok(())
 }
 
@@ -1155,7 +1171,7 @@ fn resolve_edges(db: &Connection) -> StorageResult<()> {
             })?,
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     let targets = Query::select()
         .column(Nodes::Uri)
         .from(Nodes::Table)
@@ -1166,7 +1182,7 @@ fn resolve_edges(db: &Connection) -> StorageResult<()> {
             .and_where(Expr::col(UnresolvedEdges::TargetUri).in_subquery(targets)),
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     Ok(())
 }
 
@@ -1326,14 +1342,14 @@ fn delete_node(db: &Connection, id: &EdgeTarget) -> StorageResult<()> {
             .and_where(Expr::col(TextIndex::Rowid).eq(node_id)),
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     let (sql, values) = build_query(
         Query::delete()
             .from_table(Nodes::Table)
             .and_where(Expr::col(Nodes::Id).eq(node_id)),
     )?;
     db.execute(&sql, params_from_iter(values))
-        .map_err(map_mutation)?;
+        .map_err(map_mutation_error_to_storage_error)?;
     Ok(())
 }
 
@@ -1358,7 +1374,7 @@ fn nodes_get_id_by_uri(db: &Connection, uri: &str) -> StorageResult<Option<i64>>
         .map_err(StorageError::from)
 }
 
-fn map_mutation(error: rusqlite::Error) -> StorageError {
+fn map_mutation_error_to_storage_error(error: rusqlite::Error) -> StorageError {
     if matches!(&error, rusqlite::Error::SqliteFailure(e, _) if e.code == rusqlite::ErrorCode::ConstraintViolation)
     {
         StorageError::new_with_cause(
@@ -1371,7 +1387,7 @@ fn map_mutation(error: rusqlite::Error) -> StorageError {
     }
 }
 
-fn map_match(error: rusqlite::Error) -> StorageError {
+fn map_fts_error_to_storage_error(error: rusqlite::Error) -> StorageError {
     if matches!(&error,rusqlite::Error::SqliteFailure(e,_) if e.code==rusqlite::ErrorCode::Unknown)
     {
         StorageError::new_with_cause(
@@ -1409,7 +1425,7 @@ fn edges_get_by_row_id_and_type(request: &NeighborPageRequest<'_>) -> SelectStat
             Endpoint::Target,
             Expr::col((Endpoint::Target, Nodes::Id)).equals((Edges::Table, Edges::TargetId)),
         )
-        .and_where(Expr::col((anchor, Nodes::Id)).eq(request.node.get_value()));
+        .and_where(Expr::col((anchor, Nodes::Id)).eq(request.node.get_handle()));
     apply_filters(&mut query, request, neighbor);
     query
         .order_by((Edges::Table, Edges::Type), Order::Asc)

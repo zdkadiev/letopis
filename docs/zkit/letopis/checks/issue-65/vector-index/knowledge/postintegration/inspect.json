@@ -1,0 +1,14 @@
+{
+  "request": {
+    "element_ids": [
+      "letopis/architecture/storage.md",
+      "src/storage/vector_index.rs",
+      "src/storage/schema.rs",
+      "src/storage/vector.rs",
+      "src/storage/vectors.sql"
+    ]
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"snapshot\":\"5e6aee4700c271f271e20d26508e694ba0b60c1e\",\"elements\":{\"letopis/architecture/storage.md\":{\"path\":\"letopis/architecture/storage.md\",\"lines\":[1,149],\"hash\":\"33222990c676e619991ad724b35220bdea8378b27c32af95f9937599ca4e8673\"},\"src/storage/schema.rs\":{\"path\":\"src/storage/schema.rs\",\"hash\":\"d440844eaaf1d36c99eb6740206022cc4eec9527eaefd359113beb4a9f2dd481\"},\"src/storage/vector.rs\":{\"path\":\"src/storage/vector.rs\",\"hash\":\"fbfac32e414f8d7818e78c4fe6a31623aaa3c1329fd62b3ff82f27e835aeaa84\"},\"src/storage/vector_index.rs\":{\"path\":\"src/storage/vector_index.rs\",\"hash\":\"caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a\"},\"src/storage/vectors.sql\":{\"path\":\"src/storage/vectors.sql\",\"hash\":\"3a934553394c296ee5dfe680440c1b61c16eb288121f935f72739bb951d321a5\"}}}}\n",
+  "stderr": ""
+}

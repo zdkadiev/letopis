@@ -1,4 +1,4 @@
-use super::utils::{CandidateObservation, CandidateSelection, map_document_file};
+use super::utils::{CandidateObservation, CandidateSelection, map_file_result_to_document_result};
 use super::{
     CommandError, CommandErrorKind, CommandResult, DocumentError, DocumentErrorKind,
     DocumentResult, ElementAddress, ElementLocation, FileReader, GitSnapshots, GitWorktreeListing,
@@ -39,12 +39,16 @@ impl<D: Refresher, G: GitWorktreeListing + GitSnapshots, F: FileReader, M: Markd
     for InspectionService<D, G, F, M>
 {
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
-        self.refresher.refresh(&[]).map_err(map_document_error)?;
+        self.refresher
+            .refresh(&[])
+            .map_err(map_document_error_to_command_error)?;
         let requested = ids
             .iter()
             .map(ElementAddress::as_str)
             .collect::<BTreeSet<_>>();
-        let observation = self.get_candidates().map_err(map_document_error)?;
+        let observation = self
+            .get_candidate_observation()
+            .map_err(map_document_error_to_command_error)?;
         let mut captured = CapturedKnowledge::default();
         for path in observation.paths {
             let file = self.capture_file(path, &requested)?;
@@ -62,32 +66,31 @@ impl<D: Refresher, G: GitWorktreeListing + GitSnapshots, F: FileReader, M: Markd
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .verify_discovery(&observation.discovery)
-        .map_err(map_document_error)?;
-        let retained = self
-            .git
-            .tree_pin_by_oid(&tree)
-            .map_err(map_snapshot_error)?;
+        .verify_discovery_unchanged(&observation.discovery)
+        .map_err(map_document_error_to_command_error)?;
+        self.git
+            .tree_sync_by_oid(&tree)
+            .map_err(map_snapshot_error_to_command_error)?;
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .verify_discovery(&observation.discovery)
-        .map_err(map_document_error)?;
+        .verify_discovery_unchanged(&observation.discovery)
+        .map_err(map_document_error_to_command_error)?;
         Ok(Inspection {
-            snapshot: retained.get_oid().clone(),
+            snapshot: tree,
             elements: captured.elements,
         })
     }
 }
 
 impl<D, G: GitWorktreeListing, F: FileReader, M> InspectionService<D, G, F, M> {
-    fn get_candidates(&self) -> DocumentResult<CandidateObservation> {
+    fn get_candidate_observation(&self) -> DocumentResult<CandidateObservation> {
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .get_candidates(&[])
+        .get_candidate_observation_by_paths(&[])
     }
 }
 
@@ -100,9 +103,10 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
         requested: &BTreeSet<&str>,
     ) -> CommandResult<CapturedKnowledge> {
         let mut captured = CapturedKnowledge::default();
-        let Some(file) =
-            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
-                .map_err(map_document_error)?
+        let Some(file) = map_file_result_to_document_result(
+            self.filesystem.file_get_by_path(Path::new(path.as_str())),
+        )
+        .map_err(map_document_error_to_command_error)?
         else {
             captured.observations.insert(path, None);
             return Ok(captured);
@@ -122,7 +126,7 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
         let oid = self
             .git
             .blob_write(&file.bytes)
-            .map_err(map_snapshot_error)?;
+            .map_err(map_snapshot_error_to_command_error)?;
         captured.collect_metadata(&path, parsed, requested);
         captured.entries.insert(path, oid);
         Ok(captured)
@@ -140,7 +144,10 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
             if let Some(bytes) = &bytes
                 && !captured.entries.contains_key(&path)
             {
-                let oid = self.git.blob_write(bytes).map_err(map_snapshot_error)?;
+                let oid = self
+                    .git
+                    .blob_write(bytes)
+                    .map_err(map_snapshot_error_to_command_error)?;
                 captured.entries.insert(path.clone(), oid);
             }
             captured.collect_source_metadata(&sources, bytes.as_deref(), requested);
@@ -157,7 +164,9 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
                 oid: oid.clone(),
             })
             .collect::<Vec<_>>();
-        self.git.tree_assemble(&entries).map_err(map_snapshot_error)
+        self.git
+            .tree_assemble(&entries)
+            .map_err(map_snapshot_error_to_command_error)
     }
 
     fn capture_source_bytes(
@@ -172,11 +181,13 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
                 .git
                 .blob_get_by_tree_oid_and_path(corpus, path)
                 .map(Some)
-                .map_err(map_snapshot_error);
+                .map_err(map_snapshot_error_to_command_error);
         }
-        let bytes = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
-            .map_err(map_document_error)?
-            .map(|file| file.bytes);
+        let bytes = map_file_result_to_document_result(
+            self.filesystem.file_get_by_path(Path::new(path.as_str())),
+        )
+        .map_err(map_document_error_to_command_error)?
+        .map(|file| file.bytes);
         if let Some(observed) = captured.observations.get(path)
             && *observed != bytes.as_deref().map(Sha256::digest)
         {
@@ -288,7 +299,7 @@ impl CapturedKnowledge {
     }
 }
 
-fn map_document_error(cause: DocumentError) -> CommandError {
+fn map_document_error_to_command_error(cause: DocumentError) -> CommandError {
     let kind = match cause.get_kind() {
         DocumentErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
         DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
@@ -296,7 +307,7 @@ fn map_document_error(cause: DocumentError) -> CommandError {
     CommandError::new_with_cause(kind, "cannot capture current elements", cause)
 }
 
-fn map_snapshot_error(cause: SnapshotError) -> CommandError {
+fn map_snapshot_error_to_command_error(cause: SnapshotError) -> CommandError {
     let kind = match cause.get_kind() {
         SnapshotErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
         SnapshotErrorKind::NotFound => CommandErrorKind::NotFound,

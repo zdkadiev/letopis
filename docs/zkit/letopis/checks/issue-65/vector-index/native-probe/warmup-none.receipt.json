@@ -1,0 +1,19 @@
+{
+  "name": "warmup-none",
+  "mode": "none",
+  "argv": [
+    "/opt/homebrew/opt/sqlite/bin/sqlite3",
+    "-readonly",
+    "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/native-probe/none.db"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 0.13734800019301474,
+  "process_user_seconds": 0.05706,
+  "process_system_seconds": 0.06980200000000014,
+  "stdout": "",
+  "stderr": "",
+  "sqlite_timers": [],
+  "K": 5,
+  "rows": 6,
+  "output_sha256": "0b4b05fa6caa8c06288226eb9c7cb8a477e85b0b14e7d80debb698547a9d903f"
+}

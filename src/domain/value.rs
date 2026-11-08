@@ -56,6 +56,9 @@ impl ByteSpan {
     /// * `start` — the first included byte offset.
     /// * `end` — the first excluded byte offset.
     ///
+    /// # Returns
+    /// The validated byte range.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidRange`] when `start > end`.
     pub fn new(start: usize, end: usize) -> Result<Self, ValueError> {
@@ -91,6 +94,9 @@ impl LineRange {
     /// * `start` — the first included one-based line number.
     /// * `end` — the last included one-based line number.
     ///
+    /// # Returns
+    /// The validated line range.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidRange`] when `start` is zero or greater
     /// than `end`.
@@ -123,6 +129,9 @@ impl TreeOid {
     ///
     /// * `raw` — the candidate full tree OID text.
     ///
+    /// # Returns
+    /// The parsed tree identity.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidOid`] for any other length or for a
     /// non-lowercase-hexadecimal character. Repository existence is not checked.
@@ -147,6 +156,9 @@ impl BlobOid {
     /// # Arguments
     ///
     /// * `raw` — the candidate full blob OID text.
+    ///
+    /// # Returns
+    /// The parsed blob identity.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidOid`] for noncanonical input. Existence is not checked.

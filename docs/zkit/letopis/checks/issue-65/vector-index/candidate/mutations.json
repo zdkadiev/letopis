@@ -1,0 +1,38 @@
+[
+  {
+    "name": "skip-migration",
+    "test": "exact_flat_bootstrap_preserves_populated_state_and_is_idempotent",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "skip-writer-model-recheck",
+    "test": "exact_flat_competing_opener_rechecks_the_committed_model",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "skip-original-vector-validation",
+    "test": "exact_flat_bootstrap_does_not_repair_nonfinite_or_malformed_old_vectors",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "accept-unknown-model",
+    "test": "exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "accept-bad-version-bound",
+    "test": "exact_flat_upgrade_does_not_repair_a_corrupt_native_model_version",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "write-query-only",
+    "test": "exact_flat_query_only_bootstrap_preserves_legacy_observation",
+    "exit": 101,
+    "caught": true
+  }
+]

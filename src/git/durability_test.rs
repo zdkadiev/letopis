@@ -1,4 +1,4 @@
-use super::{StagedObject, ref_lock_is_busy, ref_retain_by_oid as retain_ref_with_cleanup};
+use super::{StagedObject, ref_lock_is_busy, ref_update_by_oid as retain_ref_with_cleanup};
 use crate::{process_test_support as fixture, service::SnapshotError};
 use fixture::{FORMATS, TempRepo};
 use gix::{Repository, hash::ObjectId, objs::Kind};
@@ -13,7 +13,7 @@ use std::{
 mod confirmation {
     use super::{
         CONCURRENT_PUBLICATION, ConcurrentLock, FAILURE, FORMATS, FailurePoint, TempRepo,
-        ref_retain_by_oid,
+        ref_update_by_oid,
     };
     use super::{LOCK_OBSERVATION, LockObservation};
     use crate::git::durability::{StagedObject, ref_lock_is_busy};
@@ -25,15 +25,15 @@ mod confirmation {
         // Given: a ref whose rename succeeded but directory synchronization failed.
         let (fixture, repo, oid) = prepare_repo();
         FAILURE.with(|slot| slot.set(Some(FailurePoint::RefDirectorySync)));
-        let first = ref_retain_by_oid(&repo, oid);
+        let first = ref_update_by_oid(&repo, oid);
         // When: a retry sees that value while the same sync failure remains active.
-        let retry = ref_retain_by_oid(&repo, oid);
+        let retry = ref_update_by_oid(&repo, oid);
         FAILURE.with(|slot| slot.set(None));
         // Then: neither visibility nor retry bypasses the failure; recovery can finish durability.
         assert!(first.is_err());
         assert!(retry.is_err());
         assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
     }
 
     #[test]
@@ -48,7 +48,7 @@ mod confirmation {
                 .with(|slot| *slot.borrow_mut() = Some((path.clone(), oid, state)));
             FAILURE.with(|slot| slot.set(Some(FailurePoint::RefDirectorySync)));
             // When: exact bytes become visible through either acquisition outcome.
-            let result = ref_retain_by_oid(&repo, oid);
+            let result = ref_update_by_oid(&repo, oid);
             FAILURE.with(|slot| slot.set(None));
             // Then: confirmation fails until synchronization is possible and never alters a foreign lock.
             assert!(result.is_err());
@@ -63,7 +63,7 @@ mod confirmation {
                 );
                 fs::remove_file(path.with_extension("lock")).unwrap();
             }
-            ref_retain_by_oid(&repo, oid).unwrap();
+            ref_update_by_oid(&repo, oid).unwrap();
             assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
         }
     }
@@ -72,7 +72,7 @@ mod confirmation {
     fn packed_confirmation_requires_backing_file_and_parent_sync() {
         // Given: an exact packed-only ref without a loose backing file.
         let (fixture, repo, oid) = prepare_repo();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
         let loose = repo
             .common_dir()
@@ -81,13 +81,13 @@ mod confirmation {
         // When: file or parent synchronization is unavailable for a matching packed value.
         for point in [FailurePoint::RefSync, FailurePoint::RefDirectorySync] {
             FAILURE.with(|slot| slot.set(Some(point)));
-            let result = ref_retain_by_oid(&repo, oid);
+            let result = ref_update_by_oid(&repo, oid);
             FAILURE.with(|slot| slot.set(None));
             // Then: packed visibility alone cannot acknowledge durability.
             assert!(result.is_err(), "{point:?}");
             assert!(!ref_lock_is_busy(result.as_ref().unwrap_err()));
         }
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         assert!(!loose.exists());
         assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     }
@@ -96,17 +96,17 @@ mod confirmation {
     fn packed_confirmation_does_not_touch_a_foreign_packing_lock() {
         // Given: a packed ref with another packer's lock still held.
         let (fixture, repo, oid) = prepare_repo();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
         let lock = repo.common_dir().join("packed-refs.lock");
         fs::write(&lock, b"foreign packer CANARY").unwrap();
         // When: confirmation cannot coordinate the backing file's lifetime.
-        let result = ref_retain_by_oid(&repo, oid);
+        let result = ref_update_by_oid(&repo, oid);
         // Then: it reports contention, preserving the foreign lock until its owner releases it.
         assert!(ref_lock_is_busy(&result.unwrap_err()));
         assert_eq!(fs::read(&lock).unwrap(), b"foreign packer CANARY");
         fs::remove_file(lock).unwrap();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
     }
 
     #[test]
@@ -119,7 +119,7 @@ mod confirmation {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, format!("{oid}\n")).unwrap();
         // When: durable confirmation owns the lock, syncs the backing and its parent chain.
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         // Then: bytes remain exact and this isolated scenario also supplies the syscall oracle.
         assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
         assert!(!path.with_extension("lock").exists());
@@ -133,7 +133,7 @@ mod confirmation {
         fixture.run_git_successfully(&["update-ref", &name, &oid.to_string()], None);
         fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
         // When: durable confirmation synchronizes packed-refs under both owned locks.
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         // Then: its exact target remains packed; the syscall oracle observes the backing sync.
         assert!(!repo.common_dir().join(&name).exists());
         assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
@@ -150,7 +150,7 @@ mod confirmation {
             *slot.borrow_mut() = Some((path.clone(), oid, ConcurrentLock::Released));
         });
         // When: confirmation owns the newly released lock and completes the winner's sync.
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         // Then: success has the exact value; the syscall oracle requires a post-rename backing sync.
         assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
         assert!(!path.with_extension("lock").exists());
@@ -160,11 +160,11 @@ mod confirmation {
     fn packed_confirmation_holds_both_locks_during_backing_sync() {
         // Given: a packed-only target and an independent create-new lock probe.
         let (fixture, repo, oid) = prepare_repo();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
         LOCK_OBSERVATION.with(|slot| slot.set(Some(LockObservation::Pending)));
         // When: confirmation reaches its backing-file sync boundary.
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         let observed = LOCK_OBSERVATION.with(Cell::take);
         // Then: neither a ref writer nor a packer can acquire its lock during confirmation.
         assert_eq!(
@@ -180,14 +180,14 @@ mod confirmation {
     fn packed_confirmation_rejects_a_symlink_backing_instead_of_syncing_the_wrong_parent() {
         // Given: a packed-ref symlink whose actual file resides outside the ref-store directory.
         let (fixture, repo, oid) = prepare_repo();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
         let packed = repo.common_dir().join("packed-refs");
         let external = fixture.get_root().join("external-packed-refs");
         fs::rename(&packed, &external).unwrap();
         std::os::unix::fs::symlink(&external, &packed).unwrap();
         // When: the chosen backing cannot be opened without following that alias.
-        let result = ref_retain_by_oid(&repo, oid);
+        let result = ref_update_by_oid(&repo, oid);
         // Then: the operation fails without acknowledging an unsynchronized external parent.
         assert!(result.is_err());
         assert!(!ref_lock_is_busy(result.as_ref().unwrap_err()));
@@ -230,7 +230,7 @@ fn stages_syncs_publishes_and_retains_git_compatible_objects() {
         );
         // When: completed synced contents are promoted before the exact direct ref.
         object.object_publish().unwrap();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         // Then: Git reads the original bytes and duplicate publication is idempotent.
         assert_eq!(
             fixture.run_git_successfully(&["cat-file", "blob", &expected], None),
@@ -241,7 +241,7 @@ fn stages_syncs_publishes_and_retains_git_compatible_objects() {
             .unwrap()
             .object_publish()
             .unwrap();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
     }
 }
 
@@ -256,7 +256,7 @@ fn writes_canonical_tree_objects_in_both_formats() {
         let oid = object.object_get_oid();
         // When: the library stages, syncs and publishes that tree with its actual kind header.
         object.object_publish().unwrap();
-        ref_retain_by_oid(&repo, oid).unwrap();
+        ref_update_by_oid(&repo, oid).unwrap();
         // Then: type, identity and payload agree with Git's independent oracle.
         assert_eq!(oid.to_string(), expected);
         assert_eq!(
@@ -304,7 +304,7 @@ fn rejects_symbolic_malformed_and_conflicting_refs_without_replacing_them() {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, content).unwrap();
         // When: a create-only retention attempt checks the exact non-dereferenced target.
-        let result = ref_retain_by_oid(&repo, oid);
+        let result = ref_update_by_oid(&repo, oid);
         // Then: invalid or conflicting refs are not overwritten.
         assert!(result.is_err(), "{content}");
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
@@ -326,18 +326,18 @@ fn respects_foreign_locks_and_equal_ref_noops() {
     let lock_path = path.with_extension("lock");
     fs::write(&lock_path, b"foreign lock CANARY").unwrap();
     // When / Then: a missing ref cannot steal the lock or report success.
-    assert!(ref_retain_by_oid(&repo, oid).is_err());
+    assert!(ref_update_by_oid(&repo, oid).is_err());
     assert!(!path.exists());
     assert_eq!(fs::read(&lock_path).unwrap(), b"foreign lock CANARY");
     // Given: the concurrent winner now published the exact value, retaining its lock.
     fs::write(&path, format!("{oid}\n")).unwrap();
     // When / Then: matching bytes cannot bypass ownership; the foreign lock stays untouched.
     assert!(ref_lock_is_busy(
-        &ref_retain_by_oid(&repo, oid).unwrap_err()
+        &ref_update_by_oid(&repo, oid).unwrap_err()
     ));
     assert_eq!(fs::read(&lock_path).unwrap(), b"foreign lock CANARY");
     fs::remove_file(&lock_path).unwrap();
-    ref_retain_by_oid(&repo, oid).unwrap();
+    ref_update_by_oid(&repo, oid).unwrap();
 }
 
 #[test]
@@ -360,8 +360,8 @@ fn leaves_private_reflogs_untouched_under_all_policies() {
                 fs::write(&log, b"user-owned historical log\n").unwrap();
             }
             // When: private retention creates the ref and repeats the idempotent operation.
-            ref_retain_by_oid(&repo, oid).unwrap();
-            ref_retain_by_oid(&repo, oid).unwrap();
+            ref_update_by_oid(&repo, oid).unwrap();
+            ref_update_by_oid(&repo, oid).unwrap();
             // Then: no log is created or appended, regardless of Git's auto-log configuration.
             assert_eq!(log.exists(), existing);
             if existing {
@@ -398,7 +398,7 @@ fn concurrent_creators_and_packed_refs_preserve_exact_target() {
     });
     fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
     let repo = gix::open(&root).unwrap();
-    ref_retain_by_oid(&repo, ObjectId::from_hex(expected.as_bytes()).unwrap()).unwrap();
+    ref_update_by_oid(&repo, ObjectId::from_hex(expected.as_bytes()).unwrap()).unwrap();
     // Then: Git's packed-ref reader sees exactly the expected direct target.
     assert_eq!(fixture.get_direct_ref(&expected), expected);
 }
@@ -420,7 +420,7 @@ fn injected_failures_preserve_publication_order_and_report_post_link_errors() {
         let result = StagedObject::new(&repo, Kind::Blob, b"failure").and_then(|object| {
             let oid = object.object_get_oid();
             object.object_publish()?;
-            ref_retain_by_oid(&repo, oid)
+            ref_update_by_oid(&repo, oid)
         });
         FAILURE.with(|slot| slot.set(None));
         // Then: failure is reported and no retaining ref survives a pre-ref-publication error.
@@ -449,7 +449,7 @@ fn reports_directory_sync_failure_after_ref_publication() {
     object.object_publish().unwrap();
     FAILURE.with(|slot| slot.set(Some(FailurePoint::RefDirectorySync)));
     // When: rename succeeds but its subsequent directory sync fails.
-    let result = ref_retain_by_oid(&repo, oid);
+    let result = ref_update_by_oid(&repo, oid);
     FAILURE.with(|slot| slot.set(None));
     // Then: a visible correct ref can remain, but the operation must report failure.
     assert!(result.is_err());
@@ -491,7 +491,7 @@ fn linked_worktrees_publish_in_common_store_with_shared_permissions() {
     assert_eq!(oid.to_string(), expected);
     // When: the linked-worktree handle publishes an object and private ref.
     object.object_publish().unwrap();
-    ref_retain_by_oid(&repo, oid).unwrap();
+    ref_update_by_oid(&repo, oid).unwrap();
     // Then: Git sees them in the common store, with its shared permissions policy preserved.
     assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     assert_eq!(
@@ -533,7 +533,7 @@ fn rejects_filesystem_symlink_refs_without_touching_the_referent() {
     fs::write(&referent, &bytes).unwrap();
     std::os::unix::fs::symlink(&referent, &ref_path).unwrap();
     // When: exact direct retention encounters the symlink.
-    let result = ref_retain_by_oid(&repo, oid);
+    let result = ref_update_by_oid(&repo, oid);
     // Then: it refuses the indirection and leaves both filesystem entries intact.
     assert!(result.is_err());
     assert!(
@@ -543,6 +543,128 @@ fn rejects_filesystem_symlink_refs_without_touching_the_referent() {
             .is_symlink()
     );
     assert_eq!(fs::read_to_string(referent).unwrap(), bytes);
+}
+
+#[test]
+fn existing_object_reuse_requires_verified_bytes_without_residual_entries() {
+    // Given: an independently named existing loose blob in both supported formats.
+    for format in FORMATS {
+        let fixture = TempRepo::new(format);
+        let repo = gix::open(fixture.get_root()).unwrap();
+        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+        let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+        let before = fs::read_dir(repo.objects.store_ref().path())
+            .unwrap()
+            .count();
+        // When: confirming existing content and probing content that is absent.
+        let actual =
+            super::loose_object_get_by_content(&repo, Kind::Blob, b"reused bytes", &cleanup)
+                .unwrap();
+        let absent =
+            super::loose_object_get_by_content(&repo, Kind::Blob, b"absent bytes", &cleanup)
+                .unwrap();
+        // Then: exact Git identity is reused without leaving new directory entries.
+        assert_eq!(actual.unwrap().to_string(), expected);
+        assert!(absent.is_none());
+        assert_eq!(
+            fs::read_dir(repo.objects.store_ref().path())
+                .unwrap()
+                .count(),
+            before
+        );
+    }
+}
+
+#[test]
+fn existing_object_reuse_refuses_corruption_and_cancellation() {
+    // Given: corrupt bytes at the independently computed loose-object identity.
+    let fixture = TempRepo::new(FORMATS[0]);
+    let repo = gix::open(fixture.get_root()).unwrap();
+    let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+    let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+    let path = repo
+        .objects
+        .store_ref()
+        .path()
+        .join(&expected[..2])
+        .join(&expected[2..]);
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&path, b"invalid zlib").unwrap();
+    // When: a reuse probe encounters corruption, then a cancelled owner.
+    let corrupt = super::loose_object_get_by_content(&repo, Kind::Blob, b"reused bytes", &cleanup);
+    cleanup.shutdown().unwrap();
+    let cancelled =
+        super::loose_object_get_by_content(&repo, Kind::Blob, b"absent bytes", &cleanup);
+    // Then: neither failure becomes absence or a successful write.
+    let error = corrupt.unwrap_err();
+    let diagnostic = format!("{error} {error:?}");
+    assert!(!diagnostic.contains(&fixture.get_root().display().to_string()));
+    assert!(!diagnostic.contains("invalid zlib"));
+    assert!(cancelled.is_err());
+    assert_eq!(fs::read(path).unwrap(), b"invalid zlib");
+}
+
+#[test]
+fn existing_object_reuse_rechecks_decodable_content_identity() {
+    // Given: a valid compressed blob installed under a different blob identity.
+    let fixture = TempRepo::new(FORMATS[0]);
+    let repo = gix::open(fixture.get_root()).unwrap();
+    let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+    let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+    let other = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"different bytes"));
+    let root = repo.objects.store_ref().path();
+    let destination = root.join(&expected[..2]).join(&expected[2..]);
+    fs::set_permissions(&destination, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::copy(root.join(&other[..2]).join(&other[2..]), &destination).unwrap();
+    // When: the reuse path decodes a valid object whose hash is wrong.
+    let result = super::loose_object_get_by_content(&repo, Kind::Blob, b"reused bytes", &cleanup);
+    // Then: successful decompression cannot substitute for identity verification.
+    assert!(result.is_err());
+}
+
+#[test]
+fn existing_object_reuse_supports_trees_and_defers_packed_objects() {
+    // Given: an existing empty tree, independently written and named by Git.
+    for format in FORMATS {
+        let fixture = TempRepo::new(format);
+        let repo = gix::open(fixture.get_root()).unwrap();
+        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+        let expected = fixture.get_oid(&["hash-object", "-w", "-t", "tree", "--stdin"], Some(b""));
+        // When: confirming its loose representation.
+        let loose = super::loose_object_get_by_content(&repo, Kind::Tree, b"", &cleanup).unwrap();
+        // Then: tree identities are preserved in both formats.
+        assert_eq!(loose.unwrap().to_string(), expected);
+        // Given: that tree is now reachable only through a pack.
+        fixture.run_git_successfully(&["update-ref", "refs/letopis/reuse-test", &expected], None);
+        fixture.run_git_successfully(&["repack", "-ad"], None);
+        fixture.run_git_successfully(&["prune-packed"], None);
+        let root = repo.objects.store_ref().path();
+        assert!(!root.join(&expected[..2]).join(&expected[2..]).exists());
+        // When: the loose-only optimization encounters the packed object.
+        let packed = super::loose_object_get_by_content(&repo, Kind::Tree, b"", &cleanup).unwrap();
+        // Then: it defers to ordinary staging instead of pretending to sync a pack.
+        assert!(packed.is_none());
+    }
+}
+
+#[test]
+fn existing_object_reuse_propagates_object_and_directory_sync_failures() {
+    // Given: an existing object and independently injected synchronization failures.
+    let fixture = TempRepo::new(FORMATS[0]);
+    let repo = gix::open(fixture.get_root()).unwrap();
+    let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
+    fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
+    for point in [FailurePoint::ObjectSync, FailurePoint::DirectorySync] {
+        FAILURE.with(|slot| slot.set(Some(point)));
+        // When: durability confirmation encounters the failing synchronization step.
+        let oid = super::loose_object_get_by_content(&repo, Kind::Blob, b"reused bytes", &cleanup)
+            .unwrap()
+            .unwrap();
+        let result = super::loose_object_sync_by_oid(&repo, oid, &cleanup);
+        FAILURE.with(|slot| slot.set(None));
+        // Then: equality cannot bypass either durability requirement.
+        assert!(result.is_err(), "{point:?}");
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -605,7 +727,7 @@ fn get_unused_blob(fixture: &TempRepo, label: &str, excluded_prefix: Option<&str
 fn retain_after_contention(repo: &Repository, oid: ObjectId) -> Result<(), SnapshotError> {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        let result = ref_retain_by_oid(repo, oid);
+        let result = ref_update_by_oid(repo, oid);
         if !result.as_ref().is_err_and(ref_lock_is_busy) || Instant::now() >= deadline {
             return result;
         }
@@ -654,7 +776,7 @@ fn try_create_probe_lock(path: &Path) -> bool {
     }
 }
 
-fn ref_retain_by_oid(
+fn ref_update_by_oid(
     repo: &gix::Repository,
     oid: gix::hash::ObjectId,
 ) -> Result<(), crate::service::SnapshotError> {

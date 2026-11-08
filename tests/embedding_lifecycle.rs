@@ -1,5 +1,6 @@
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead};
+use std::num::NonZeroUsize;
 mod support;
 
 use letopis::{
@@ -44,7 +45,9 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let matches = read.text_index_get_by_expression(FINAL_MARKER).unwrap();
+            let matches = read
+                .text_index_get_by_expression(FINAL_MARKER, NonZeroUsize::new(100).unwrap())
+                .unwrap();
             assert_eq!(matches.len(), 1);
             assert_eq!(matches[0].id.as_str(), "long.md");
             let node = StorageRead::nodes_get_by_uri(

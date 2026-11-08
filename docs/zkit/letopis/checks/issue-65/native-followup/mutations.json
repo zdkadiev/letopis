@@ -1,0 +1,32 @@
+[
+  {
+    "name": "omit-memo",
+    "test": "tree_reads_reuse_structure_only_within_the_owned_reader",
+    "exit_code": 101,
+    "detected": true
+  },
+  {
+    "name": "ignore-content-identity",
+    "test": "memoized_tree_reads_reject_replacements_and_recover_after_restoration",
+    "exit_code": 101,
+    "detected": true
+  },
+  {
+    "name": "cache-invalid-structure",
+    "test": "invalid_tree_bodies_are_validated_on_every_demand",
+    "exit_code": 101,
+    "detected": true
+  },
+  {
+    "name": "unbounded-memo",
+    "test": "tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects",
+    "exit_code": 101,
+    "detected": true
+  },
+  {
+    "name": "omit-full-audit-structure",
+    "test": "full_audits_validate_tree_structure_despite_addressed_read_memoization",
+    "exit_code": 101,
+    "detected": true
+  }
+]

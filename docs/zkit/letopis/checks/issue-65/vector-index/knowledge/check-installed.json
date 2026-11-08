@@ -1,0 +1,10 @@
+{
+  "request": {
+    "paths": [
+      "letopis/architecture/storage.md"
+    ]
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":{\"errors\":[]}}\n",
+  "stderr": ""
+}

@@ -20,6 +20,22 @@ from provider import start_provider
 
 
 class ContentionTests(unittest.TestCase):
+    def test_writer_executes_full_index_command(self):
+        # Given: a CLI accepting only the current full-index argv and JSON input.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            binary = root / "cli"
+            binary.write_text(f"#!{sys.executable}\nimport json, sys\n"
+                              "assert sys.argv[1:] == ['index', '--full']\n"
+                              "assert json.load(sys.stdin) == {}\n"
+                              "print(json.dumps({'ok': True, 'result': {'revision': 1}}))\n")
+            binary.chmod(0o755)
+            # When: launching the owned contention writer.
+            record = actual_contention_call({"repository": root}, {"executable": str(binary)},
+                                             root, {"role": "writer"})
+            # Then: it publishes successfully using index --full.
+            self.assertEqual(record["outcome"], "success")
+
     def test_interrupted_baseline_is_persisted_before_any_writer_launch(self):
         # Given: an owned baseline reader still running when cancellation arrives.
         with tempfile.TemporaryDirectory() as directory:
@@ -89,7 +105,7 @@ class ContentionTests(unittest.TestCase):
                 run_contention(scenario, {"executable": str(binary)}, root / "evidence", verify=verify)
             # Then: each actual launch was preceded by verification; writer is reaped.
             events = (root / "events").read_text().splitlines()
-            self.assertEqual(events, ["verify", "check", "verify", "reindex", "verify"])
+            self.assertEqual(events, ["verify", "check", "verify", "index", "verify"])
             with self.assertRaises(ProcessLookupError):
                 os.kill(int((root / "writer.pid").read_text()), 0)
 
@@ -227,7 +243,7 @@ def _prepare_interruptible_cli(root, slow_baseline=False):
     binary = root / "cli"
     script = _VERIFIED_CLI
     if slow_baseline:
-        script = script.replace("if sys.argv[1] == 'reindex':", "if sys.argv[1] == 'check':\n    time.sleep(60)\nif sys.argv[1] == 'reindex':")
+        script = script.replace("if sys.argv[1] == 'index':", "if sys.argv[1] == 'check':\n    time.sleep(60)\nif sys.argv[1] == 'index':")
     binary.write_text(f"#!{sys.executable}\n" + script)
     binary.chmod(0o755)
     return binary, {"repository": root, "argv": ["check"], "stdin": b"{}",
@@ -251,7 +267,7 @@ def _interrupt(*_):
 _VERIFIED_CLI = '''import fcntl, json, os, pathlib, sys, time
 with open('events', 'a') as stream:
     stream.write(sys.argv[1] + '\\n')
-if sys.argv[1] == 'reindex':
+if sys.argv[1] == 'index':
     pathlib.Path('writer.pid').write_text(str(os.getpid()))
     with open('.letopis/index.lock', 'a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)

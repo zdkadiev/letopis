@@ -1,0 +1,22 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/vector-index-2026-11-07/candidate/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.21s
+     Running unittests src/lib.rs (../target-build/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test storage::vector_index::tests::exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog ... FAILED
+
+failures:
+
+---- storage::vector_index::tests::exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog stdout ----
+
+thread 'storage::vector_index::tests::exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog' (545951493) panicked at src/storage/vector_index.rs:365:9:
+assertion failed: result.is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    storage::vector_index::tests::exact_flat_bootstrap_rejects_a_corrupt_distance_hidden_by_native_catalog
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 627 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `--lib`

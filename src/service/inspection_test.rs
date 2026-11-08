@@ -7,8 +7,8 @@ use crate::{
     markdown::MarkdownParser,
     service::{
         CapturedFile, CommandErrorKind, DocumentResult, ElementAddress, FileStat, GitSnapshots,
-        GitWorktreeListing, Inspector, RefreshOutcome, Refresher, RetainedTree, SnapshotEntry,
-        SnapshotError, SnapshotErrorKind, SnapshotFile,
+        GitWorktreeListing, Inspector, RefreshOutcome, Refresher, SnapshotEntry, SnapshotError,
+        SnapshotErrorKind, SnapshotFile,
     },
 };
 use std::{cell::RefCell, rc::Rc};
@@ -71,7 +71,7 @@ fn inspection_filters_raw_symlinks_before_decoding_and_normalizes_safe_results()
     });
     let service = InspectionService::new((), git, files, ());
     // When: inspection selects candidates before capture.
-    let paths = service.get_candidates().unwrap().paths;
+    let paths = service.get_candidate_observation().unwrap().paths;
     // Then: invalid-byte symlinks and irrelevant names are excluded before decoding.
     assert_eq!(paths, [RepoPath::parse("note.md").unwrap()]);
 }
@@ -90,7 +90,9 @@ fn inspection_preserves_listing_error_context_and_cause() {
         .returning(|_| Ok(None));
     let service = InspectionService::new((), git, files, ());
     // When: the selection error takes inspection's document-error mapping.
-    let error = super::map_document_error(service.get_candidates().unwrap_err());
+    let error = super::map_document_error_to_command_error(
+        service.get_candidate_observation().unwrap_err(),
+    );
     // Then: the public capture diagnostic and internal cause remain distinct.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert_eq!(error.to_string(), "cannot capture current elements");
@@ -395,7 +397,7 @@ impl GitWorktreeListing for RecordingGit {
 }
 
 impl GitSnapshots for RecordingGit {
-    fn tree_retain_by_oid(&self, _: &TreeOid) -> Result<(), SnapshotError> {
+    fn ref_update_by_oid(&self, _: &TreeOid) -> Result<(), SnapshotError> {
         panic!("inspection must not retain author roots")
     }
 
@@ -462,7 +464,7 @@ impl GitSnapshots for RecordingGit {
         Ok(MARKED_SOURCE.to_vec())
     }
 
-    fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+    fn tree_sync_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
         assert_eq!(tree.as_str(), "c".repeat(40));
         self.0.borrow_mut().push("pin".into());
         if self.1 == Scenario::PinFailure {
@@ -471,7 +473,7 @@ impl GitSnapshots for RecordingGit {
                 "pin failed",
             ));
         }
-        Ok(RetainedTree::new(tree.clone()))
+        Ok(())
     }
 }
 

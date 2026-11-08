@@ -1,0 +1,1801 @@
+diff --git a/docs/zkit/letopis/decisions.md b/docs/zkit/letopis/decisions.md
+index 56ec1e4..816cb14 100644
+--- a/docs/zkit/letopis/decisions.md
++++ b/docs/zkit/letopis/decisions.md
+@@ -109,6 +109,7 @@
+ | [D-102](#D-102) | TK-12: pinned query config и базовые search/inspect | принято пользователем |
+ | [D-103](#D-103) | Разработка TK-18 до завершения отложенных измерений G-1 | принято пользователем |
+ | [D-104](#D-104) | Issue 61: явный init, вложенная config и disabled embeddings | принято пользователем |
++| [D-107](#D-107) | Точный packed flat/cos индекс vec1 | реализация запроса пользователя; выбор flat — инженерное решение |
+ 
+ ## Решения
+ 
+@@ -2283,3 +2284,37 @@ operation; переполнение пересчитывает, не откло
+ **Уточняет:** D-93 (authoring), D-95 (diagnostic publication), D-105 (full audit).
+ **Связи:** [X-4](contracts/X-4-markdown.md), [MC-1/MC-7](mechanics.md),
+ [upgrade](../../development.md#issue-69-обязательный-path-и-явный-reindex).
++
++
++<a id="D-107"></a>
++### D-107: Точный packed flat/cos индекс vec1
++> **Статус:** реализовано по запросу пользователя; host-проверки пройдены · **Дата:** 2026-11-07
++
++Пользователь поручил добавить ускоряющий векторный индекс SQLite. Выбор точного
++flat/cos в закреплённом vec1 — инженерное решение в рамках этого поручения;
++приблизительный ANN, top-K cap и ослабление полного eligible-channel ranking
++не согласовывались и не вводятся. D-79/D-96 описывают прежний no-index baseline.
++
++Новые базы и config reset создают flat/cos. Старые распознанные none/cos базы
++однократно перестраиваются при writable bootstrap с повторной проверкой после
++получения writer. Opaque model сравнивается с factory output того же native
++module, native model-version проверяется до increment, исходные finite bytes и
++размерность проверяются до rebuild. Неизвестные/повреждённые модели не заменяются
++молча. Rebuild сохраняет исходные векторы, rowids, identity и attempts/errors;
++логическая schema version остаётся 1. Already-flat не требует writer, query-only
++legacy и observational status сохраняют read-only путь. Consumer read views
++создаются после подготовки; отдельный pinned reader должен переживать переход.
++
++Flat хранит полный f32 payload в packed blocks, без quantization/training/bucket
++pruning. Это авторитетное хранение векторов, а не disposable secondary index.
++Полный vector channel, SQL tie order, RRF, свежие knowledge/source captures и
++ошибки кандидатов за итоговым limit сохраняются. Новых runtime, зависимостей,
++provider calls, embedding identity/config fields и повторного document embedding нет.
++
++Native SQL probe отдельно от CLI показал сохранение полного порядка/расстояний
++и всех original bytes. Это не заменяет actual-root make verify, native runner,
++paired CLI measurements или formal hardware acceptance. Итог проверки
++зафиксирован в [отчёте](checks/issue-65/vector-index/report.md).
++
++**Связи:** [design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md),
++[mechanics](mechanics.md), [D-79](#D-79), [D-96](#D-96).
+diff --git a/docs/zkit/letopis/mechanics.md b/docs/zkit/letopis/mechanics.md
+index 861851d..8b63b4a 100644
+--- a/docs/zkit/letopis/mechanics.md
++++ b/docs/zkit/letopis/mechanics.md
+@@ -138,7 +138,18 @@ Drain (`letopis embed --drain`, MC-5) обрабатывает один текс
+ 
+ Векторы хранятся в `.letopis/vectors.db` ([D-92](decisions.md#D-92)), подключаемом через ATTACH: vector_keys(row_id, search_hash UNIQUE), vec1 vector_index с тем же rowid, meta(config_identity), embed_failures(search_hash PK, attempts, error). Удаление кэша не затрагивает vectors.db: после пересборки работа — только новые тексты. Удаление или повреждение vectors.db — полный пересчёт векторов и попыток без потери знаний. В выдачу попадают только векторы, соединённые с nodes.search_hash текущего read view.
+ 
+-VectorPort принимает конечные float32 одинаковой длины, проверяет размерность/непустоту и запрещает некорректные значения. Native Ollama использует truncate:false, совместимый API проверяет индексы соответствия. Baseline vec1 no-index/cos без training/ANN и лишнего flat rebuild; при config reset vec1 в `.letopis/vectors.db` пересоздаётся транзакционно, чтобы очистить старую размерность. Совместимость schema change/rollback со старым read view — обязательная реализационная проверка R-8/P-2, не доказанная моделью.
++VectorPort принимает конечные float32 одинаковой длины, проверяет размерность/непустоту и запрещает некорректные значения. Native Ollama использует truncate:false, совместимый API проверяет индексы соответствия. Текущая реализация использует точный vec1 flat/cos без training/ANN ([D-107](decisions.md#D-107)); исходный no-index/cos baseline сохраняет исторический смысл. При config reset vec1 в `.letopis/vectors.db` пересоздаётся транзакционно с flat/cos, чтобы очистить старую размерность. Совместимость schema change/rollback со старым read view проверяется отдельно; модель сама её не доказывает.
++
++Writable bootstrap однократно переводит распознанный none/cos в flat/cos до
++создания consumer read views. Opaque model сравнивается с моделями, созданными
++тем же закреплённым native module; описание vec1cat само по себе скрывает
++неизвестные distance tags. Под bounded immediate transaction повторяется проверка
++режима, проверяется native MODEL version и исходные finite vector bytes, затем
++native rebuild сохраняет rowids, payload, dimensions, identity и execution state.
++Ошибка откатывает переход; уже-flat не требует writer. Legacy query-only и
++наблюдательный status не перестраивают данные. Flat blocks содержат авторитетные
++векторы и не являются удаляемой избыточной копией. Детали и проверки:
++[exact-index design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md).
+ 
+ ### MC-4 — источники и актуальность
+ 
+@@ -459,3 +470,29 @@ Current-object/delta buffers масштабируются с объектом; c
+ ## Index CLI — issue #94 (2026-11-05)
+ 
+ The explicit `index` command uses the existing synchronous Refresher publication pipeline. Default incremental publication retains roots, `--verify` audits effective snapshot closures, and `--full` reparses the selected owners and forces a revision bump while auditing closures. Optional JSON `paths` scope candidate observations and cached-owner removals at path-component boundaries; unselected owners remain untouched. Full graph/source-reference accounting and snapshot closure verification remain global. `check.paths` filters findings only. The former `reindex` CLI command is removed; use `index --full`. The index lock and background drain behavior are unchanged.
++
++## Tree validation reuse — issue #65 (2026-11-06)
++
++The invocation-owned raw Git reader may retain up to 4096 successful tree-body
++validation identities, without retaining their payloads. Each addressed read still
++reads/decodes and independently verifies the current exact object type and hash
++before consulting that metadata. Failed validation is never memoized; overflow
++continues normal validation. Full closure audits validate each visited tree body
++directly on every audit, independent of addressed-read reuse. Current source
++captures and provenance batch/error boundaries are unchanged.
++
++## Pure Markdown reuse during search — issue #65 (2026-11-06)
++
++Search eligibility retains at most the last successful pure Markdown projection
++within one invocation, after every binding performs its fresh confined file
++capture and hashes the captured bytes. Reuse requires the same repository path
++and byte hash; the existing per-node identity/hash/line predicate still runs.
++Retention bypasses inputs over 256 KiB, more than 1024 elements or over 256 KiB
++of combined path/element-ID content. Edges and search text are released before
++retention. These are logical payload/entry budgets, not a total allocator/RSS cap.
++Missing, invalid and unmarked observations leave no reusable parse. Source reads,
++provenance, filter/error demand order and complete eligible-channel ranking remain
++unchanged. The parser computes line coordinates with a monotonic byte/line cursor
++after disjoint element bounds are validated, preserving CRLF, Unicode and EOF
++coordinates without repeated prefix scans. See the
++[search experiment spec](../../superpowers/specs/2026-11-06-search-optimization-design.md).
+diff --git a/docs/zkit/letopis/mechanics/storage-schema.sql b/docs/zkit/letopis/mechanics/storage-schema.sql
+index ec8cc6d..b39dee9 100644
+--- a/docs/zkit/letopis/mechanics/storage-schema.sql
++++ b/docs/zkit/letopis/mechanics/storage-schema.sql
+@@ -72,7 +72,7 @@ create table files(
+ -- create virtual table vec.vector_index using vec1(vector);  -- rowid = vector_keys.row_id
+ -- create table vec.query_error(id integer primary key check(id=1), at integer not null, error text not null);  -- D-62, cleared on success
+ -- create table vec.embed_failures(search_hash text primary key, attempts integer not null check(attempts>=1), error text);
+--- insert into vec.vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
++-- insert into vec.vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
+ -- Work: nodes.search_hash without vec.vector_keys row and not exhausted in embed_failures.
+ -- Publish: one vec transaction checks meta.config_identity, INSERT OR IGNORE key+vector,
+ -- DELETE the embed_failures row. Config reset: BEGIN IMMEDIATE, re-check identity, recreate.
+diff --git a/letopis/architecture/search-pipeline.md b/letopis/architecture/search-pipeline.md
+index 1962bb4..98d6fb3 100644
+--- a/letopis/architecture/search-pipeline.md
++++ b/letopis/architecture/search-pipeline.md
+@@ -1,4 +1,4 @@
+-<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
++<!-- letopis: {"created_at":1793278527,"source_snapshot":"9ad584f02562b3d502ba4813ab8382de4575d696"} -->
+ # Search pipeline
+ 
+ A `search` request contains a query, a positive result limit and optional filters.
+@@ -29,3 +29,25 @@ by ID. This is rank fusion, not arithmetic on raw BM25 and vector distances.
+ [Vector query](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
+ 
+ [Embedding execution](embedding-execution.md "letopis:type=related_to;path=letopis/architecture/embedding-execution.md")
++
++## Bounded retrieval proposal, 2026-11-07
++
++The implemented search still reads complete channels and observes all candidates.
++The user clarified: an omitted search limit defaults to 100; an explicit positive
++limit uses min(limit, 100). Database retrieval must use that effective bound.
++Both FTS and nearest-vector matching, ordering and candidate limiting must run
++in SQLite. Rust receives only selected candidate IDs and ranking metadata;
++loading complete channels and truncating in process memory is disallowed by the
++new design. This bounds application result materialization, not the SQLite
++engine's internal memory or exact vector scanning work.
++Proposed application: at most this many knowledge hits per channel, union at most
++twice that number, then fresh checks, filters and reciprocal-rank fusion; return
++at most the effective limit. For limit 5, each channel returns at most 5, not 100.
++This changes full-corpus filtered ranking and errors outside the candidate pool;
++selective filters can leave fewer results. Shared vector hashes must not evade
++the joined knowledge-hit cap. Product code and timings are still unchanged.
++The previous 65.83-second measurement used final limit 5.
++
++[Bounded search research](../../docs/zkit/letopis/checks/issue-65/search-next/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/search-next/report.md")
++
++[Bounded search design](../../docs/superpowers/specs/2026-11-07-bounded-search-design.md "letopis:type=external;path=docs/superpowers/specs/2026-11-07-bounded-search-design.md")
+diff --git a/letopis/architecture/storage.md b/letopis/architecture/storage.md
+index c34b5a2..bb7f437 100644
+--- a/letopis/architecture/storage.md
++++ b/letopis/architecture/storage.md
+@@ -1,4 +1,4 @@
+-<!-- letopis: {"created_at":1793727646,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
++<!-- letopis: {"created_at":1793727646,"source_snapshot":"9942751be3da3e64918d7aa755b995d443cf7f36"} -->
+ # SQLite storage and read views
+ 
+ Markdown and source files remain authoritative. `.letopis/cache.db` is the
+@@ -7,9 +7,11 @@ separately so rebuilding the cache does not inherently discard those vectors.
+ 
+ The cache schema contains a publication revision, `nodes`, `edges`, the contentless
+ FTS5 `text_index` and per-file observations. A node has a text identity and an
+-integer row key. An edge stores its source, target and type; its target has no
+-foreign key, so a missing target can remain recorded for diagnostics. The FTS row
+-is associated with the node row key. Invalid-file state belongs to the file record.
++integer row key. Resolved edges store source/target node keys and type, with foreign
++keys on both endpoints. Missing knowledge targets are recorded separately in
++`unresolved_edges` by `target_uri` for diagnostics until they can be resolved.
++The FTS row is associated with the node row key. Invalid-file state belongs to
++the file record.
+ 
+ The vector database tracks configuration identity, `search_hash` to vector keys,
+ vec1 cosine-search data, failed attempts and the latest query error. Its index
+@@ -79,3 +81,117 @@ work selection can observe each completed vector publication.
+ [Status policy](../../src/service/status.rs "letopis:type=external;path=src/service/status.rs")
+ 
+ [Application interfaces](../../src/service/mod.rs "letopis:type=external;path=src/service/mod.rs")
++
++## Exact vec1 execution modes and migration findings
++
++Integrated into the working tree on 2026-11-07, new and reset vector indexes use
++`flat/cos`. `none` is exact cosine search through a SQL scan/sort of raw vectors;
++`flat/cos` is also exact exhaustive search, using packed original f32 vectors,
++the same cosine function and a compact result heap. It has no coarse buckets
++or quantized codes. Actual-root host verification passed; measured whole-CLI
++results below establish no wall-time improvement on the tested corpus.
++
++Flat moves the authoritative full-vector payload into native index blocks;
++base shadow rows become bucket references. Read vector bytes through the virtual
++table. Do not drop/recreate this index as if it were a redundant secondary index.
++The existing `search_hash` keys, rowids, dimensions and embedding identity must
++survive a physical-mode change, together with attempts and query diagnostics.
++
++Changing new-schema SQL alone does not upgrade an existing populated database.
++Storage bootstrap now prepares recognized none/cos under a bounded immediate write
++transaction, rechecking after acquiring the writer before native rebuild. The private
++`vector_index.rs` classifies opaque persisted model bytes against none/cos and
++flat/cos models generated by the pinned native factory; it does not trust a decoded
++header or `vec1cat` display that can conceal an unknown distance tag. Before legacy
++conversion it rejects missing, wrongly typed, nonpositive or overflowing native MODEL
++versions, mismatched vector lengths and nonfinite f32 components. Unknown models
++remain errors. Already-flat, read-only and query-only compatible handles avoid a
++migration writer; status remains observational. New/reset defaults are flat/cos;
++vector schema version remains 1 and embedding identity is unchanged. Migration,
++readback, rollback/retry, competing-opener and separate pinned-reader tests are
++present. Ten targeted scenarios and six caught behavioral mutants accompany the
++actual-root host storage runner PASS across all 16 commands. Its nested
++`make verify` passed 2,443 test executions with zero failures and 22 ignored,
++including profile/example repeats; these are executions, not unique tests.
++
++Trained vec1 models can use coarse buckets and quantized codes. Full `K` controls
++result capacity, not bucket coverage: default probing can omit candidates even
++when `K` equals corpus size. `nprobe:1` means one bucket, not all buckets; complete
++coverage requires the explicit bucket count and no early slack stop. Quantized
++metrics can change rank even with complete coverage. Full eligible-channel rank
++fusion and first-demand candidate error/freshness guarantees cannot be replaced
++by ANN or winner-only observation without a separate accepted contract change.
++
++A bounded native SQL experiment on copied 100,000 x 768 vector data measured
++full-K median CPU 2.145223 s in none/cos versus 0.107106 s in flat/cos (20.03x).
++Three paired repetitions at K=5/100/1000/100000 matched the full-result prefixes
++in IDs, order and 17-digit distances; ordered hashing also matched all vector
++BLOB bytes after rebuild. These are native SQLite/vec1 results from a stored
++embedding query, excluding CLI refresh, provenance, filters, fusion and inference;
++this native diagnostic used SQLite CLI 3.54.1 versus product SQLite 3.53.2.
++It does not establish a whole-command speedup, fresh singleton-drain layout or
++write-path cost.
++
++
++Actual-root product init on the populated none/cos copy, including checked upgrade,
++took 3.435155 s and preserved all 100,000 vectors. Three paired full hybrid CLI
++searches per mode on the synthetic 100k corpus with real stored provider vectors
++measured median wall time 65.592816 s before versus 65.829875 s after: no whole-wall
++improvement was established. All six outputs were byte-identical with the same five
++IDs. Maximum observed CLI peak RSS was 187.9375 versus 158.921875 MiB, excluding
++the Ollama model daemon; this is not a complete memory-budget result.
++
++A separate genuine Samply capture contained 79,244 usable stacks and 70,303,137 us
++observed CPU delta. The native vector-query owner accounted for 0.9954% inclusive
++observed CPU and candidate eligibility for 96.7047%. These scopes overlap and must
++not be added; sampled CPU shares are not elapsed-wall-time attribution. The full
++CLI evidence, not the isolated native speedup, controls the end-to-end conclusion.
++
++Source inspection shows a singleton flat insert can replace a whole small packed
++block at commit; the default reuse threshold is 16 KiB, so it does not rewrite an
++existing approximately 1 MiB rebuilt block on every append. Incremental BLOB writes
++serve delete tombstones, not insertion appends. An index grown by singleton commits
++can have a different layout from a bulk rebuild: the native 20.03x query result
++measured the rebuilt 100k layout. Fresh-drain throughput, SQLite page/WAL write cost
++and performance relative to the earlier approximately 142-minute model drain remain
++unmeasured; the read result does not establish those write-path properties.
++
++Corrected raw-typed corruption controls found a 3-byte vector rejects rebuilding
++and leaves none mode intact; injected NaN/infinity components survive rebuilding
++and return SQL NULL distances in both modes. A formatting-only printf control
++had misleadingly rendered NULL as 0.0. Retain typed product decoding and errors,
++and test nonfinite values, damaged packed blocks, failed rebuild rollback and
++old pinned readers. Full-K distance equality on valid data alone does not prove
++corruption parity. Native rollback unloads its model, but cursor configuration
++can be retained: finish mode-inspection statements before rebuilding and use fresh
++observations after rollback/retry rather than keeping active cursors across it.
++
++[Read-view and vector ranking](search-pipeline.md "letopis:type=related_to;path=letopis/architecture/search-pipeline.md")
++
++[Native vec1 implementation](../../vendor/vec1/vec1.c "letopis:type=external;path=vendor/vec1/vec1.c")
++
++[Schema recognition](../../src/storage/schema.rs "letopis:type=external;path=src/storage/schema.rs")
++
++[Native experiment and corrected controls](../../docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md")
++
++[Native paired measurements](../../docs/zkit/letopis/checks/issue-65/vector-index/native-probe/summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/native-probe/summary.json")
++
++[Raw typed corruption controls](../../docs/zkit/letopis/checks/issue-65/vector-index/native-probe/control-v2-runs.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/native-probe/control-v2-runs.json")
++
++[Guarded physical index preparation](../../src/storage/vector_index.rs "letopis:type=external;path=src/storage/vector_index.rs")
++
++[Actual-root verification executions](../../docs/zkit/letopis/checks/issue-65/vector-index/verification.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/verification.json")
++
++[Host storage receipt](../../docs/zkit/letopis/checks/issue-65/vector-index/host-storage/manifest.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/host-storage/manifest.json")
++
++[Whole-CLI paired comparison](../../docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json")
++
++[First checked product upgrade](../../docs/zkit/letopis/checks/issue-65/vector-index/first-upgrade-init.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/first-upgrade-init.json")
++
++[Samply capture validation](../../docs/zkit/letopis/checks/issue-65/vector-index/profile/validation.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/profile/validation.json")
++
++[Inclusive observed CPU stacks](../../docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json")
++
++[Profile scope and process receipt](../../docs/zkit/letopis/checks/issue-65/vector-index/profile/receipt.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/profile/receipt.json")
++
++[Caught production mutants](../../docs/zkit/letopis/checks/issue-65/vector-index/candidate/mutations.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/candidate/mutations.json")
+diff --git a/src/git/cleanup.rs b/src/git/cleanup.rs
+index 3b142e6..52c99e3 100644
+--- a/src/git/cleanup.rs
++++ b/src/git/cleanup.rs
+@@ -82,6 +82,20 @@ impl GitWriteCleanup {
+         self.cancelled.load(Ordering::SeqCst)
+     }
+ 
++    /// Require an active command before and after confirming existing durable resources.
++    ///
++    /// # Errors
++    /// Returns the terminal cancellation error once cleanup has begun.
++    pub(super) fn writes_verify_active(&self) -> Result<(), SnapshotError> {
++        if self.writes_is_cancelled() {
++            return Err(SnapshotError::new(
++                SnapshotErrorKind::InternalError,
++                WRITE_CANCELLED_MESSAGE,
++            ));
++        }
++        Ok(())
++    }
++
+     /// Create/register an outer stage atomically with respect to cancellation.
+     pub(super) fn stage_create(
+         self: &Arc<Self>,
+@@ -145,12 +159,7 @@ impl GitWriteCleanup {
+ 
+     fn write_admit(&self) -> Result<MutexGuard<'_, WriteState>, SnapshotError> {
+         let state = self.state_lock();
+-        if self.writes_is_cancelled() {
+-            return Err(SnapshotError::new(
+-                SnapshotErrorKind::InternalError,
+-                WRITE_CANCELLED_MESSAGE,
+-            ));
+-        }
++        self.writes_verify_active()?;
+         Ok(state)
+     }
+ 
+diff --git a/src/git/durability.rs b/src/git/durability.rs
+index f881f03..b8af206 100644
+--- a/src/git/durability.rs
++++ b/src/git/durability.rs
+@@ -8,7 +8,7 @@ use super::{
+ use crate::service::{SnapshotError, SnapshotErrorKind};
+ use gix::{
+     Repository,
+-    hash::ObjectId,
++    hash::{Kind as HashKind, ObjectId},
+     objs::{Kind, Write as ObjectWrite},
+     refs::Target,
+ };
+@@ -77,11 +77,7 @@ impl StagedObject {
+         let staged = store.object_path(&oid);
+         let permissions = repository_get_shared_permissions(repo)?;
+         gix::fs::set_shared_repository_permissions(&staged, permissions).map_err(fail_io)?;
+-        #[cfg(test)]
+-        tests::inject_failure(tests::FailurePoint::ObjectSync)?;
+-        File::open(&staged)
+-            .and_then(|file| file.sync_all())
+-            .map_err(fail_io)?;
++        object_sync(&staged)?;
+         let live = gix::odb::loose::Store::at(&object_root, repo.object_hash());
+         Ok(Self {
+             directory,
+@@ -120,11 +116,7 @@ impl StagedObject {
+             self.object_verify_existing()?;
+         }
+         // A racing winner can still be between its link and sync. Sync its inode too.
+-        File::open(&self.destination)
+-            .and_then(|file| file.sync_all())
+-            .map_err(fail_io)?;
+-        #[cfg(test)]
+-        tests::inject_failure(tests::FailurePoint::DirectorySync)?;
++        object_sync(&self.destination)?;
+         directory_sync_parent_chain(parent, &self.object_root)?;
+         self.directory.stage_close()
+     }
+@@ -156,6 +148,52 @@ impl StagedObject {
+     }
+ }
+ 
++/// Verify and sync an existing loose object without staging another compressed copy.
++/// Packed or absent objects use the ordinary publication path instead.
++///
++/// # Errors
++/// Fails closed on cancellation, corrupt existing bytes, invalid configuration or sync failure.
++pub(super) fn object_reuse_existing(
++    repo: &Repository,
++    kind: Kind,
++    bytes: &[u8],
++    cleanup: &GitWriteCleanup,
++) -> Result<Option<ObjectId>, SnapshotError> {
++    cleanup.writes_verify_active()?;
++    let oid = object_compute_oid(repo.object_hash(), kind, bytes)?;
++    let object_root = repo.objects.store_ref().path();
++    let store = gix::odb::loose::Store::at(object_root, repo.object_hash());
++    let mut buffer = Vec::new();
++    let Some(object) = store.try_find(&oid, &mut buffer).map_err(|_| {
++        SnapshotError::new(
++            SnapshotErrorKind::InternalError,
++            DURABILITY_INTEGRITY_MESSAGE,
++        )
++    })?
++    else {
++        return Ok(None);
++    };
++    if object.kind != kind {
++        return Err(SnapshotError::new(
++            SnapshotErrorKind::InternalError,
++            DURABILITY_INTEGRITY_MESSAGE,
++        ));
++    }
++    object_verify_identity(oid, object.kind, object.data)?;
++    repository_get_shared_permissions(repo)?;
++    let destination = store.object_path(&oid);
++    object_sync(&destination)?;
++    let parent = destination.parent().ok_or_else(|| {
++        SnapshotError::new(
++            SnapshotErrorKind::InternalError,
++            DURABILITY_INTEGRITY_MESSAGE,
++        )
++    })?;
++    directory_sync_parent_chain(parent, object_root)?;
++    cleanup.writes_verify_active()?;
++    Ok(Some(oid))
++}
++
+ /// Identifies contention that a command may retry through the full durable protocol.
+ /// Other I/O/integrity failures must not be converted to equality-only success.
+ pub(super) fn ref_lock_is_busy(error: &SnapshotError) -> bool {
+@@ -350,26 +388,49 @@ fn repository_get_shared_permissions(repo: &Repository) -> Result<i32, SnapshotE
+ }
+ 
+ fn object_verify_identity(oid: ObjectId, kind: Kind, bytes: &[u8]) -> Result<(), SnapshotError> {
++    if object_compute_oid(oid.kind(), kind, bytes)? != oid {
++        return Err(SnapshotError::new(
++            SnapshotErrorKind::InternalError,
++            DURABILITY_INTEGRITY_MESSAGE,
++        ));
++    }
++    Ok(())
++}
++
++fn object_compute_oid(
++    format: HashKind,
++    kind: Kind,
++    bytes: &[u8],
++) -> Result<ObjectId, SnapshotError> {
+     let kind = std::str::from_utf8(kind.as_bytes()).map_err(|_| {
+         SnapshotError::new(
+             SnapshotErrorKind::InternalError,
+             DURABILITY_INTEGRITY_MESSAGE,
+         )
+     })?;
+-    let mut hash = ObjectHasher::new(oid.kind().len_in_hex(), kind, bytes.len() as u64)?;
++    let mut hash = ObjectHasher::new(format.len_in_hex(), kind, bytes.len() as u64)?;
+     for chunk in bytes.chunks(HASH_CHUNK_BYTES) {
+         hash.update(chunk);
+     }
+-    if hash.finish()? != oid {
+-        return Err(SnapshotError::new(
++    ObjectId::from_hex(hash.finish()?.as_bytes()).map_err(|_| {
++        SnapshotError::new(
+             SnapshotErrorKind::InternalError,
+             DURABILITY_INTEGRITY_MESSAGE,
+-        ));
+-    }
+-    Ok(())
++        )
++    })
++}
++
++fn object_sync(path: &Path) -> Result<(), SnapshotError> {
++    #[cfg(test)]
++    tests::inject_failure(tests::FailurePoint::ObjectSync)?;
++    File::open(path)
++        .and_then(|file| file.sync_all())
++        .map_err(fail_io)
+ }
+ 
+ fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> {
++    #[cfg(test)]
++    tests::inject_failure(tests::FailurePoint::DirectorySync)?;
+     for directory in path.ancestors() {
+         File::open(directory)
+             .and_then(|file| file.sync_all())
+@@ -615,6 +676,125 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn existing_object_reuse_requires_verified_bytes_without_residual_entries() {
++        // Given: an independently named existing loose blob in both supported formats.
++        for format in FORMATS {
++            let fixture = TempRepo::new(format);
++            let repo = gix::open(fixture.get_root()).unwrap();
++            let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
++            let expected =
++                fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
++            let before = fs::read_dir(repo.objects.store_ref().path())
++                .unwrap()
++                .count();
++            // When: confirming existing content and probing content that is absent.
++            let actual =
++                super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup).unwrap();
++            let absent =
++                super::object_reuse_existing(&repo, Kind::Blob, b"absent bytes", &cleanup).unwrap();
++            // Then: exact Git identity is reused without leaving new directory entries.
++            assert_eq!(actual.unwrap().to_string(), expected);
++            assert!(absent.is_none());
++            assert_eq!(
++                fs::read_dir(repo.objects.store_ref().path())
++                    .unwrap()
++                    .count(),
++                before
++            );
++        }
++    }
++
++    #[test]
++    fn existing_object_reuse_refuses_corruption_and_cancellation() {
++        // Given: corrupt bytes at the independently computed loose-object identity.
++        let fixture = TempRepo::new(FORMATS[0]);
++        let repo = gix::open(fixture.get_root()).unwrap();
++        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
++        let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
++        let path = repo
++            .objects
++            .store_ref()
++            .path()
++            .join(&expected[..2])
++            .join(&expected[2..]);
++        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
++        fs::write(&path, b"invalid zlib").unwrap();
++        // When: a reuse probe encounters corruption, then a cancelled owner.
++        let corrupt = super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup);
++        cleanup.writes_cancel_and_cleanup().unwrap();
++        let cancelled = super::object_reuse_existing(&repo, Kind::Blob, b"absent bytes", &cleanup);
++        // Then: neither failure becomes absence or a successful write.
++        let error = corrupt.unwrap_err();
++        let diagnostic = format!("{error} {error:?}");
++        assert!(!diagnostic.contains(&fixture.get_root().display().to_string()));
++        assert!(!diagnostic.contains("invalid zlib"));
++        assert!(cancelled.is_err());
++        assert_eq!(fs::read(path).unwrap(), b"invalid zlib");
++    }
++
++    #[test]
++    fn existing_object_reuse_rechecks_decodable_content_identity() {
++        // Given: a valid compressed blob installed under a different blob identity.
++        let fixture = TempRepo::new(FORMATS[0]);
++        let repo = gix::open(fixture.get_root()).unwrap();
++        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
++        let expected = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
++        let other = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"different bytes"));
++        let root = repo.objects.store_ref().path();
++        let destination = root.join(&expected[..2]).join(&expected[2..]);
++        fs::set_permissions(&destination, fs::Permissions::from_mode(0o600)).unwrap();
++        fs::copy(root.join(&other[..2]).join(&other[2..]), &destination).unwrap();
++        // When: the reuse path decodes a valid object whose hash is wrong.
++        let result = super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup);
++        // Then: successful decompression cannot substitute for identity verification.
++        assert!(result.is_err());
++    }
++
++    #[test]
++    fn existing_object_reuse_supports_trees_and_defers_packed_objects() {
++        // Given: an existing empty tree, independently written and named by Git.
++        for format in FORMATS {
++            let fixture = TempRepo::new(format);
++            let repo = gix::open(fixture.get_root()).unwrap();
++            let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
++            let expected =
++                fixture.get_oid(&["hash-object", "-w", "-t", "tree", "--stdin"], Some(b""));
++            // When: confirming its loose representation.
++            let loose = super::object_reuse_existing(&repo, Kind::Tree, b"", &cleanup).unwrap();
++            // Then: tree identities are preserved in both formats.
++            assert_eq!(loose.unwrap().to_string(), expected);
++            // Given: that tree is now reachable only through a pack.
++            fixture
++                .run_git_successfully(&["update-ref", "refs/letopis/reuse-test", &expected], None);
++            fixture.run_git_successfully(&["repack", "-ad"], None);
++            fixture.run_git_successfully(&["prune-packed"], None);
++            let root = repo.objects.store_ref().path();
++            assert!(!root.join(&expected[..2]).join(&expected[2..]).exists());
++            // When: the loose-only optimization encounters the packed object.
++            let packed = super::object_reuse_existing(&repo, Kind::Tree, b"", &cleanup).unwrap();
++            // Then: it defers to ordinary staging instead of pretending to sync a pack.
++            assert!(packed.is_none());
++        }
++    }
++
++    #[test]
++    fn existing_object_reuse_propagates_object_and_directory_sync_failures() {
++        // Given: an existing object and independently injected synchronization failures.
++        let fixture = TempRepo::new(FORMATS[0]);
++        let repo = gix::open(fixture.get_root()).unwrap();
++        let cleanup = std::sync::Arc::new(crate::git::cleanup::GitWriteCleanup::new());
++        fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"reused bytes"));
++        for point in [FailurePoint::ObjectSync, FailurePoint::DirectorySync] {
++            FAILURE.with(|slot| slot.set(Some(point)));
++            // When: reuse encounters the failing durability step.
++            let result = super::object_reuse_existing(&repo, Kind::Blob, b"reused bytes", &cleanup);
++            FAILURE.with(|slot| slot.set(None));
++            // Then: equality cannot bypass either durability requirement.
++            assert!(result.is_err(), "{point:?}");
++        }
++    }
++
+     #[test]
+     fn stages_syncs_publishes_and_retains_git_compatible_objects() {
+         // Given: real repositories and independently computed Git object identities.
+diff --git a/src/git/objects.rs b/src/git/objects.rs
+index 275e8e0..3007e45 100644
+--- a/src/git/objects.rs
++++ b/src/git/objects.rs
+@@ -1,7 +1,7 @@
+ use super::{
+     GitRepository,
+     constants::{BLOB_KIND, GITLINK_KIND, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
+-    durability::StagedObject,
++    durability::{StagedObject, object_reuse_existing},
+     tree::tree_entry_get,
+     validation::tree_bytes_validate,
+ };
+@@ -141,12 +141,9 @@ pub(super) fn tree_get_by_oid(
+     missing: SnapshotErrorKind,
+     wrong: SnapshotErrorKind,
+ ) -> Result<Vec<u8>, SnapshotError> {
+-    let bytes = git
+-        .reader
++    git.reader
+         .borrow_mut()
+-        .object_bytes_get_by_oid(oid, TREE_KIND, missing, wrong)?;
+-    tree_bytes_validate(&bytes, git.oid_len)?;
+-    Ok(bytes)
++        .tree_bytes_get_by_oid(oid, missing, wrong)
+ }
+ fn tree_entry_get_by_name(
+     git: &GitRepository,
+@@ -218,6 +215,9 @@ impl<'a> Directory<'a> {
+     }
+ }
+ fn object_write(git: &GitRepository, kind: Kind, bytes: &[u8]) -> Result<String, SnapshotError> {
++    if let Some(oid) = object_reuse_existing(&git.repo, kind, bytes, &git.cleanup)? {
++        return Ok(oid.to_string());
++    }
+     let object = StagedObject::new_with_cleanup(&git.repo, kind, bytes, &git.cleanup)?;
+     let oid = object.object_get_oid().to_string();
+     object.object_publish()?;
+@@ -253,3 +253,169 @@ fn paths_validate(excluded_roots: &[&str], paths: &[&RepoPath]) -> Result<(), Sn
+     }
+     Ok(())
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::tree_get_by_oid;
++    use crate::{
++        domain::TreeOid,
++        git::{GitRepository, validation::tree_validation_get_count},
++        process_test_support::{FORMATS, TempRepo},
++        service::{GitSnapshots, SnapshotError, SnapshotErrorKind},
++    };
++    use std::fs;
++
++    #[test]
++    fn tree_reads_reuse_structure_only_within_the_owned_reader() {
++        for format in FORMATS {
++            // Given: an independently written Git tree and a fresh product reader.
++            let fixture = TempRepo::new(format);
++            let oid = fixture.get_oid(&["rev-parse", "HEAD^{tree}"], None);
++            let expected = fixture.run_git_successfully(&["cat-file", "tree", &oid], None);
++            let git = GitRepository::open(fixture.get_root(), &[]).unwrap();
++            let before = tree_validation_get_count();
++            // When: the same immutable body is demanded twice by this reader.
++            assert_eq!(get_tree(&git, &oid).unwrap(), expected);
++            assert_eq!(get_tree(&git, &oid).unwrap(), expected);
++            // Then: structural work is shared, but a separate owner starts unvalidated.
++            assert_eq!(tree_validation_get_count() - before, 1);
++            let separate = GitRepository::open(fixture.get_root(), &[]).unwrap();
++            assert_eq!(get_tree(&separate, &oid).unwrap(), expected);
++            assert_eq!(tree_validation_get_count() - before, 2);
++        }
++    }
++
++    #[test]
++    fn memoized_tree_reads_reject_replacements_and_recover_after_restoration() {
++        for format in FORMATS {
++            // Given: a previously validated tree and independently written replacement objects.
++            let fixture = TempRepo::new(format);
++            let oid = fixture.get_oid(&["rev-parse", "HEAD^{tree}"], None);
++            let empty = fixture.get_oid(&["hash-object", "-w", "-t", "tree", "--stdin"], Some(b""));
++            let blob = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"CANARY"));
++            let original = fs::read(fixture.build_object_path(&oid)).unwrap();
++            let git = GitRepository::open(fixture.get_root(), &[]).unwrap();
++            let expected = get_tree(&git, &oid).unwrap();
++            for (replacement, kind) in [
++                (Some(&empty), SnapshotErrorKind::InternalError),
++                (Some(&blob), SnapshotErrorKind::InvalidRequest),
++                (None, SnapshotErrorKind::NotFound),
++            ] {
++                // When: the object's current backing bytes change or disappear after memoization.
++                if let Some(replacement) = replacement {
++                    fixture.replace_loose_object(&oid, replacement);
++                } else {
++                    fs::remove_file(fixture.build_object_path(&oid)).unwrap();
++                }
++                let error = get_tree(&git, &oid).unwrap_err();
++                // Then: current failures remain visible; restoring valid bytes permits recovery.
++                assert_eq!(error.get_kind(), kind);
++                assert!(!format!("{error:?}").contains("CANARY"));
++                if replacement.is_some() {
++                    fs::remove_file(fixture.build_object_path(&oid)).unwrap();
++                }
++                fs::write(fixture.build_object_path(&oid), &original).unwrap();
++                assert_eq!(get_tree(&git, &oid).unwrap(), expected);
++            }
++        }
++    }
++
++    #[test]
++    fn invalid_tree_bodies_are_validated_on_every_demand() {
++        for format in FORMATS {
++            // Given: a correctly hashed tree with a forbidden zero-prefixed mode.
++            let fixture = TempRepo::new(format);
++            let blob = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"source"));
++            let mut bytes = b"0100644 file\0".to_vec();
++            bytes.extend_from_slice(
++                gix::hash::ObjectId::from_hex(blob.as_bytes())
++                    .unwrap()
++                    .as_bytes(),
++            );
++            let oid = fixture.get_oid(
++                &["hash-object", "-w", "--literally", "-t", "tree", "--stdin"],
++                Some(&bytes),
++            );
++            let git = GitRepository::open(fixture.get_root(), &[]).unwrap();
++            let before = tree_validation_get_count();
++            // When: the malformed body is demanded twice from the same owner.
++            let first = get_tree(&git, &oid).unwrap_err();
++            let second = get_tree(&git, &oid).unwrap_err();
++            // Then: failures never authorize a later structural-validation bypass.
++            assert_eq!(first.get_kind(), SnapshotErrorKind::InternalError);
++            assert_eq!(second.get_kind(), SnapshotErrorKind::InternalError);
++            assert_eq!(tree_validation_get_count() - before, 2);
++        }
++    }
++
++    #[test]
++    fn full_audits_validate_tree_structure_despite_addressed_read_memoization() {
++        for format in FORMATS {
++            // Given: the root body has already passed an addressed read on this owner.
++            let fixture = TempRepo::new(format);
++            let oid = fixture.get_oid(&["rev-parse", "HEAD^{tree}"], None);
++            let tree = TreeOid::parse(&oid).unwrap();
++            let git = GitRepository::open(fixture.get_root(), &[]).unwrap();
++            get_tree(&git, &oid).unwrap();
++            let before = tree_validation_get_count();
++            // When: two independent full closure audits retain that root.
++            git.tree_pin_by_oid(&tree).unwrap();
++            git.tree_pin_by_oid(&tree).unwrap();
++            // Then: each full audit rechecks its tree body, independent of the memo.
++            assert_eq!(tree_validation_get_count() - before, 2);
++        }
++    }
++
++    #[test]
++    fn tree_validation_memo_overflow_revalidates_without_rejecting_valid_objects() {
++        for format in FORMATS {
++            // Given: 4097 independently written distinct valid trees exceed the metadata budget.
++            let fixture = TempRepo::new(format);
++            let trees = create_trees(&fixture, 4097);
++            let git = GitRepository::open(fixture.get_root(), &[]).unwrap();
++            for oid in &trees {
++                get_tree(&git, oid).unwrap();
++            }
++            let before = tree_validation_get_count();
++            // When: the last cached and first uncached bodies are each demanded twice.
++            for _ in 0..2 {
++                get_tree(&git, &trees[4095]).unwrap();
++                get_tree(&git, &trees[4096]).unwrap();
++            }
++            // Then: overflow remains accepted but is structurally checked every time.
++            assert_eq!(tree_validation_get_count() - before, 2);
++        }
++    }
++
++    fn get_tree(git: &GitRepository, oid: &str) -> Result<Vec<u8>, SnapshotError> {
++        tree_get_by_oid(
++            git,
++            oid,
++            SnapshotErrorKind::NotFound,
++            SnapshotErrorKind::InvalidRequest,
++        )
++    }
++
++    fn create_trees(fixture: &TempRepo, count: usize) -> Vec<String> {
++        let blob = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"source"));
++        let blob = gix::hash::ObjectId::from_hex(blob.as_bytes()).unwrap();
++        let mut paths = String::new();
++        for index in 0..count {
++            let path = fixture.get_root().join(format!(".git/memo-input-{index}"));
++            let mut bytes = format!("100644 file-{index}\0").into_bytes();
++            bytes.extend_from_slice(blob.as_bytes());
++            fs::write(&path, bytes).unwrap();
++            paths.push_str(path.to_str().unwrap());
++            paths.push('\n');
++        }
++        let output = fixture.run_git_successfully(
++            &["hash-object", "-w", "-t", "tree", "--stdin-paths"],
++            Some(paths.as_bytes()),
++        );
++        String::from_utf8(output)
++            .unwrap()
++            .lines()
++            .map(str::to_owned)
++            .collect()
++    }
++}
+diff --git a/src/git/reader.rs b/src/git/reader.rs
+index e5250d7..12a4d28 100644
+--- a/src/git/reader.rs
++++ b/src/git/reader.rs
+@@ -2,6 +2,7 @@ use super::{
+     constants::{BLOB_KIND, HASH_CHUNK_BYTES, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
+     error::object_map_io_error,
+     hashing::ObjectHasher,
++    validation::tree_bytes_validate,
+ };
+ use crate::service::{SnapshotError, SnapshotErrorKind};
+ use gix::{
+@@ -13,8 +14,9 @@ use gix::{
+         store::{Handle, init::Options},
+     },
+ };
+-use std::{fmt, io, rc::Rc};
++use std::{collections::BTreeSet, fmt, io, rc::Rc};
+ 
++const MAX_VALIDATED_TREES: usize = 4096;
+ const MAX_REUSABLE_BYTES: usize = 4 * 1024 * 1024;
+ 
+ /// Keep only the current verified tree body; blob payloads are discarded after hashing.
+@@ -29,6 +31,7 @@ pub(super) struct ObjectReader {
+     objects: Handle<Rc<Store>>,
+     oid_len: usize,
+     buffer: Vec<u8>,
++    validated_trees: BTreeSet<String>,
+     #[cfg(test)]
+     object_reads: usize,
+ }
+@@ -39,6 +42,7 @@ impl fmt::Debug for ObjectReader {
+             .debug_struct("ObjectReader")
+             .field("oid_len", &self.oid_len)
+             .field("buffer_capacity", &self.buffer.capacity())
++            .field("validated_trees", &self.validated_trees.len())
+             .finish_non_exhaustive()
+     }
+ }
+@@ -71,6 +75,7 @@ impl ObjectReader {
+             objects: Rc::new(store).to_handle(),
+             oid_len,
+             buffer: Vec::new(),
++            validated_trees: BTreeSet::new(),
+             #[cfg(test)]
+             object_reads: 0,
+         })
+@@ -117,6 +122,29 @@ impl ObjectReader {
+         self.object_reads
+     }
+ 
++    /// Read fresh verified tree bytes, reusing only successful structural validation.
++    /// The bounded memo retains identities, never payloads, for this reader's lifetime.
++    ///
++    /// # Errors
++    /// Uses caller-selected missing/type errors; decoding, identity and structure failures are internal.
++    pub(super) fn tree_bytes_get_by_oid(
++        &mut self,
++        oid: &str,
++        missing: SnapshotErrorKind,
++        wrong_type: SnapshotErrorKind,
++    ) -> Result<Vec<u8>, SnapshotError> {
++        let bytes = self.object_bytes_get_by_oid(oid, TREE_KIND, missing, wrong_type)?;
++        // Consult metadata only after verifying current bytes, so replacement or
++        // disappearance cannot hide behind an earlier structural success.
++        if !self.validated_trees.contains(oid) {
++            tree_bytes_validate(&bytes, self.oid_len)?;
++            if self.validated_trees.len() < MAX_VALIDATED_TREES {
++                self.validated_trees.insert(oid.to_owned());
++            }
++        }
++        Ok(bytes)
++    }
++
+     /// Read verified bytes for an addressed object; no payload survives in a cache.
+     ///
+     /// # Errors
+diff --git a/src/git/validation.rs b/src/git/validation.rs
+index 0ae95f7..e70081d 100644
+--- a/src/git/validation.rs
++++ b/src/git/validation.rs
+@@ -2,6 +2,11 @@ use super::tree::tree_entry_get;
+ use crate::service::{SnapshotError, SnapshotErrorKind};
+ use std::{cmp::Ordering, collections::BTreeSet};
+ 
++#[cfg(test)]
++thread_local! {
++    static TREE_VALIDATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
++}
++
+ const TREE_INTEGRITY_MESSAGE: &str = "Git tree integrity failed";
+ const TREE_MODE: u16 = 0o040000;
+ const SYMLINK_MODE: u16 = 0o120000;
+@@ -16,6 +21,8 @@ const MAX_NAME_BYTES: usize = 4096;
+ /// # Errors
+ /// Returns `InternalError` when the body fails Git's structural checks.
+ pub(super) fn tree_bytes_validate(mut bytes: &[u8], oid_len: usize) -> Result<(), SnapshotError> {
++    #[cfg(test)]
++    TREE_VALIDATION_COUNT.with(|count| count.set(count.get() + 1));
+     if !matches!(oid_len, 40 | 64) {
+         return Err(SnapshotError::new(
+             SnapshotErrorKind::InternalError,
+@@ -57,6 +64,12 @@ pub(super) fn tree_bytes_validate(mut bytes: &[u8], oid_len: usize) -> Result<()
+     Ok(())
+ }
+ 
++/// Count full structural validations on the current test thread.
++#[cfg(test)]
++pub(super) fn tree_validation_get_count() -> usize {
++    TREE_VALIDATION_COUNT.with(std::cell::Cell::get)
++}
++
+ fn validate_name(name: &[u8], mode: u16) -> Result<(), SnapshotError> {
+     if name.len() > MAX_NAME_BYTES
+         || matches!(name, b"." | b"..")
+diff --git a/src/markdown/scan.rs b/src/markdown/scan.rs
+index 9d2b688..a571395 100644
+--- a/src/markdown/scan.rs
++++ b/src/markdown/scan.rs
+@@ -105,6 +105,8 @@ fn layout_build(
+ ) -> Result<Layout, Diagnostic> {
+     let mut elements: Vec<Element> = Vec::new();
+     let mut metadata_ranges = Vec::new();
++    let mut line_offset = 0;
++    let mut line_number = 1;
+     for range in comments {
+         let start = line_start_calculate(text, range.start);
+         let after = line_end_calculate(text, start);
+@@ -129,12 +131,13 @@ fn layout_build(
+             reason = "element_bounds_calculate returns ordered ranges"
+         )]
+         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
++        // Validated elements never overlap, so preceding bytes need no second line scan.
++        let line_start = line_number + line_breaks_count(&text.as_bytes()[line_offset..begin]);
++        line_offset = end.saturating_sub(1);
++        line_number = line_start + line_breaks_count(&text.as_bytes()[begin..line_offset]);
+         #[expect(clippy::expect_used, reason = "a nonempty element spans ordered lines")]
+-        let lines = LineRange::new(
+-            line_number_calculate(text, begin),
+-            line_number_calculate(text, end.saturating_sub(1)),
+-        )
+-        .expect("nonempty element lines are ordered");
++        let lines =
++            LineRange::new(line_start, line_number).expect("nonempty element lines are ordered");
+         elements.push(Element {
+             id,
+             metadata,
+@@ -183,10 +186,6 @@ fn line_end_calculate(text: &str, offset: usize) -> usize {
+         .map_or(text.len(), |position| offset + position + 1)
+ }
+ 
+-fn line_number_calculate(text: &str, at: usize) -> u64 {
+-    text.as_bytes()[..at]
+-        .iter()
+-        .filter(|&&c| c == b'\n')
+-        .count() as u64
+-        + 1
++fn line_breaks_count(bytes: &[u8]) -> u64 {
++    bytes.iter().filter(|&&c| c == b'\n').count() as u64
+ }
+diff --git a/src/service/search.rs b/src/service/search.rs
+index bad0e15..b67223f 100644
+--- a/src/service/search.rs
++++ b/src/service/search.rs
+@@ -2,13 +2,13 @@ use super::utils::is_current_knowledge;
+ use super::utils::map_document_file;
+ use super::{
+     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
+-    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest,
+-    QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink,
+-    SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
++    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile,
++    ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag,
++    SearchLink, SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
+     SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
+     VectorOutcome,
+ };
+-use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
++use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri};
+ use std::path::Path;
+ use std::{
+     collections::{BTreeMap, BTreeSet},
+@@ -20,6 +20,23 @@ use std::{fmt, rc::Rc};
+ use comparisons::RevisionComparisons;
+ use ranking::{rank_candidates, validate_metrics};
+ 
++const MAX_REUSED_FILE_BYTES: usize = 256 * 1024;
++const MAX_REUSED_ELEMENTS: usize = 1024;
++const MAX_REUSED_ID_BYTES: usize = 256 * 1024;
++
++/// Observe every binding independently while reusing one bounded pure projection.
++struct CurrentKnowledge<'a> {
++    filesystem: &'a dyn FileReader,
++    markdown: &'a dyn MarkdownCodec,
++    last_parsed: Option<ParsedKnowledge>,
++}
++
++struct ParsedKnowledge {
++    path: RepoPath,
++    file_hash: Sha256,
++    parsed: ParsedFile,
++}
++
+ /// Infer and validate vector candidates while storage owns the pinned read view.
+ struct QueryCandidates<'a, E> {
+     storage: &'a dyn StorageRead,
+@@ -140,12 +157,17 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
+     ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
+         let mut comparisons = RevisionComparisons::new(self.provenance);
+         let mut links = BTreeMap::new();
++        let mut current = CurrentKnowledge {
++            filesystem: self.filesystem,
++            markdown: self.markdown,
++            last_parsed: None,
++        };
+         for (id, node) in metadata {
+             let sources = self.get_source_bindings(id)?;
+             if !Self::matches_sources(&mut comparisons, node, &sources, filters)? {
+                 continue;
+             }
+-            let mut link = self.build_link(
++            let mut link = current.build_link(
+                 node,
+                 self.storage.project_get_by_id().map_err(map_search_error)?,
+             )?;
+@@ -164,28 +186,6 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
+         Ok(links)
+     }
+ 
+-    fn build_link(&self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
+-        let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
+-            .map_err(map_search_error)?;
+-        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
+-            .map_err(map_search_error)?;
+-        let parsed = file
+-            .as_ref()
+-            .and_then(|file| self.markdown.file_parse(&path, &file.bytes).ok().flatten());
+-        let flags = if is_current_knowledge(node, parsed.as_ref()) {
+-            BTreeSet::new()
+-        } else {
+-            BTreeSet::from([SearchFlag::Stale])
+-        };
+-        Ok(SearchLink {
+-            element_id: node.id.clone(),
+-            path,
+-            lines: node.lines,
+-            revision,
+-            flags,
+-        })
+-    }
+-
+     fn matches_sources(
+         comparisons: &mut RevisionComparisons<'_>,
+         node: &KnowledgeMetadata,
+@@ -243,6 +243,73 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
+     }
+ }
+ 
++impl CurrentKnowledge<'_> {
++    fn build_link(&mut self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
++        let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
++            .map_err(map_search_error)?;
++        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
++            .map_err(map_search_error)?;
++        let current = if let Some(file) = file {
++            self.is_current(node, &path, &file.bytes)
++        } else {
++            self.last_parsed = None;
++            false
++        };
++        let flags = if current {
++            BTreeSet::new()
++        } else {
++            BTreeSet::from([SearchFlag::Stale])
++        };
++        Ok(SearchLink {
++            element_id: node.id.clone(),
++            path,
++            lines: node.lines,
++            revision,
++            flags,
++        })
++    }
++
++    /// Reuse only successful parsing after hashing bytes from this binding's fresh capture.
++    /// Missing, invalid, unmarked and oversized observations never leave reusable state.
++    fn is_current(&mut self, node: &KnowledgeMetadata, path: &RepoPath, bytes: &[u8]) -> bool {
++        let file_hash = Sha256::digest(bytes);
++        if let Some(last) = &self.last_parsed
++            && last.path == *path
++            && last.file_hash == file_hash
++        {
++            return is_current_knowledge(node, Some(&last.parsed));
++        }
++        self.last_parsed = None;
++        let Some(mut parsed) = self.markdown.file_parse(path, bytes).ok().flatten() else {
++            return false;
++        };
++        let current = is_current_knowledge(node, Some(&parsed));
++        let id_bytes = parsed
++            .elements
++            .iter()
++            .fold(path.as_str().len(), |size, item| {
++                size.saturating_add(item.element.id.as_str().len())
++            });
++        if bytes.len() <= MAX_REUSED_FILE_BYTES
++            && parsed.elements.len() <= MAX_REUSED_ELEMENTS
++            && id_bytes <= MAX_REUSED_ID_BYTES
++        {
++            // Eligibility needs no graph or search payload; retain only its existing pure predicate inputs.
++            parsed.edges.clear();
++            for element in &mut parsed.elements {
++                element.search_text = String::new();
++            }
++            parsed.elements.shrink_to_fit();
++            self.last_parsed = Some(ParsedKnowledge {
++                path: path.clone(),
++                file_hash,
++                parsed,
++            });
++        }
++        current
++    }
++}
++
+ impl<E: Embedder> QueryCandidates<'_, E> {
+     fn find_vector_candidates(
+         &mut self,
+@@ -2197,6 +2264,369 @@ mod tests {
+         }
+     }
+ 
++    mod parse_reuse {
++        use crate::{
++            domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, TreeOid},
++            markdown::{Diagnostic, MarkdownParser},
++            service::{
++                CacheDatabase, CapturedFile, CommandErrorKind, CommandResult, DocumentResult,
++                FileError, FileErrorKind, FileStat, KnowledgeMetadata, MarkdownCodec,
++                MockFileReader, ParsedFile, ProvenanceObservation, ProvenanceRequest,
++                SearchFilters, SearchFlag, SearchLink, SnapshotError, SourceProvenance,
++                SourceRevisionComparison, SourceRevisionRequest, TransactionError,
++                search::{CurrentKnowledge, SearchEligibility, map_search_error},
++            },
++            storage::{TestDatabases, open_test_storage},
++        };
++        use std::{
++            cell::Cell,
++            collections::{BTreeMap, BTreeSet},
++            path::Path,
++        };
++
++        struct CountedParser(Cell<usize>);
++        struct NoSources;
++
++        #[test]
++        fn repeated_bindings_capture_every_time_but_parse_once_per_operation() {
++            // Given: eight published sections of one unchanged current file.
++            let bytes = build_sections(8);
++            let nodes = build_metadata("note.md", &bytes);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            let files = build_files(vec![Some(bytes.clone()); 16]);
++            // When: the same live collaborators serve two independent eligibility operations.
++            let first = get_links(&storage, &files, &parser, &nodes);
++            let second = get_links(&storage, &files, &parser, &nodes);
++            // Then: all links remain current, all sixteen captures occur, and neither parse survives its operation.
++            assert_eq!(first.len(), 8);
++            assert_eq!(second.len(), 8);
++            assert!(
++                first
++                    .values()
++                    .chain(second.values())
++                    .all(|link| link.flags.is_empty())
++            );
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        #[test]
++        fn changed_invalid_missing_and_restored_captures_retain_their_flags() {
++            // Given: eight section bindings encounter same-size edits, invalid bytes, absence, and restoration.
++            let original = build_sections(8);
++            let edited = String::from_utf8(original.clone())
++                .unwrap()
++                .replace("body", "edit")
++                .into_bytes();
++            let invalid = b"<!-- letopis: {} -->\ninvalid\n".to_vec();
++            let files = build_files(vec![
++                Some(original.clone()),
++                Some(edited),
++                Some(original.clone()),
++                Some(invalid.clone()),
++                Some(invalid),
++                None,
++                Some(original.clone()),
++                Some(original.clone()),
++            ]);
++            let nodes = build_metadata("note.md", &original);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: eligibility follows sorted bindings while every capture independently changes.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: exact current-byte changes are visible, and invalid parses are retried rather than retained.
++            let stale: Vec<_> = links
++                .values()
++                .map(|link| link.flags.contains(&SearchFlag::Stale))
++                .collect();
++            assert_eq!(stale, [false, true, false, true, true, true, false, false]);
++            assert_eq!(parser.0.get(), 6);
++        }
++
++        #[test]
++        fn equal_bytes_at_distinct_paths_need_distinct_parses() {
++            // Given: two files contain identical section bytes but have distinct knowledge identities.
++            let bytes = build_sections(2);
++            let mut nodes = build_metadata("a.md", &bytes);
++            nodes.extend(build_metadata("b.md", &bytes));
++            let files = build_files(vec![Some(bytes); 4]);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: sorted demand moves from a.md to b.md.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: each file is parsed once and no path-specific identity leaks to the next file.
++            assert_eq!(links.len(), 4);
++            assert!(links.values().all(|link| link.flags.is_empty()));
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        #[test]
++        fn oversized_inputs_and_entry_sets_bypass_retention() {
++            // Given: byte and entry budgets are independently exceeded by valid files.
++            let long_path = format!("{}.md", "n".repeat(300));
++            for (path, bytes) in [
++                (
++                    "note.md",
++                    [build_sections(2), vec![b'x'; 256 * 1024]].concat(),
++                ),
++                ("note.md", build_sections(1025)),
++                (long_path.as_str(), build_sections(1024)),
++            ] {
++                let mut nodes = build_metadata(path, &bytes);
++                nodes.retain(|id, _| {
++                    id.as_str().ends_with("s0000") || id.as_str().ends_with("s0001")
++                });
++                let files = build_files(vec![Some(bytes); 2]);
++                let parser = CountedParser(Cell::new(0));
++                let root = tempfile::tempdir().unwrap();
++                let storage =
++                    open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                        .unwrap();
++                // When: both bindings are evaluated using the ordinary path.
++                let links = get_links(&storage, &files, &parser, &nodes);
++                // Then: bypass changes no flags and retains no reusable parse.
++                assert_eq!(links.len(), 2);
++                assert!(links.values().all(|link| link.flags.is_empty()));
++                assert_eq!(parser.0.get(), 2);
++            }
++        }
++
++        #[test]
++        fn missing_capture_discards_the_previous_success() {
++            // Given: a valid file disappears between its three bindings and then returns unchanged.
++            let bytes = build_sections(3);
++            let nodes = build_metadata("note.md", &bytes);
++            let files = build_files(vec![Some(bytes.clone()), None, Some(bytes)]);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: each binding captures its own current file state.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: absence marks only its binding stale and restoration is parsed again.
++            assert_eq!(
++                links
++                    .values()
++                    .map(|link| link.flags.contains(&SearchFlag::Stale))
++                    .collect::<Vec<_>>(),
++                [false, true, false]
++            );
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        #[test]
++        fn every_binding_still_checks_its_own_hash_and_lines() {
++            // Given: three pinned bindings include a wrong hash and wrong line range.
++            let bytes = build_sections(3);
++            let mut nodes = build_metadata("note.md", &bytes);
++            nodes
++                .get_mut(&KnowledgeId::parse("note.md#s0001").unwrap())
++                .unwrap()
++                .hash = Sha256::digest(b"wrong");
++            nodes
++                .get_mut(&KnowledgeId::parse("note.md#s0002").unwrap())
++                .unwrap()
++                .lines = LineRange::new(1, 2).unwrap();
++            let files = build_files(vec![Some(bytes); 3]);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: all bindings reuse one successful parse after their fresh captures.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: stale predicates use each pinned node rather than the first node's answer.
++            assert_eq!(
++                links
++                    .values()
++                    .map(|link| link.flags.contains(&SearchFlag::Stale))
++                    .collect::<Vec<_>>(),
++                [false, true, true]
++            );
++            assert_eq!(parser.0.get(), 1);
++        }
++
++        #[test]
++        fn retained_projection_releases_search_and_graph_payloads() {
++            // Given: a valid whole-file element contains searchable text and a graph link.
++            let bytes = b"<!-- letopis: {\"created_at\":1} -->\nbody [source](code.rs \"letopis:type=external;path=code.rs\")\n";
++            let nodes = build_metadata("note.md", bytes);
++            let files = build_files(vec![Some(bytes.to_vec())]);
++            let parser = CountedParser(Cell::new(0));
++            let mut current = CurrentKnowledge {
++                filesystem: &files,
++                markdown: &parser,
++                last_parsed: None,
++            };
++            // When: one current binding leaves a reusable eligibility projection.
++            let link = current
++                .build_link(nodes.values().next().unwrap(), 1)
++                .unwrap();
++            let parsed = &current.last_parsed.as_ref().unwrap().parsed;
++            // Then: only bounded element metadata is retained, while text buffers and graph allocations are released.
++            assert!(link.flags.is_empty());
++            assert!(parsed.edges.is_empty());
++            assert_eq!(parsed.elements.len(), 1);
++            assert_eq!(parsed.elements[0].search_text.capacity(), 0);
++        }
++
++        #[test]
++        fn fresh_capture_errors_abort_without_retaining_state_for_retry() {
++            // Given: a safe first capture is followed by an I/O error at the second binding.
++            let bytes = build_sections(2);
++            let nodes = build_metadata("note.md", &bytes);
++            let mut files = MockFileReader::new();
++            let mut demand = 0;
++            files
++                .expect_file_get_by_path()
++                .times(4)
++                .returning(move |_| {
++                    demand += 1;
++                    if demand == 2 {
++                        return Err(FileError::new(FileErrorKind::Io));
++                    }
++                    Ok(Some(build_capture(bytes.clone())))
++                });
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: the failed operation is retried using the same collaborators.
++            let error = get_links_result(&storage, &files, &parser, &nodes).unwrap_err();
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: I/O remains an error rather than stale or partial success, and the retry parses afresh.
++            assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
++            assert_eq!(links.len(), 2);
++            assert!(links.values().all(|link| link.flags.is_empty()));
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        impl MarkdownCodec for CountedParser {
++            fn file_parse(
++                &self,
++                path: &RepoPath,
++                bytes: &[u8],
++            ) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
++                self.0.set(self.0.get() + 1);
++                MarkdownParser::new().file_parse(path, bytes)
++            }
++        }
++        impl SourceProvenance for NoSources {
++            fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
++                Ok(())
++            }
++            fn observe_sources(
++                &self,
++                _: ProvenanceRequest<'_>,
++            ) -> DocumentResult<ProvenanceObservation> {
++                Ok(ProvenanceObservation {
++                    flags: BTreeSet::new(),
++                    issues: BTreeSet::new(),
++                })
++            }
++            fn compare_revision(
++                &self,
++                _: SourceRevisionRequest<'_>,
++            ) -> Result<SourceRevisionComparison, SnapshotError> {
++                panic!("unfiltered search cannot compare revisions")
++            }
++        }
++        fn get_links(
++            storage: &TestDatabases,
++            files: &MockFileReader,
++            parser: &CountedParser,
++            nodes: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
++        ) -> BTreeMap<KnowledgeId, SearchLink> {
++            get_links_result(storage, files, parser, nodes).unwrap()
++        }
++        fn get_links_result(
++            storage: &TestDatabases,
++            files: &MockFileReader,
++            parser: &CountedParser,
++            nodes: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
++        ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
++            storage
++                .cache
++                .with_read_tx(|| {
++                    SearchEligibility {
++                        storage: &storage.cache,
++                        filesystem: files,
++                        markdown: parser,
++                        provenance: &NoSources,
++                    }
++                    .get_eligible_links(nodes, &SearchFilters::default())
++                })
++                .map_err(|error| match error {
++                    TransactionError::Operation(error) => error,
++                    TransactionError::Storage(error) => map_search_error(error),
++                })
++        }
++        fn build_files(captures: Vec<Option<Vec<u8>>>) -> MockFileReader {
++            let mut files = MockFileReader::new();
++            let count = captures.len();
++            let mut captures = captures.into_iter();
++            files
++                .expect_file_get_by_path()
++                .times(count)
++                .returning(move |_: &Path| {
++                    Ok(captures.next().expect("extra live read").map(build_capture))
++                });
++            files
++        }
++        fn build_capture(bytes: Vec<u8>) -> CapturedFile {
++            CapturedFile {
++                bytes,
++                stat: FileStat {
++                    size: 1,
++                    mtime_ns: 1,
++                    inode: 1,
++                    device: 1,
++                },
++                checked_at_ns: 1,
++            }
++        }
++        fn build_sections(count: usize) -> Vec<u8> {
++            (0..count).map(|index| format!("## Section {{#s{index:04}}}\n<!-- letopis: {{\"created_at\":1}} -->\nbody\n"))
++                .collect::<String>().into_bytes()
++        }
++        fn build_metadata(path: &str, bytes: &[u8]) -> BTreeMap<KnowledgeId, KnowledgeMetadata> {
++            MarkdownParser::new()
++                .file_parse(&RepoPath::parse(path).unwrap(), bytes)
++                .unwrap()
++                .unwrap()
++                .elements
++                .into_iter()
++                .map(|parsed| {
++                    let element = parsed.element;
++                    (
++                        element.id.clone(),
++                        KnowledgeMetadata {
++                            uri: element.id.clone(),
++                            id: element.id,
++                            kind: ElementKind::Vertex,
++                            hash: element.hash,
++                            created_at: 1,
++                            source_snapshot: None,
++                            lines: element.lines,
++                            search_hash: parsed.search_hash,
++                        },
++                    )
++                })
++                .collect()
++        }
++    }
++
+     fn build_noop_refresher() -> MockRefresher {
+         let mut refresher = MockRefresher::new();
+         refresher.expect_reindex().times(0);
+diff --git a/src/storage/mod.rs b/src/storage/mod.rs
+index 6b4b03a..acb6951 100644
+--- a/src/storage/mod.rs
++++ b/src/storage/mod.rs
+@@ -6,6 +6,7 @@ mod query;
+ mod schema;
+ mod transaction;
+ mod vector;
++mod vector_index;
+ 
+ pub(crate) use cache::CacheStorage;
+ pub(crate) use connection::{
+diff --git a/src/storage/schema.rs b/src/storage/schema.rs
+index 02bdeed..09ab36d 100644
+--- a/src/storage/schema.rs
++++ b/src/storage/schema.rs
+@@ -1,6 +1,7 @@
+ use super::{
+     connection::{map_sqlite, wait_for_storage_contention},
+     native::register_vec1,
++    vector_index::vector_index_prepare,
+ };
+ use crate::service::{StorageError, StorageErrorKind, StorageResult};
+ use rusqlite::{Connection, Transaction, TransactionBehavior};
+@@ -31,7 +32,8 @@ pub(crate) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()>
+ }
+ 
+ pub(crate) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
+-    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
++    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)?;
++    vector_index_prepare(connection)
+ }
+ 
+ pub(crate) fn validate_cache(connection: &Connection) -> StorageResult<()> {
+diff --git a/src/storage/vector.rs b/src/storage/vector.rs
+index 5538673..7d7f5eb 100644
+--- a/src/storage/vector.rs
++++ b/src/storage/vector.rs
+@@ -26,7 +26,7 @@ const NATIVE_DIMENSION_MAX: usize = 4096;
+ const RESET_INDEX: &str = r#"
+     drop table vector_index;
+     create virtual table vector_index using vec1(vector);
+-    insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
++    insert into vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
+ "#;
+ 
+ /// Select the vector database on a write connection or a cache read connection.
+@@ -611,7 +611,11 @@ pub(super) fn vector_keys_get_by_search_hash(
+         .transpose()
+ }
+ 
+-fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
++/// Decode native-endian f32 values without accepting empty, truncated or nonfinite payloads.
++///
++/// # Errors
++/// Returns an internal storage error for invalid stored vector bytes.
++pub(super) fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
+     if bytes.is_empty() || !bytes.len().is_multiple_of(4) {
+         return Err(StorageError::new(
+             StorageErrorKind::InternalError,
+diff --git a/src/storage/vectors.sql b/src/storage/vectors.sql
+index de1c5cd..c7ca955 100644
+--- a/src/storage/vectors.sql
++++ b/src/storage/vectors.sql
+@@ -3,4 +3,4 @@ create table vector_keys(row_id integer primary key, search_hash text not null u
+ create virtual table vector_index using vec1(vector);
+ create table query_error(id integer primary key check(id=1), at integer not null, error text not null);
+ create table embed_failures(search_hash text primary key, attempts integer not null check(attempts>=1), error text);
+-insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
++insert into vector_index(cmd,arg) values('rebuild','{index:"flat",distance:"cos"}');
+diff --git a/tests/markdown_elements.rs b/tests/markdown_elements.rs
+index 99598d5..eab96ff 100644
+--- a/tests/markdown_elements.rs
++++ b/tests/markdown_elements.rs
+@@ -267,6 +267,20 @@ fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
+     }
+ }
+ 
++#[test]
++fn adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings() {
++    // Given: uneven sections include CRLF, a fenced fake heading, a gap and no final LF.
++    let text = "前文\r\n\r\n## A {#a}\r\n<!-- letopis: {\"created_at\":1} -->\r\nА\r\n\r\n```md\r\n## Fake {#fake}\r\n```\r\n# Outside\r\nGap\r\n\r\n## B {#b}\r\n<!-- letopis: {\"created_at\":2} -->\r\nБ";
++    // When: parse both non-overlapping elements with their complete document context.
++    let parsed = parse_file("a.md", text);
++    // Then: both section line ranges retain independent literal coordinates.
++    assert_eq!(parsed.elements.len(), 2);
++    assert_eq!(parsed.elements[0].element.lines.get_start(), 3);
++    assert_eq!(parsed.elements[0].element.lines.get_end(), 9);
++    assert_eq!(parsed.elements[1].element.lines.get_start(), 13);
++    assert_eq!(parsed.elements[1].element.lines.get_end(), 15);
++}
++
+ fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
+     let got = &parsed.element;
+     assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
+diff --git a/tests/performance/README.md b/tests/performance/README.md
+index 738c5c2..1fde893 100644
+--- a/tests/performance/README.md
++++ b/tests/performance/README.md
+@@ -1,5 +1,26 @@
+ # Model-free performance diagnosis (#65)
+ 
++The [search optimization experiments](../../docs/zkit/letopis/checks/issue-65/search-optimization/report.md)
++compare four methods and record the selected changes: 111.886 → 61.102 s median
++on the synthetic 100k corpus with real Ollama vectors. Its
++[commands](../../docs/zkit/letopis/checks/issue-65/search-optimization/commands.md)
++cover verification, repeat measurements and Samply recording. This real-provider
++follow-up is separate from the model-free harness described below.
++
++The [native Samply follow-up](../../docs/zkit/letopis/checks/issue-65/native-followup/report.md)
++records the verified check/status optimization, genuine before/after profiles,
++and the separately authorized real Ollama campaign. Its coverage status is explicit.
++
++The [2026-11-06 100k/Ollama attempt](../../docs/zkit/letopis/checks/issue-65/2026-11-06-100k/report.md)
++records successful 100k initialization with a larger budget, current command
++timings, and the real Ollama provider attempt blocked by sandbox loopback access.
++
++The [2026-11-05 follow-up](../../docs/zkit/letopis/checks/issue-65/current/report.md)
++measures the current library-backed Git implementation and records the focused
++loose-object reuse optimization. Historical reports below retain their captured
++revisions. The scenario name `reindex` is kept for existing comparison files;
++current surveys and contention writers execute `index --full`.
++
+ Use `/opt/homebrew/bin/python3.12 -B` on this host; system Python is too old.
+ The runner uses new synthetic standalone repositories, explicit disabled/fake
+ embedding settings and immutable evidence. It never uses the working repository's
+diff --git a/tests/performance/contention.py b/tests/performance/contention.py
+index b7de488..fc88363 100644
+--- a/tests/performance/contention.py
++++ b/tests/performance/contention.py
+@@ -114,7 +114,7 @@ def coordinate_reindex(scenario, build, evidence, verify):
+ def measure_contention_call(scenario, build, evidence, options):
+     """Publish an exclusive, synced subcall receipt before its result is consumed."""
+     role = options["role"]
+-    argv = ["reindex"] if role == "writer" else scenario["argv"]
++    argv = ["index", "--full"] if role == "writer" else scenario["argv"]
+     data = b"{}\n" if role == "writer" else scenario["stdin"]
+     settings = {"timeout": scenario.get("timeout", 120), "cancel_event": options.get("cancel_event")}
+     record = measure_process([build["executable"], *argv], scenario["repository"], data, settings)
+@@ -152,7 +152,7 @@ def build_contention_receipt(scenario, baseline, reader, written, index_locked):
+                "overlap_seconds": overlap, "writer_index_lock_observed": index_locked,
+                "throughput_success_per_s": sum(call["outcome"] == "success" for call in (reader, written)) / duration,
+                "reader_validation": validate_result(scenario, reader),
+-               "writer_validation": validate_result({"expected": {"command": "reindex"}}, written),
++               "writer_validation": validate_result({"expected": {"command": "index"}}, written),
+                "scope": "CLI lifetime overlap; no direct SQL lock-wait attribution"}
+ 
+ 
+diff --git a/tests/performance/report.py b/tests/performance/report.py
+index c6512ee..a1f069d 100644
+--- a/tests/performance/report.py
++++ b/tests/performance/report.py
+@@ -84,7 +84,7 @@ def validate_command(scenario: dict, result) -> dict:
+         if result["problems"] or result["revision"] is None or result["locks"]:
+             raise ValueError("unexpected problems or locks")
+         return {"revision": result["revision"], "backlog": result["embedding_backlog"]}
+-    if command == "reindex":
++    if command in ("index", "reindex"):
+         if type(result["revision"]) is not int or result["revision"] < 1:
+             raise ValueError("invalid publication")
+         return {"revision": result["revision"]}
+diff --git a/tests/performance/scenarios.py b/tests/performance/scenarios.py
+index 1985562..7528fdf 100644
+--- a/tests/performance/scenarios.py
++++ b/tests/performance/scenarios.py
+@@ -119,7 +119,8 @@ def prepare_scenario(fixture: dict, name: str, output: Path) -> dict:
+         expected.update(build_traversal_oracle())
+     if command == "inspect":
+         expected["inspection"] = build_inspection_oracle(output, FIRST_ID)
+-    return {"repository": output, "argv": [command], "stdin": encode_json(request),
++    argv = ["index", "--full"] if command == "index" else [command]
++    return {"repository": output, "argv": argv, "stdin": encode_json(request),
+             "expected": expected,
+             "setup_seconds": time.monotonic() - started, "state_hashes": hashes,
+             "cache_label": "initialized_projection_os_cache_uncontrolled",
+@@ -163,7 +164,9 @@ def build_request(name: str) -> tuple[str, dict]:
+     if name == "traverse":
+         return name, {"element_ids": [FIRST_ID], "mode": "both", "direction": "outgoing",
+                       "depth": 2, "limit": 20, "edge_limit": 40}
+-    if name in ("check", "status", "reindex"):
++    if name == "reindex":
++        return "index", {}
++    if name in ("check", "status"):
+         return name, {}
+     return "search", {"query": '"case 000000"' if not name.startswith("refresh")
+                        else '"Altered___case 000000"', "limit": 10}
+diff --git a/tests/performance/test_contention.py b/tests/performance/test_contention.py
+index 2261a94..f0f18af 100644
+--- a/tests/performance/test_contention.py
++++ b/tests/performance/test_contention.py
+@@ -20,6 +20,22 @@ from provider import start_provider
+ 
+ 
+ class ContentionTests(unittest.TestCase):
++    def test_writer_executes_full_index_command(self):
++        # Given: a CLI accepting only the current full-index argv and JSON input.
++        with tempfile.TemporaryDirectory() as directory:
++            root = Path(directory).resolve()
++            binary = root / "cli"
++            binary.write_text(f"#!{sys.executable}\nimport json, sys\n"
++                              "assert sys.argv[1:] == ['index', '--full']\n"
++                              "assert json.load(sys.stdin) == {}\n"
++                              "print(json.dumps({'ok': True, 'result': {'revision': 1}}))\n")
++            binary.chmod(0o755)
++            # When: launching the owned contention writer.
++            record = actual_contention_call({"repository": root}, {"executable": str(binary)},
++                                             root, {"role": "writer"})
++            # Then: it publishes successfully using index --full.
++            self.assertEqual(record["outcome"], "success")
++
+     def test_interrupted_baseline_is_persisted_before_any_writer_launch(self):
+         # Given: an owned baseline reader still running when cancellation arrives.
+         with tempfile.TemporaryDirectory() as directory:
+@@ -89,7 +105,7 @@ class ContentionTests(unittest.TestCase):
+                 run_contention(scenario, {"executable": str(binary)}, root / "evidence", verify=verify)
+             # Then: each actual launch was preceded by verification; writer is reaped.
+             events = (root / "events").read_text().splitlines()
+-            self.assertEqual(events, ["verify", "check", "verify", "reindex", "verify"])
++            self.assertEqual(events, ["verify", "check", "verify", "index", "verify"])
+             with self.assertRaises(ProcessLookupError):
+                 os.kill(int((root / "writer.pid").read_text()), 0)
+ 
+@@ -227,7 +243,7 @@ def _prepare_interruptible_cli(root, slow_baseline=False):
+     binary = root / "cli"
+     script = _VERIFIED_CLI
+     if slow_baseline:
+-        script = script.replace("if sys.argv[1] == 'reindex':", "if sys.argv[1] == 'check':\n    time.sleep(60)\nif sys.argv[1] == 'reindex':")
++        script = script.replace("if sys.argv[1] == 'index':", "if sys.argv[1] == 'check':\n    time.sleep(60)\nif sys.argv[1] == 'index':")
+     binary.write_text(f"#!{sys.executable}\n" + script)
+     binary.chmod(0o755)
+     return binary, {"repository": root, "argv": ["check"], "stdin": b"{}",
+@@ -251,7 +267,7 @@ def _interrupt(*_):
+ _VERIFIED_CLI = '''import fcntl, json, os, pathlib, sys, time
+ with open('events', 'a') as stream:
+     stream.write(sys.argv[1] + '\\n')
+-if sys.argv[1] == 'reindex':
++if sys.argv[1] == 'index':
+     pathlib.Path('writer.pid').write_text(str(os.getpid()))
+     with open('.letopis/index.lock', 'a') as lock:
+         fcntl.flock(lock, fcntl.LOCK_EX)
+diff --git a/tests/performance/test_report.py b/tests/performance/test_report.py
+index 011f6ad..1ec13db 100644
+--- a/tests/performance/test_report.py
++++ b/tests/performance/test_report.py
+@@ -23,6 +23,18 @@ def make_measurement(response) -> dict:
+ 
+ 
+ class ReportTests(unittest.TestCase):
++    def test_index_requires_a_positive_published_revision(self):
++        # Given: the current full-index command and literal publication responses.
++        scenario = {"expected": {"command": "index"}}
++        # When: validating a successful rebuild and invalid revision alternatives.
++        valid = validate_result(scenario, make_measurement({"ok": True, "result": {"revision": 7}}))
++        invalid = [validate_result(scenario, make_measurement({"ok": True, "result": {"revision": value}}))
++                   for value in (0, -1, True, "7", None)]
++        # Then: only a positive integer publication can enter the timing series.
++        self.assertTrue(valid["valid"])
++        self.assertEqual(valid["observed"], {"revision": 7})
++        self.assertTrue(all(not result["valid"] for result in invalid))
++
+     def test_inspect_rejects_another_valid_fragment_and_missing_location(self):
+         # Given: independently frozen bytes for the first of two marked sections.
+         first, second = b"## Zero {#zero}\nzero\n", b"## One {#one}\none\n"
+diff --git a/tests/performance/test_scenarios.py b/tests/performance/test_scenarios.py
+index 9fe7b56..98bb40d 100644
+--- a/tests/performance/test_scenarios.py
++++ b/tests/performance/test_scenarios.py
+@@ -13,6 +13,18 @@ from scenarios import (ROOT, build_release, build_traversal_oracle, prepare_exis
+ 
+ 
+ class ScenarioTests(unittest.TestCase):
++    def test_full_rebuild_uses_current_index_command(self):
++        # Given: the historical reindex scenario on a fresh synthetic repository.
++        with tempfile.TemporaryDirectory() as directory:
++            root = Path(directory).resolve()
++            fixture = prepare_fixture(root / "fixture", 60)
++            # When: preparing a full projection rebuild.
++            scenario = prepare_scenario(fixture, "reindex", root / "case")
++            # Then: the current CLI receives index --full and an empty JSON request.
++            self.assertEqual(scenario["argv"], ["index", "--full"])
++            self.assertEqual(scenario["stdin"], b"{}\n")
++            self.assertEqual(scenario["expected"]["command"], "index")
++
+     def test_packing_control_preserves_target_bytes_and_source_tree(self):
+         # Given: identical seed/count/fragment bytes with different file packing.
+         with tempfile.TemporaryDirectory() as directory:

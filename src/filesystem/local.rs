@@ -157,8 +157,7 @@ impl LocalFileSystem {
     /// # Errors
     /// Reports unsafe roots or operating-system failures.
     pub(crate) fn new(root: &Path) -> FileResult<Self> {
-        let root_path = std::path::absolute(root)
-            .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+        let root_path = std::path::absolute(root).map_err(map_error_to_file_io_error)?;
         let root = open(root, DIRECTORY_FLAGS, Mode::empty()).map_err(file_map_io)?;
         let filesystem = Self {
             root: File::from(root),
@@ -312,7 +311,7 @@ impl FileParent {
             directory: filesystem
                 .directory_get_root()
                 .try_clone()
-                .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?,
+                .map_err(map_error_to_file_io_error)?,
             links: Vec::new(),
         };
         let mut path = PathBuf::new();
@@ -611,7 +610,7 @@ where
     let observation = before_read()?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+        .map_err(map_error_to_file_io_error)?;
     #[cfg(test)]
     if let Some(hook) = filesystem.after_read.take() {
         hook();
@@ -642,9 +641,8 @@ fn file_get_time_ns(_files: &LocalFileSystem) -> FileResult<i64> {
     }
     let elapsed = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
-    i64::try_from(elapsed.as_nanos())
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))
+        .map_err(map_error_to_file_io_error)?;
+    i64::try_from(elapsed.as_nanos()).map_err(map_error_to_file_io_error)
 }
 
 fn file_get_verified_identity_by_path(
@@ -708,11 +706,9 @@ fn file_get_observation_by_parent_and_name(
 fn file_build_stat(stat: &Stat) -> FileResult<FileStat> {
     let nanoseconds =
         i128::from(stat.st_mtime) * i128::from(NANOS_PER_SECOND) + i128::from(stat.st_mtime_nsec);
-    let mtime_ns = i64::try_from(nanoseconds)
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+    let mtime_ns = i64::try_from(nanoseconds).map_err(map_error_to_file_io_error)?;
     Ok(FileStat {
-        size: u64::try_from(stat.st_size)
-            .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?,
+        size: u64::try_from(stat.st_size).map_err(map_error_to_file_io_error)?,
         mtime_ns,
         inode: stat.st_ino,
         device: file_build_identity(stat)?.device,
@@ -809,7 +805,7 @@ fn directory_get_by_path(filesystem: &LocalFileSystem, path: &Path) -> FileResul
             parent
                 .directory
                 .try_clone()
-                .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?,
+                .map_err(map_error_to_file_io_error)?,
         );
     }
     parent.directory_verify_links(filesystem)?;
@@ -818,7 +814,7 @@ fn directory_get_by_path(filesystem: &LocalFileSystem, path: &Path) -> FileResul
         .try_clone()
         .map(OwnedFd::from)
         .map(Some)
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))
+        .map_err(map_error_to_file_io_error)
 }
 
 fn lock_get_owner_by_path(
@@ -871,8 +867,7 @@ fn file_create_if_absent_by_path(
         return Ok(());
     }
     let (temporary, mut file) = file_create_temporary(&parent.directory)?;
-    file_retry_io(|| file.write_all(bytes))
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+    file_retry_io(|| file.write_all(bytes)).map_err(map_error_to_file_io_error)?;
     fchmod(&file, Mode::RUSR | Mode::WUSR).map_err(file_map_io)?;
     file_sync(&file)?;
     parent.directory_verify_links(filesystem)?;
@@ -899,9 +894,7 @@ fn file_create_if_absent_by_path(
 
 fn file_create_temporary(directory: &File) -> FileResult<(TemporaryEntry, File)> {
     // Own cleanup before creating an entry so descriptor-duplication failure leaks nothing.
-    let directory = directory
-        .try_clone()
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+    let directory = directory.try_clone().map_err(map_error_to_file_io_error)?;
     for _ in 0..TEMP_ATTEMPTS {
         let name = format!(
             ".file.tmp.{}.{}",
@@ -927,17 +920,16 @@ fn file_create_temporary(directory: &File) -> FileResult<(TemporaryEntry, File)>
 
 fn file_sync(file: &File) -> FileResult<()> {
     file_verify_sync(SyncTarget::File)?;
-    file_retry_io(|| file_sync_data(file))
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))
+    file_retry_io(|| file_sync_contents(file)).map_err(map_error_to_file_io_error)
 }
 
 #[cfg(target_os = "macos")]
-fn file_sync_data(file: &File) -> io::Result<()> {
+fn file_sync_contents(file: &File) -> io::Result<()> {
     rustix::fs::fcntl_fullfsync(file).map_err(io::Error::from)
 }
 
 #[cfg(not(target_os = "macos"))]
-fn file_sync_data(file: &File) -> io::Result<()> {
+fn file_sync_contents(file: &File) -> io::Result<()> {
     file.sync_all()
 }
 
@@ -945,8 +937,7 @@ fn directory_sync(directory: &File) -> FileResult<()> {
     file_verify_sync(SyncTarget::Directory)?;
     // A retained descriptor identifies the directory even if its path is concurrently changed.
     fstat(directory).map_err(file_map_io)?;
-    file_retry_io(|| directory.sync_all())
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))
+    file_retry_io(|| directory.sync_all()).map_err(map_error_to_file_io_error)
 }
 
 #[cfg_attr(
@@ -1045,8 +1036,7 @@ fn lock_acquire_by_path(filesystem: &LocalFileSystem, path: &Path) -> FileResult
     let (parent, name, file) = lock_get_file_by_path(filesystem, path)?;
     let before = file_get_lock_stat(&file)?;
     if !lock_try_acquire(filesystem, &file)? {
-        file_retry_io(|| file.lock())
-            .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+        file_retry_io(|| file.lock()).map_err(map_error_to_file_io_error)?;
     }
     lock_finish_acquisition(filesystem, &parent, &name, file, before)
 }
@@ -1119,16 +1109,14 @@ fn lock_finish_acquisition(
         .set_len(0)
         .and_then(|()| guard.file.seek(SeekFrom::Start(0)))
         .and_then(|_| writeln!(guard.file, "{}", std::process::id()))
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+        .map_err(map_error_to_file_io_error)?;
     file_verify_lock(filesystem, parent, name, &guard.file)?;
     directory_verify_root(filesystem)?;
     Ok(guard)
 }
 
 fn lock_try_acquire(_files: &LocalFileSystem, file: &File) -> FileResult<bool> {
-    if lock_retry_acquisition(|| file.try_lock())
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?
-    {
+    if lock_retry_acquisition(|| file.try_lock()).map_err(map_error_to_file_io_error)? {
         return Ok(true);
     }
     #[cfg(test)]
@@ -1203,7 +1191,7 @@ fn lock_get_pid(file: &mut File) -> FileResult<NonZeroU32> {
     let mut bytes = Vec::new();
     file.take(PID_READ_LIMIT)
         .read_to_end(&mut bytes)
-        .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?;
+        .map_err(map_error_to_file_io_error)?;
     if bytes.len() > MAX_PID_BYTES {
         return Err(FileError::new(FileErrorKind::InvalidOwner));
     }
@@ -1231,7 +1219,7 @@ pub(super) fn file_retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io
 
 fn directory_verify_root(filesystem: &LocalFileSystem) -> FileResult<()> {
     let current = open(&filesystem.root_path, DIRECTORY_FLAGS, Mode::empty())
-        .map_err(|cause| FileError::new_with_cause(FileErrorKind::Changed, cause))?;
+        .map_err(map_error_to_file_changed_error)?;
     file_verify_identity(
         &fstat(filesystem.directory_get_root()).map_err(file_map_io)?,
         &fstat(current).map_err(file_map_io)?,
@@ -1303,8 +1291,8 @@ fn file_get_entry_once(parent: &File, name: &OsStr) -> FileResult<Option<Stat>> 
 }
 
 fn file_verify_entry(parent: &File, name: &OsStr, before: &Stat) -> FileResult<Stat> {
-    let current = statat(parent, name, AtFlags::SYMLINK_NOFOLLOW)
-        .map_err(|cause| FileError::new_with_cause(FileErrorKind::Changed, cause))?;
+    let current =
+        statat(parent, name, AtFlags::SYMLINK_NOFOLLOW).map_err(map_error_to_file_changed_error)?;
     file_verify_identity(before, &current)?;
     Ok(current)
 }
@@ -1328,8 +1316,7 @@ fn file_verify_type(stat: &Stat, expected: FileType, kind: FileErrorKind) -> Fil
 
 fn file_build_identity(stat: &Stat) -> FileResult<FileIdentity> {
     Ok(FileIdentity {
-        device: u64::try_from(i128::from(stat.st_dev))
-            .map_err(|error| FileError::new_with_cause(FileErrorKind::Io, error))?,
+        device: u64::try_from(i128::from(stat.st_dev)).map_err(map_error_to_file_io_error)?,
         inode: stat.st_ino,
     })
 }
@@ -1369,6 +1356,26 @@ fn directory_set_before_nested_preflight(hook: AbsenceHook) {
 #[cfg(test)]
 fn file_set_after_absence(hook: AbsenceHook) {
     AFTER_ABSENCE.set(Some(hook));
+}
+
+/// Maps a failure into an I/O-classified file error.
+///
+/// # Arguments
+///
+/// * `error` — failure classified with the I/O kind.
+fn map_error_to_file_io_error(error: impl std::error::Error + Send + Sync + 'static) -> FileError {
+    FileError::new_with_cause(FileErrorKind::Io, error)
+}
+
+/// Maps a failure into a changed-file error.
+///
+/// # Arguments
+///
+/// * `error` — failure classified with the changed kind.
+fn map_error_to_file_changed_error(
+    error: impl std::error::Error + Send + Sync + 'static,
+) -> FileError {
+    FileError::new_with_cause(FileErrorKind::Changed, error)
 }
 
 #[cfg(test)]

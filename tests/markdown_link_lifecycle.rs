@@ -1,6 +1,7 @@
 use crate::support::storage::get_current;
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
+use std::num::NonZeroUsize;
 mod support;
 
 use letopis::{
@@ -129,7 +130,9 @@ fn legacy_titles_never_publish_into_a_fresh_cache() {
     assert!(
         storage
             .cache
-            .with_read_tx(|| storage.cache.text_index_get_by_expression("new OR old"))
+            .with_read_tx(|| storage
+                .cache
+                .text_index_get_by_expression("new OR old", NonZeroUsize::new(100).unwrap()))
             .unwrap()
             .is_empty()
     );
@@ -245,7 +248,8 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
                 }))
             );
             assert_eq!(
-                read.text_index_get_by_expression("StableToken").unwrap()[0]
+                read.text_index_get_by_expression("StableToken", NonZeroUsize::new(100).unwrap())
+                    .unwrap()[0]
                     .id
                     .as_str(),
                 "note.md"

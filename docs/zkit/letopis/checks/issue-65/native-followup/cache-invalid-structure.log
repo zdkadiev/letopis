@@ -1,0 +1,22 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.87s
+     Running unittests src/lib.rs (.artifacts/issue-65/2026-11-06-native-followup/test-target/debug/deps/letopis-3ec941bdc62022ba)
+
+running 1 test
+test git::objects::tests::invalid_tree_bodies_are_validated_on_every_demand ... FAILED
+
+failures:
+
+---- git::objects::tests::invalid_tree_bodies_are_validated_on_every_demand stdout ----
+
+thread 'git::objects::tests::invalid_tree_bodies_are_validated_on_every_demand' (526097375) panicked at src/git/objects.rs:343:47:
+called `Result::unwrap_err()` on an `Ok` value: [48, 49, 48, 48, 54, 52, 52, 32, 102, 105, 108, 101, 0, 29, 58, 6, 84, 124, 112, 107, 208, 247, 91, 19, 14, 222, 207, 72, 50, 41, 91, 186, 107]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    git::objects::tests::invalid_tree_bodies_are_validated_on_every_demand
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 609 filtered out; finished in 0.34s
+
+error: test failed, to rerun pass `--lib`

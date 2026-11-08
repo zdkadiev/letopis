@@ -1,0 +1,20 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.04s
+     Running tests/markdown_elements.rs (../target/debug/deps/markdown_elements-c4e21ca0b637474f)
+
+running 12 tests
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... ok
+test locates_the_complete_invalid_comment_without_unrelated_prefix_text ... ok
+test code_examples_do_not_declare_elements ... ok
+test metadata_must_fit_exactly_one_standalone_line ... ok
+test adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings ... ok
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... ok
+test nested_elements_and_orphan_metadata_are_rejected ... ok
+test anchors_are_unique_across_real_headings ... ok
+test unicode_crlf_and_eof_have_exact_spans ... ok
+test raw_html_content_does_not_declare_metadata ... ok
+test file_errors_never_return_partial_elements ... ok
+test golden_elements_have_exact_bytes_and_metadata ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

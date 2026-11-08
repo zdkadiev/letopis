@@ -1,5 +1,26 @@
 # Model-free performance diagnosis (#65)
 
+The [search optimization experiments](../../docs/zkit/letopis/checks/issue-65/search-optimization/report.md)
+compare four methods and record the selected changes: 111.886 → 61.102 s median
+on the synthetic 100k corpus with real Ollama vectors. Its
+[commands](../../docs/zkit/letopis/checks/issue-65/search-optimization/commands.md)
+cover verification, repeat measurements and Samply recording. This real-provider
+follow-up is separate from the model-free harness described below.
+
+The [native Samply follow-up](../../docs/zkit/letopis/checks/issue-65/native-followup/report.md)
+records the verified check/status optimization, genuine before/after profiles,
+and the separately authorized real Ollama campaign. Its coverage status is explicit.
+
+The [2026-11-06 100k/Ollama attempt](../../docs/zkit/letopis/checks/issue-65/2026-11-06-100k/report.md)
+records successful 100k initialization with a larger budget, current command
+timings, and the real Ollama provider attempt blocked by sandbox loopback access.
+
+The [2026-11-05 follow-up](../../docs/zkit/letopis/checks/issue-65/current/report.md)
+measures the current library-backed Git implementation and records the focused
+loose-object reuse optimization. Historical reports below retain their captured
+revisions. The scenario name `reindex` is kept for existing comparison files;
+current surveys and contention writers execute `index --full`.
+
 Use `/opt/homebrew/bin/python3.12 -B` on this host; system Python is too old.
 The runner uses new synthetic standalone repositories, explicit disabled/fake
 embedding settings and immutable evidence. It never uses the working repository's

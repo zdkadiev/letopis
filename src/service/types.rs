@@ -17,6 +17,12 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
 };
 
+/// Default and maximum number of knowledge hits returned by each search channel.
+pub(crate) const MAX_SEARCH_LIMIT: NonZeroUsize = match NonZeroUsize::new(100) {
+    Some(limit) => limit,
+    None => panic!("the fixed search limit must be positive"),
+};
+
 /// Internal bound shared by neighbor producers and consumers.
 pub(crate) const NEIGHBOR_PAGE_QUANTUM: usize = 32;
 
@@ -318,6 +324,9 @@ impl ElementAddress {
     ///
     /// * `raw` — Address text to normalize or keep as an absolute HTTP/HTTPS URL.
     ///
+    /// # Returns
+    /// The normalized element address.
+    ///
     /// # Errors
     /// Reports an invalid request for malformed absolute URLs or invalid local addresses.
     pub fn parse(raw: &str) -> CommandResult<Self> {
@@ -326,19 +335,13 @@ impl ElementAddress {
         });
         // Absolute URLs must not become local knowledge through path normalization.
         let normalized = if absolute_http {
-            SourceUri::parse(raw).map(|source| source.as_str().to_owned())
+            SourceUri::parse(raw).map(map_source_uri_to_string)
         } else {
             KnowledgeId::parse(raw)
-                .map(|id| id.as_str().to_owned())
-                .or_else(|_| SourceUri::parse(raw).map(|source| source.as_str().to_owned()))
+                .map(map_knowledge_id_to_string)
+                .or_else(|_| SourceUri::parse(raw).map(map_source_uri_to_string))
         }
-        .map_err(|cause| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InvalidRequest,
-                "invalid element address",
-                cause,
-            )
-        })?;
+        .map_err(map_error_to_invalid_element_address_command_error)?;
         Ok(Self(normalized))
     }
 
@@ -377,12 +380,12 @@ pub struct InspectedElement {
     pub hash: Option<Sha256>,
 }
 
-/// Literal search text, normalized restrictions and final result bound.
+/// Literal search text, normalized restrictions and bounded retrieval/result limit.
 #[derive(Debug)]
 pub struct SearchRequest {
     /// Uninterpreted user query, tokenized by the search service.
     pub query: String,
-    /// Maximum links after combining complete candidate channels.
+    /// Positive per-channel and final limit; search caps it at 100.
     pub limit: NonZeroUsize,
     /// Normalized source, revision and current-flag restrictions.
     pub filters: SearchFilters,
@@ -521,6 +524,9 @@ impl GraphNodeKey {
     /// # Arguments
     ///
     /// * `handle` — Backend node handle valid only in its read view.
+    ///
+    /// # Returns
+    /// The node key.
     pub fn new(handle: i64) -> Self {
         Self(handle)
     }
@@ -528,7 +534,7 @@ impl GraphNodeKey {
     /// Returns the backend node handle.
     ///
     /// The handle stays tied to the key's read view.
-    pub fn get_value(self) -> i64 {
+    pub fn get_handle(self) -> i64 {
         self.0
     }
 }
@@ -711,23 +717,6 @@ impl SearchFilters {
     }
 }
 
-/// A tree whose complete local closure has a confirmed permanent service ref.
-#[derive(Debug)]
-pub struct RetainedTree {
-    oid: TreeOid,
-}
-
-impl RetainedTree {
-    pub(crate) fn new(oid: TreeOid) -> Self {
-        Self { oid }
-    }
-
-    /// Returns the retained tree OID.
-    pub fn get_oid(&self) -> &TreeOid {
-        &self.oid
-    }
-}
-
 /// Supported finite protocol selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderKind {
@@ -795,6 +784,9 @@ impl Configuration {
     ///
     /// * `bytes` — Complete configuration document bytes.
     ///
+    /// # Returns
+    /// The validated configuration.
+    ///
     /// # Errors
     /// Rejects malformed or duplicate JSON, unknown fields, invalid sections and legacy flat
     /// documents.
@@ -802,7 +794,7 @@ impl Configuration {
         let root = parse_config_root(bytes)?;
         let section = root
             .get(ROOT_SECTION)
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            .ok_or_else(build_invalid_embedding_config_error)?;
         Ok(Self {
             embedding_model: parse_section(section)?,
             discovery: parse_discovery_section(&root)?,
@@ -835,7 +827,7 @@ impl Configuration {
     }
 
     /// Returns the discovery configuration.
-    pub fn get_discovery(&self) -> DiscoveryConfig {
+    pub fn get_discovery_config(&self) -> DiscoveryConfig {
         self.discovery
     }
 
@@ -856,6 +848,9 @@ impl DiscoveryConfig {
     /// # Arguments
     ///
     /// * `bytes` — Complete configuration document bytes.
+    ///
+    /// # Returns
+    /// The parsed discovery policy.
     ///
     /// # Errors
     /// Rejects malformed or duplicate JSON, unknown fields and invalid discovery values.
@@ -878,9 +873,8 @@ impl Default for DiscoveryConfig {
 }
 
 fn parse_config_root(bytes: &[u8]) -> EmbeddingResult<Map<String, Value>> {
-    let JsonValue(value) = serde_json::from_slice::<JsonValue<true>>(bytes).map_err(|error| {
-        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
-    })?;
+    let JsonValue(value) = serde_json::from_slice::<JsonValue<true>>(bytes)
+        .map_err(map_error_to_embedding_invalid_config_error)?;
     let Value::Object(root) = value else {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     };
@@ -902,7 +896,7 @@ fn parse_discovery_section(root: &Map<String, Value>) -> EmbeddingResult<Discove
     };
     let section = value
         .as_object()
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+        .ok_or_else(build_invalid_embedding_config_error)?;
     if section.keys().any(|key| key != RESPECT_GITIGNORE) {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
@@ -966,7 +960,7 @@ pub struct SnapshotEntry {
 fn parse_section(settings: &Value) -> EmbeddingResult<EmbeddingState> {
     let section = settings
         .as_object()
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+        .ok_or_else(build_invalid_embedding_config_error)?;
     if section.len() != SECTION_FIELDS.len()
         || section
             .keys()
@@ -977,18 +971,18 @@ fn parse_section(settings: &Value) -> EmbeddingResult<EmbeddingState> {
     let is_enabled = section
         .get("enabled")
         .and_then(Value::as_bool)
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+        .ok_or_else(build_invalid_embedding_config_error)?;
     let max_retries = section
         .get("max_retries")
         .and_then(Value::as_u64)
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+        .ok_or_else(build_invalid_embedding_config_error)?;
     validate_retries(max_retries)?;
-    let provider = get_optional_string(section, "provider")?;
-    let model = get_optional_string(section, "model")?;
+    let provider = get_optional_string_by_key(section, "provider")?;
+    let model = get_optional_string_by_key(section, "model")?;
     let parameters = section
         .get("parameters")
         .and_then(Value::as_object)
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+        .ok_or_else(build_invalid_embedding_config_error)?;
     match (provider, model) {
         (None, None) => parse_unconfigured(is_enabled, parameters, max_retries),
         (Some(provider), Some(model)) => {
@@ -998,7 +992,7 @@ fn parse_section(settings: &Value) -> EmbeddingResult<EmbeddingState> {
     }
 }
 
-fn get_optional_string<'a>(
+fn get_optional_string_by_key<'a>(
     section: &'a Map<String, Value>,
     field: &str,
 ) -> EmbeddingResult<Option<&'a str>> {
@@ -1033,9 +1027,8 @@ fn parse_configured(
         ("parameters".into(), Value::Object(parameters.clone())),
         ("max_retries".into(), Value::from(max_retries)),
     ]));
-    let bytes = serde_json::to_vec(&projection).map_err(|error| {
-        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
-    })?;
+    let bytes =
+        serde_json::to_vec(&projection).map_err(map_error_to_embedding_invalid_config_error)?;
     let config = EmbeddingConfig::parse(&bytes)?;
     Ok(if is_enabled {
         EmbeddingState::Enabled(config)
@@ -1049,7 +1042,7 @@ fn validate_retries(retries: u64) -> EmbeddingResult<()> {
         .checked_add(1)
         .filter(|attempts| i64::try_from(*attempts).is_ok())
         .map(|_| ())
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
+        .ok_or_else(build_invalid_embedding_config_error)
 }
 
 impl EmbeddingConfig {
@@ -1063,17 +1056,18 @@ impl EmbeddingConfig {
     ///
     /// * `bytes` — Configured-settings projection bytes in JSON.
     ///
+    /// # Returns
+    /// The validated configured-settings projection.
+    ///
     /// # Errors
     /// Rejects malformed shapes, forbidden keys, invalid parameters, unsupported
     /// dimensions and budgets not exactly preserved by JCS or storage integers.
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
-        let JsonValue(value) =
-            serde_json::from_slice::<JsonValue<true>>(bytes).map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
-            })?;
+        let JsonValue(value) = serde_json::from_slice::<JsonValue<true>>(bytes)
+            .map_err(map_error_to_embedding_invalid_config_error)?;
         let root = value
             .as_object()
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            .ok_or_else(build_invalid_embedding_config_error)?;
         if root.len() != ROOT_FIELDS.len()
             || root.keys().any(|key| !ROOT_FIELDS.contains(&key.as_str()))
         {
@@ -1088,24 +1082,23 @@ impl EmbeddingConfig {
             .get("model")
             .and_then(Value::as_str)
             .filter(|model| !model.is_empty())
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            .ok_or_else(build_invalid_embedding_config_error)?;
         let parameters = root
             .get("parameters")
             .and_then(Value::as_object)
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            .ok_or_else(build_invalid_embedding_config_error)?;
         validate_parameters(parameters)?;
         let dimensions = get_dimensions(parameters)?;
         let retries = root
             .get("max_retries")
             .and_then(Value::as_u64)
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            .ok_or_else(build_invalid_embedding_config_error)?;
         let max_attempts = retries
             .checked_add(1)
             .filter(|count| i64::try_from(*count).is_ok())
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-        let canonical = serde_json_canonicalizer::to_vec(&value).map_err(|error| {
-            EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
-        })?;
+            .ok_or_else(build_invalid_embedding_config_error)?;
+        let canonical = serde_json_canonicalizer::to_vec(&value)
+            .map_err(map_error_to_embedding_invalid_config_error)?;
         verify_execution_identity(&value, &canonical)?;
         Ok(Self {
             provider,
@@ -1143,7 +1136,7 @@ impl EmbeddingConfig {
     }
 
     /// Returns the requested vector dimensions.
-    pub fn get_dimensions(&self) -> Option<NonZeroUsize> {
+    pub fn get_dimensions_by_parameters(&self) -> Option<NonZeroUsize> {
         self.dimensions
     }
 }
@@ -1174,23 +1167,13 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
 fn get_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<NonZeroUsize>> {
     parameters
         .get("dimensions")
-        .map(|value| {
-            let size = value
-                .as_u64()
-                .and_then(|size| usize::try_from(size).ok())
-                .filter(|size| (MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(size))
-                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-            NonZeroUsize::new(size)
-                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
-        })
+        .map(map_dimensions_value_to_dimension_count)
         .transpose()
 }
 
 fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<()> {
-    let JsonValue(canonical) =
-        serde_json::from_slice::<JsonValue<false>>(bytes).map_err(|error| {
-            EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
-        })?;
+    let JsonValue(canonical) = serde_json::from_slice::<JsonValue<false>>(bytes)
+        .map_err(map_error_to_embedding_invalid_config_error)?;
     if !is_exact_integers(original, &canonical) {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
@@ -1217,6 +1200,79 @@ fn is_exact_integers(original: &Value, canonical: &Value) -> bool {
         }),
         _ => true,
     }
+}
+
+/// Converts a configuration decoding failure to an invalid embedding configuration.
+///
+/// # Arguments
+///
+/// * `cause` — Configuration or JSON failure.
+fn map_error_to_embedding_invalid_config_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
+}
+
+/// Converts a parse failure to an invalid element address command error.
+///
+/// # Arguments
+///
+/// * `cause` — Identity or source parsing failure.
+fn map_error_to_invalid_element_address_command_error<
+    E: std::error::Error + Send + Sync + 'static,
+>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InvalidRequest,
+        "invalid element address",
+        cause,
+    )
+}
+
+/// Converts a source URI to its owned string form.
+///
+/// # Arguments
+///
+/// * `source` — Source URI to project.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "map passes the parsed value by value to the mapper"
+)]
+fn map_source_uri_to_string(source: SourceUri) -> String {
+    source.as_str().to_owned()
+}
+
+/// Converts a knowledge identity to its owned string form.
+///
+/// # Arguments
+///
+/// * `id` — Knowledge identity to project.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "map passes the parsed value by value to the mapper"
+)]
+fn map_knowledge_id_to_string(id: KnowledgeId) -> String {
+    id.as_str().to_owned()
+}
+
+/// Converts a dimensions value to its validated dimension count.
+///
+/// # Arguments
+///
+/// * `value` — JSON value stored under the dimensions key.
+fn map_dimensions_value_to_dimension_count(value: &Value) -> EmbeddingResult<NonZeroUsize> {
+    let size = value
+        .as_u64()
+        .and_then(|size| usize::try_from(size).ok())
+        .filter(|size| (MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(size))
+        .ok_or_else(build_invalid_embedding_config_error)?;
+    NonZeroUsize::new(size).ok_or_else(build_invalid_embedding_config_error)
+}
+
+/// Builds the error reported for an invalid embedding configuration.
+fn build_invalid_embedding_config_error() -> EmbeddingError {
+    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
 }
 
 #[cfg(test)]

@@ -1,0 +1,14 @@
+{
+  "request": {
+    "query": "vec1",
+    "limit": 5,
+    "filters": {
+      "sources": [
+        "vendor/vec1/vec1.c"
+      ]
+    }
+  },
+  "exit_code": 0,
+  "stdout": "{\"ok\":true,\"result\":[{\"element_id\":\"letopis/architecture/storage.md\",\"path\":\"letopis/architecture/storage.md\",\"lines\":[1,142],\"revision\":96,\"flags\":[]}]}\n",
+  "stderr": ""
+}

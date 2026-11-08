@@ -643,7 +643,6 @@ mod search_tests {
         // Given: search bodies with invalid shapes, fields, numbers or trailing input.
         for body in [
             "{}",
-            r#"{"query":"x"}"#,
             r#"{"limit":1}"#,
             r#"{"query":null,"limit":1}"#,
             r#"{"query":1,"limit":1}"#,
@@ -803,6 +802,42 @@ mod search_tests {
         println!("CLI_RESPONSE {}", json!({"exit":exit,"response":value}));
     }
 
+    #[test]
+    fn search_defaults_and_caps_positive_limits() {
+        // Given: omitted, small, boundary and oversized valid limits.
+        for (input, expected) in [
+            (r#"{"query":"sqlite"}"#, 100),
+            (r#"{"query":"sqlite","limit":1}"#, 1),
+            (r#"{"query":"sqlite","limit":5}"#, 5),
+            (r#"{"query":"sqlite","limit":100}"#, 100),
+            (r#"{"query":"sqlite","limit":101}"#, 100),
+            (r#"{"query":"sqlite","limit":18446744073709551615}"#, 100),
+        ] {
+            // When: the search request is decoded.
+            let Ok(Request::Search(request)) = parse(input) else {
+                panic!("search request")
+            };
+            // Then: each request has its independently specified effective bound.
+            assert_eq!(request.limit.get(), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn search_rejects_invalid_limits_without_defaulting_them() {
+        // Given: supplied limits that are not positive unsigned integers.
+        for limit in ["0", "null", "-1", "1.0", "1e0", "18446744073709551616"] {
+            let input = format!(r#"{{"query":"sqlite","limit":{limit}}}"#);
+            // When: the search request is decoded.
+            let error = parse(&input).unwrap_err();
+            // Then: an explicit invalid value is rejected rather than replaced by a default.
+            assert_eq!(
+                error.get_kind(),
+                CommandErrorKind::InvalidRequest,
+                "{limit}"
+            );
+        }
+    }
+
     fn parse(body: &str) -> CommandResult<Request> {
         request_parse(&[OsString::from("search")], &mut body.as_bytes())
     }
@@ -928,8 +963,8 @@ mod traversal_tests {
     }
 
     #[test]
-    fn normalizes_starts_and_open_types_without_restricting_empty_types() {
-        // Given
+    fn normalizes_starts_and_open_types() {
+        // Given: an input with relative, duplicate and case-varied addresses and edge types.
         let mut body = build_input();
         body["element_ids"] = json!([
             "./a.md",
@@ -942,11 +977,11 @@ mod traversal_tests {
         ]);
         body["edge_types"] = json!(["custom_relation9", "includes", "custom_relation9"]);
         body["edge_limit"] = json!(2);
-        // When
+        // When: the request is parsed.
         let Request::Traverse(request) = parse(&body.to_string()).unwrap() else {
             panic!("traverse")
         };
-        // Then
+        // Then: addresses and edge types are normalized and deduplicated, and defaults are kept.
         assert_eq!(
             request
                 .element_ids
@@ -978,17 +1013,21 @@ mod traversal_tests {
             ),
             (TraversalMode::Both, TraversalDirection::Outgoing, 1, 3)
         );
-        // Given
+    }
+
+    #[test]
+    fn absent_or_empty_edge_types_parse_without_a_limit() {
+        // Given: an input without an edge type selection or with an empty one.
         for types in [None, Some(json!([]))] {
             let mut body = build_input();
             if let Some(types) = types {
                 body["edge_types"] = types;
             }
-            // When
+            // When: the request is parsed.
             let Request::Traverse(request) = parse(&body.to_string()).unwrap() else {
                 panic!("traverse")
             };
-            // Then
+            // Then: no edge types and no edge limit remain on the request.
             assert!(request.edge_types.is_empty());
             assert!(request.edge_limit.is_none());
         }

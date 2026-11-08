@@ -1,0 +1,14 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source)
+error: field `file_hash` is never read
+  --> src/service/search.rs:36:5
+   |
+34 | struct ParsedKnowledge {
+   |        --------------- field in this struct
+35 |     path: RepoPath,
+36 |     file_hash: Sha256,
+   |     ^^^^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: could not compile `letopis` (lib test) due to 1 previous error

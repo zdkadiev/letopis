@@ -1,0 +1,11 @@
+{
+  "command": "CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=1 make verify V=1 (invoked by host storage runner on actual root)",
+  "exit_code": 0,
+  "test_groups": 171,
+  "passed_executions": 2443,
+  "ignored_executions": 22,
+  "failed_executions": 0,
+  "counts_scope": "test executions including profile/example repeats; not unique tests",
+  "log_sha256": "693344304c25f919da84774a42e19d2c655ee32fd538b8f84d2208258cb5c751",
+  "product_input_hashes_verified": 107
+}

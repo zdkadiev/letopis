@@ -114,7 +114,7 @@ def coordinate_reindex(scenario, build, evidence, verify):
 def measure_contention_call(scenario, build, evidence, options):
     """Publish an exclusive, synced subcall receipt before its result is consumed."""
     role = options["role"]
-    argv = ["reindex"] if role == "writer" else scenario["argv"]
+    argv = ["index", "--full"] if role == "writer" else scenario["argv"]
     data = b"{}\n" if role == "writer" else scenario["stdin"]
     settings = {"timeout": scenario.get("timeout", 120), "cancel_event": options.get("cancel_event")}
     record = measure_process([build["executable"], *argv], scenario["repository"], data, settings)
@@ -152,7 +152,7 @@ def build_contention_receipt(scenario, baseline, reader, written, index_locked):
                "overlap_seconds": overlap, "writer_index_lock_observed": index_locked,
                "throughput_success_per_s": sum(call["outcome"] == "success" for call in (reader, written)) / duration,
                "reader_validation": validate_result(scenario, reader),
-               "writer_validation": validate_result({"expected": {"command": "reindex"}}, written),
+               "writer_validation": validate_result({"expected": {"command": "index"}}, written),
                "scope": "CLI lifetime overlap; no direct SQL lock-wait attribution"}
 
 

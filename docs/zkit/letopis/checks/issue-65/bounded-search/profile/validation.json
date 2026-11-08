@@ -1,0 +1,19 @@
+{
+  "samples": 3323,
+  "usable_stacks": 3323,
+  "threads": 2,
+  "sha256": "484897ac4e29dc58c69235a618e6c930cd9f2978ae6b054ac0f3c49bb0ca525e",
+  "bytes": 41329,
+  "libraries": [
+    "dyld",
+    "letopis",
+    "libsystem_kernel.dylib",
+    "libsystem_pthread.dylib",
+    "libsystem_malloc.dylib",
+    "libsystem_c.dylib",
+    "libsystem_platform.dylib",
+    "libsamply_mac_preload.dylib",
+    "libdyld.dylib",
+    "LDAP"
+  ]
+}

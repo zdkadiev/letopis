@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.71s
+     Running unittests src/lib.rs (../target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test service::search::tests::parse_reuse::every_binding_still_checks_its_own_hash_and_lines ... FAILED
+
+failures:
+
+---- service::search::tests::parse_reuse::every_binding_still_checks_its_own_hash_and_lines stdout ----
+
+thread 'service::search::tests::parse_reuse::every_binding_still_checks_its_own_hash_and_lines' (541357736) panicked at src/service/search.rs:2449:13:
+assertion `left == right` failed
+  left: [false, false, false]
+ right: [false, true, true]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    service::search::tests::parse_reuse::every_binding_still_checks_its_own_hash_and_lines
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 617 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`

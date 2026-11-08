@@ -1,0 +1,24 @@
+
+running 1 test
+test cli::input::tests::search_defaults_and_caps_positive_limits ... FAILED
+
+failures:
+
+---- cli::input::tests::search_defaults_and_caps_positive_limits stdout ----
+
+thread 'cli::input::tests::search_defaults_and_caps_positive_limits' (563897445) panicked at src/cli/input.rs:417:13:
+assertion `left == right` failed: {"query":"sqlite"}
+  left: 99
+ right: 100
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cli::input::tests::search_defaults_and_caps_positive_limits
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 629 filtered out; finished in 0.00s
+
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.26s
+     Running unittests src/lib.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/letopis-43e59323f2756d14)
+error: test failed, to rerun pass `--lib`
