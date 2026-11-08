@@ -1213,7 +1213,7 @@ mod help_tests {
         // When / Then: version and general help return their expected text.
         assert_eq!(
             help_get_by_args(&to_args(&["--version"])).as_deref(),
-            Some("letopis 0.2.0\n")
+            Some("letopis 0.3.0\n")
         );
         assert!(
             help_get_by_args(&to_args(&["--help"]))
@@ -1270,7 +1270,7 @@ mod help_tests {
         assert_eq!(help_exit, 0);
         assert!(String::from_utf8(help).unwrap().starts_with("Usage"));
         assert_eq!(version_exit, 0);
-        assert_eq!(version, b"letopis 0.2.0\n");
+        assert_eq!(version, b"letopis 0.3.0\n");
     }
 
     #[test]
