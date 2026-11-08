@@ -1790,8 +1790,8 @@ mod parse_reuse {
         let nodes = build_metadata("note.md", &bytes);
         let parser = CountedParser(Cell::new(0));
         let root = tempfile::tempdir().unwrap();
-        let storage = open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
-            .unwrap();
+        let storage =
+            open_test_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let files = build_files(vec![Some(bytes.clone()); 16]);
         // When: the same live collaborators serve two independent eligibility operations.
         let first = get_links(&storage, &files, &parser, &nodes);
@@ -1830,8 +1830,8 @@ mod parse_reuse {
         let nodes = build_metadata("note.md", &original);
         let parser = CountedParser(Cell::new(0));
         let root = tempfile::tempdir().unwrap();
-        let storage = open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
-            .unwrap();
+        let storage =
+            open_test_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         // When: eligibility follows sorted bindings while every capture independently changes.
         let links = get_links(&storage, &files, &parser, &nodes);
         // Then: exact current-byte changes are visible, and invalid parses are retried rather than retained.
@@ -1852,8 +1852,8 @@ mod parse_reuse {
         let files = build_files(vec![Some(bytes); 4]);
         let parser = CountedParser(Cell::new(0));
         let root = tempfile::tempdir().unwrap();
-        let storage = open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
-            .unwrap();
+        let storage =
+            open_test_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         // When: sorted demand moves from a.md to b.md.
         let links = get_links(&storage, &files, &parser, &nodes);
         // Then: each file is parsed once and no path-specific identity leaks to the next file.
@@ -1899,8 +1899,8 @@ mod parse_reuse {
         let files = build_files(vec![Some(bytes.clone()), None, Some(bytes)]);
         let parser = CountedParser(Cell::new(0));
         let root = tempfile::tempdir().unwrap();
-        let storage = open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
-            .unwrap();
+        let storage =
+            open_test_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         // When: each binding captures its own current file state.
         let links = get_links(&storage, &files, &parser, &nodes);
         // Then: absence marks only its binding stale and restoration is parsed again.
@@ -1930,8 +1930,8 @@ mod parse_reuse {
         let files = build_files(vec![Some(bytes); 3]);
         let parser = CountedParser(Cell::new(0));
         let root = tempfile::tempdir().unwrap();
-        let storage = open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
-            .unwrap();
+        let storage =
+            open_test_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         // When: all bindings reuse one successful parse after their fresh captures.
         let links = get_links(&storage, &files, &parser, &nodes);
         // Then: stale predicates use each pinned node rather than the first node's answer.
@@ -1988,8 +1988,8 @@ mod parse_reuse {
             });
         let parser = CountedParser(Cell::new(0));
         let root = tempfile::tempdir().unwrap();
-        let storage = open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
-            .unwrap();
+        let storage =
+            open_test_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         // When: the failed operation is retried using the same collaborators.
         let error = get_links_result(&storage, &files, &parser, &nodes).unwrap_err();
         let links = get_links(&storage, &files, &parser, &nodes);
@@ -2089,8 +2089,14 @@ mod parse_reuse {
         }
     }
     fn build_sections(count: usize) -> Vec<u8> {
-        (0..count).map(|index| format!("## Section {{#s{index:04}}}\n<!-- letopis: {{\"created_at\":1}} -->\nbody\n"))
-            .collect::<String>().into_bytes()
+        (0..count)
+            .map(|index| {
+                format!(
+                    "## Section {{#s{index:04}}}\n<!-- letopis: {{\"created_at\":1}} -->\nbody\n"
+                )
+            })
+            .collect::<String>()
+            .into_bytes()
     }
     fn build_metadata(path: &str, bytes: &[u8]) -> BTreeMap<KnowledgeId, KnowledgeMetadata> {
         MarkdownParser::new()

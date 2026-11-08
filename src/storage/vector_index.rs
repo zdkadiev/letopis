@@ -21,15 +21,12 @@ pub(super) fn vector_index_prepare(connection: &mut Connection) -> StorageResult
         read.commit()?;
         Ok(flat)
     })?;
-    let query_only: bool = connection
-        .pragma_query_value(None, "query_only", |row| row.get(0))
-        ?;
+    let query_only: bool = connection.pragma_query_value(None, "query_only", |row| row.get(0))?;
     if flat || query_only || connection.is_readonly("main")? {
         return Ok(());
     }
     wait_for_storage_contention(|| {
-        let transaction = Transaction::new_unchecked(connection, TransactionBehavior::Immediate)
-            ?;
+        let transaction = Transaction::new_unchecked(connection, TransactionBehavior::Immediate)?;
         // Recheck after acquiring the writer; another opener may already have converted it.
         if !is_exact_flat_index(&transaction)? {
             verify_legacy_vectors(&transaction)?;
@@ -52,30 +49,25 @@ pub(super) fn vector_index_prepare(connection: &mut Connection) -> StorageResult
 /// Factory equality rejects unknown tags without interpreting or repairing a private header.
 fn is_exact_flat_index(connection: &Connection) -> StorageResult<bool> {
     let reference = Connection::open_in_memory()?;
-    reference
-        .execute_batch(include_str!("vectors.sql"))
-        ?;
-    let flat: Vec<u8> = reference
-        .query_row("select val from vector_index_model where id=1", [], |row| {
+    reference.execute_batch(include_str!("vectors.sql"))?;
+    let flat: Vec<u8> =
+        reference.query_row("select val from vector_index_model where id=1", [], |row| {
             row.get(0)
-        })
-        ?;
+        })?;
     reference.execute(
-        "insert into vector_index(cmd,arg) values('rebuild','{index:\"none\",distance:\"cos\"}')", [],
+        "insert into vector_index(cmd,arg) values('rebuild','{index:\"none\",distance:\"cos\"}')",
+        [],
     )?;
-    let none: Vec<u8> = reference
-        .query_row("select val from vector_index_model where id=1", [], |row| {
+    let none: Vec<u8> =
+        reference.query_row("select val from vector_index_model where id=1", [], |row| {
             row.get(0)
-        })
-        ?;
-    let flat: Option<bool> = connection
-        .query_row(
-            "select case when val=?1 then 1 when val=?2 then 0 else null end
+        })?;
+    let flat: Option<bool> = connection.query_row(
+        "select case when val=?1 then 1 when val=?2 then 0 else null end
          from vector_index_model where id=1",
-            rusqlite::params![flat, none],
-            |row| row.get(0),
-        )
-        ?;
+        rusqlite::params![flat, none],
+        |row| row.get(0),
+    )?;
     flat.ok_or_else(|| {
         StorageError::new(
             StorageErrorKind::InternalError,
@@ -85,13 +77,11 @@ fn is_exact_flat_index(connection: &Connection) -> StorageResult<bool> {
 }
 
 fn verify_legacy_vectors(connection: &Connection) -> StorageResult<()> {
-    let model_version: i64 = connection
-        .query_row(
-            "select val from vector_index_config where id=?1",
-            [NATIVE_MODEL_VERSION_FIELD],
-            |row| row.get(0),
-        )
-        ?;
+    let model_version: i64 = connection.query_row(
+        "select val from vector_index_config where id=?1",
+        [NATIVE_MODEL_VERSION_FIELD],
+        |row| row.get(0),
+    )?;
     if model_version <= 0 || model_version == i64::MAX {
         return Err(StorageError::new(
             StorageErrorKind::InternalError,
@@ -99,9 +89,7 @@ fn verify_legacy_vectors(connection: &Connection) -> StorageResult<()> {
         ));
     }
     let dimensions = vector_index_config_get_by_id(connection, VectorSchema::Main)?;
-    let mut statement = connection
-        .prepare("select vector from vector_index")
-        ?;
+    let mut statement = connection.prepare("select vector from vector_index")?;
     let mut rows = statement.query([])?;
     while let Some(row) = rows.next()? {
         let value = row.get_ref(0)?;

@@ -473,9 +473,7 @@ fn object_sync(path: &Path) -> Result<(), SnapshotError> {
     tests::inject_failure(tests::FailurePoint::ObjectSync)?;
     File::open(path)
         .and_then(|file| file.sync_all())
-        .map_err(|error| {
-            SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-        })
+        .map_err(|error| SnapshotError::new_with_cause("Git durable write failed", SafeIo(error)))
 }
 
 fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> {

@@ -681,8 +681,8 @@ fn reject_candidate_reappearing_before_publication() {
                     "AlphaToken",
                     std::num::NonZeroUsize::new(100).unwrap(),
                 )
-                    .unwrap()
-                    .len(),
+                .unwrap()
+                .len(),
                 1
             );
 
@@ -720,8 +720,8 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
                     "AlphaToken",
                     std::num::NonZeroUsize::new(100).unwrap(),
                 )
-                    .unwrap()
-                    .len(),
+                .unwrap()
+                .len(),
                 1
             );
 
@@ -2736,9 +2736,10 @@ mod reindex {
                 assert_eq!(read.files_get().unwrap(), before);
                 assert_eq!(
                     read.text_index_get_by_expression(
-                    "AlphaToken",
-                    std::num::NonZeroUsize::new(100).unwrap(),
-                ).unwrap()[0]
+                        "AlphaToken",
+                        std::num::NonZeroUsize::new(100).unwrap(),
+                    )
+                    .unwrap()[0]
                         .id
                         .as_str(),
                     "note.md"

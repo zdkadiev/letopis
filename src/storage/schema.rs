@@ -1,6 +1,5 @@
 use super::{
-    connection::wait_for_storage_contention,
-    native::register_vec1,
+    connection::wait_for_storage_contention, native::register_vec1,
     vector_index::vector_index_prepare,
 };
 use crate::service::{StorageError, StorageErrorKind, StorageResult};

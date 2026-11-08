@@ -149,8 +149,7 @@ impl<
                 };
                 let links = eligibility.get_eligible_links(&metadata, &request.filters)?;
                 let eligible = links.keys().cloned().collect();
-                let ranked =
-                    rank_candidates(&text_matches, &vector_matches, &eligible, limit)?;
+                let ranked = rank_candidates(&text_matches, &vector_matches, &eligible, limit)?;
                 get_ranked_links(links, ranked)
             })
             .map_err(|error| match error {
