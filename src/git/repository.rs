@@ -1,6 +1,10 @@
 use super::{
-    cleanup::GitWriteCleanup, objects, objects::tree_get_by_oid, reader::ObjectReader, refs,
+    cleanup::GitWriteCleanup,
+    constants::{BLOB_KIND, FOREIGN_OID_FORMAT, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
+    durability::{StagedObject, object_reuse_existing, ref_lock_is_busy, ref_retain_by_oid},
+    reader::{ObjectReader, VerifiedObject},
     tree::tree_entry_get,
+    validation::tree_bytes_validate,
 };
 use crate::service::GitIgnoreMode;
 use crate::{
@@ -28,15 +32,24 @@ use gix_pathspec::Search;
 use std::{
     borrow::Cow,
     cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::ErrorKind,
     path::{Path, PathBuf},
     rc::Rc,
     sync::Arc,
+    thread,
+    time::Duration,
 };
 
 #[cfg(test)]
 use std::cell::Cell;
+
+const MISSING_SNAPSHOT_PATH: &str = "snapshot path is missing";
+const GITLINK_KIND: &str = "gitlink";
+// Retry safe lock contention through the entire confirmation protocol; not a command deadline.
+const REF_LOCK_ATTEMPTS: usize = 32;
+const REF_RETRY_DELAY: Duration = Duration::from_millis(10);
 
 #[cfg(test)]
 thread_local! {
@@ -162,17 +175,17 @@ impl GitRepository {
 impl GitSnapshots for GitRepository {
     fn tree_create(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         self.objects_verify_self_contained()?;
-        objects::tree_create(self, files)
+        tree_create(self, files)
     }
 
     fn blob_write(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
         self.objects_verify_self_contained()?;
-        objects::blob_write(self, bytes)
+        blob_write(self, bytes)
     }
 
     fn tree_assemble(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
         self.objects_verify_self_contained()?;
-        objects::tree_assemble(self, entries)
+        tree_assemble(self, entries)
     }
 
     fn blob_get_by_tree_oid_and_path(
@@ -181,24 +194,24 @@ impl GitSnapshots for GitRepository {
         path: &RepoPath,
     ) -> Result<Vec<u8>, SnapshotError> {
         self.objects_verify_self_contained()?;
-        objects::blob_get_by_tree_oid_and_path(self, tree, path)
+        blob_get_by_tree_oid_and_path(self, tree, path)
     }
 
     fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
         self.objects_verify_self_contained()?;
-        refs::tree_retain_by_oid(self, tree)
+        tree_retain_by_oid(self, tree)
     }
 
     fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
         self.objects_verify_self_contained()?;
-        refs::tree_pin_by_oid(self, tree)
+        tree_pin_by_oid(self, tree)
     }
 }
 
 impl SnapshotVerifier for GitRepository {
     fn tree_verify_by_oid(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError> {
         self.objects_verify_self_contained()?;
-        match objects::tree_validate_by_oid(self, tree) {
+        match tree_validate_by_oid(self, tree) {
             Ok(()) => Ok(SnapshotState::Available),
             Err(error) => match error.get_kind() {
                 SnapshotErrorKind::NotFound => Ok(SnapshotState::Missing),
@@ -284,6 +297,439 @@ fn alternates_verify_absent(path: &Path) -> Result<(), SnapshotError> {
             "cannot inspect Git object alternates",
         )),
     }
+}
+
+/// Creates a tree from exact snapshot file bytes after validating every path.
+///
+/// # Arguments
+///
+/// * `git` — repository whose excluded roots and object store are used.
+/// * `files` — complete snapshot files whose exact bytes and paths form the tree.
+///
+/// # Errors
+/// Reports invalid, duplicate or colliding paths and repository object failures.
+fn tree_create(git: &GitRepository, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
+    paths_validate(
+        git.excluded_roots,
+        &files.iter().map(|file| file.path).collect::<Vec<_>>(),
+    )?;
+    let entries = files
+        .iter()
+        .map(|file| Ok((file.path, blob_write(git, file.bytes)?)))
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    tree_build(git, &entries)
+}
+
+/// Creates a tree from existing blobs after validating every path and each distinct blob.
+///
+/// # Arguments
+///
+/// * `git` — repository whose excluded roots, reader and object store are used.
+/// * `entries` — snapshot entries whose declared paths and existing blobs form the tree.
+///
+/// # Errors
+/// Reports invalid, duplicate or colliding paths, foreign identities, missing blobs and
+/// repository object failures.
+fn tree_assemble(git: &GitRepository, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
+    paths_validate(
+        git.excluded_roots,
+        &entries.iter().map(|entry| &entry.path).collect::<Vec<_>>(),
+    )?;
+    let mut verified = BTreeSet::new();
+    for entry in entries {
+        if entry.oid.as_str().len() != git.oid_len {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InvalidRequest,
+                FOREIGN_OID_FORMAT,
+            ));
+        }
+        if verified.insert(entry.oid.as_str()) {
+            git.reader.borrow_mut().object_get_by_oid(
+                entry.oid.as_str(),
+                BLOB_KIND,
+                SnapshotErrorKind::InvalidRequest,
+                SnapshotErrorKind::InvalidRequest,
+            )?;
+        }
+    }
+    let entries: Vec<_> = entries
+        .iter()
+        .map(|entry| (&entry.path, entry.oid.clone()))
+        .collect();
+    tree_build(git, &entries)
+}
+
+/// Returns one blob's bytes after verifying the root and addressed objects without auditing
+/// unrelated descendants.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format are used.
+/// * `oid` — root tree identity whose addressed path is read.
+/// * `path` — repository-relative path of the blob within the tree.
+///
+/// # Errors
+/// Reports missing paths, non-blob leaves, foreign identities and object or decoding failures.
+fn blob_get_by_tree_oid_and_path(
+    git: &GitRepository,
+    oid: &TreeOid,
+    path: &RepoPath,
+) -> Result<Vec<u8>, SnapshotError> {
+    tree_validate_by_oid(git, oid)?;
+    let mut current = oid.as_str().to_owned();
+    let mut parts = path.as_str().split('/').peekable();
+    while let Some(part) = parts.next() {
+        let bytes = tree_get_by_oid(
+            git,
+            &current,
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )?;
+        let (kind, oid) = tree_entry_get_by_name(git, &bytes, part.as_bytes())?;
+        if parts.peek().is_none() {
+            if kind != BLOB_KIND {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::InvalidRequest,
+                    "snapshot path is not a blob",
+                ));
+            }
+            return git.reader.borrow_mut().object_bytes_get_by_oid(
+                &oid,
+                BLOB_KIND,
+                SnapshotErrorKind::InternalError,
+                SnapshotErrorKind::InternalError,
+            );
+        }
+        if kind != TREE_KIND {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::NotFound,
+                MISSING_SNAPSHOT_PATH,
+            ));
+        }
+        current = oid;
+    }
+    Err(SnapshotError::new(
+        SnapshotErrorKind::NotFound,
+        MISSING_SNAPSHOT_PATH,
+    ))
+}
+
+fn tree_entry_get_by_name(
+    git: &GitRepository,
+    mut bytes: &[u8],
+    name: &[u8],
+) -> Result<(&'static str, String), SnapshotError> {
+    while !bytes.is_empty() {
+        let (entry, rest) = tree_entry_get(bytes, git.oid_len)?;
+        if entry.name == name {
+            let kind = match entry.mode & 0o170000 {
+                0o040000 => TREE_KIND,
+                0o160000 => GITLINK_KIND,
+                _ => BLOB_KIND,
+            };
+            let oid = ObjectId::try_from(entry.oid)
+                .map_err(|_| {
+                    SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+                })?
+                .to_string();
+            return Ok((kind, oid));
+        }
+        bytes = rest;
+    }
+    Err(SnapshotError::new(
+        SnapshotErrorKind::NotFound,
+        MISSING_SNAPSHOT_PATH,
+    ))
+}
+
+/// Verifies the root tree's hash, type and own structure without claiming closure integrity.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format are used.
+/// * `oid` — tree identity whose hash, type and own structure are checked.
+///
+/// # Errors
+/// Reports a foreign identity as an invalid request and missing or corrupt objects as snapshot
+/// failures.
+fn tree_validate_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
+    if oid.as_str().len() != git.oid_len {
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InvalidRequest,
+            FOREIGN_OID_FORMAT,
+        ));
+    }
+    tree_get_by_oid(
+        git,
+        oid.as_str(),
+        SnapshotErrorKind::NotFound,
+        SnapshotErrorKind::InvalidRequest,
+    )
+    .map(|_| ())
+}
+
+/// Returns one verified tree body without traversing its children.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format are used.
+/// * `oid` — hexadecimal object identity of the tree to read.
+/// * `missing` — error kind used when the object is absent.
+/// * `wrong` — error kind used when the object is not a tree.
+///
+/// # Errors
+/// Returns the caller-selected missing or wrong-type error and reports decoding or integrity
+/// failures as internal errors.
+fn tree_get_by_oid(
+    git: &GitRepository,
+    oid: &str,
+    missing: SnapshotErrorKind,
+    wrong: SnapshotErrorKind,
+) -> Result<Vec<u8>, SnapshotError> {
+    git.reader
+        .borrow_mut()
+        .tree_bytes_get_by_oid(oid, missing, wrong)
+}
+
+fn tree_build(
+    git: &GitRepository,
+    entries: &[(&RepoPath, BlobOid)],
+) -> Result<TreeOid, SnapshotError> {
+    let mut root = Directory::default();
+    for (path, oid) in entries {
+        root.entry_insert_by_path(path.as_str(), oid.clone());
+    }
+    root.tree_write(git)
+}
+
+/// Verifies the root and durably confirms its exact direct ref without loading descendants.
+///
+/// # Arguments
+///
+/// * `git` — repository that verifies the root and retains the snapshot ref.
+/// * `oid` — identity of the root tree to validate and retain.
+///
+/// # Errors
+/// Reports an invalid or missing root and ref lock, write, sync or confirmation failures.
+fn tree_retain_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
+    tree_validate_by_oid(git, oid)?;
+    tree_ref_retain_by_oid(git, oid)
+}
+
+/// Verifies the entire closure on every call and then durably retains its root.
+///
+/// # Arguments
+///
+/// * `git` — repository that verifies the closure and retains the snapshot ref.
+/// * `oid` — identity of the root tree to verify and pin.
+///
+/// # Errors
+/// Reports an invalid or missing root, a corrupt reachable object or closure type conflict,
+/// and ref lock, write, sync or confirmation failures.
+fn tree_pin_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+    tree_validate_by_oid(git, oid)?;
+    tree_verify_closure_by_oid(git, oid)?;
+    tree_ref_retain_by_oid(git, oid)?;
+    Ok(RetainedTree::new(oid.clone()))
+}
+
+fn tree_ref_retain_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
+    let oid = ObjectId::from_hex(oid.as_str().as_bytes()).map_err(|_| {
+        SnapshotError::new(SnapshotErrorKind::InternalError, "invalid Git identity")
+    })?;
+    for attempt in 0..REF_LOCK_ATTEMPTS {
+        match ref_retain_by_oid(&git.repo, oid, &git.cleanup) {
+            Err(error) if ref_lock_is_busy(&error) && attempt + 1 < REF_LOCK_ATTEMPTS => {
+                thread::sleep(REF_RETRY_DELAY);
+            }
+            result => return result,
+        }
+    }
+    unreachable!("bounded retry always returns on the last attempt")
+}
+
+/// Verifies every object reachable from `root`, ignoring gitlinks, and rejects type conflicts.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format verify the closure.
+/// * `root` — identity of the root tree whose reachable objects are checked.
+///
+/// # Errors
+/// Reports missing or corrupt reachable objects and conflicting object types.
+fn tree_verify_closure_by_oid(git: &GitRepository, root: &TreeOid) -> Result<(), SnapshotError> {
+    let mut reader = git.reader.borrow_mut();
+    let mut pending = vec![(root.as_str().to_owned(), TREE_KIND.to_owned())];
+    let mut visited = BTreeMap::new();
+    while let Some((oid, kind)) = pending.pop() {
+        if let Some(previous) = visited.insert(oid.clone(), kind.clone()) {
+            if previous != kind {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::InternalError,
+                    "conflicting Git object types",
+                ));
+            }
+            continue;
+        }
+        let object = reader.object_get_by_oid(
+            &oid,
+            &kind,
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )?;
+        if let VerifiedObject::Tree(bytes) = object {
+            tree_bytes_validate(&bytes, git.oid_len)?;
+            pending.extend(tree_children_get(&bytes, git.oid_len)?);
+        }
+    }
+    Ok(())
+}
+
+/// Returns the direct child object identities and kinds from a verified tree body.
+///
+/// # Arguments
+///
+/// * `bytes` — verified tree body whose direct children are decoded.
+/// * `oid_len` — hexadecimal object ID length used to frame each entry.
+///
+/// # Errors
+/// Returns `InternalError` for malformed entry boundaries or octal modes.
+fn tree_children_get(
+    mut bytes: &[u8],
+    oid_len: usize,
+) -> Result<Vec<(String, String)>, SnapshotError> {
+    let mut children = Vec::new();
+    while !bytes.is_empty() {
+        let (entry, remaining) = tree_entry_get(bytes, oid_len)?;
+        let kind = match entry.mode & 0o170000 {
+            0o100000 | 0o120000 => Some(BLOB_KIND),
+            0o040000 => Some(TREE_KIND),
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            let oid: String = entry.oid.iter().map(|byte| format!("{byte:02x}")).collect();
+            children.push((oid, kind.into()));
+        }
+        bytes = remaining;
+    }
+    Ok(children)
+}
+
+#[derive(Default)]
+struct Directory<'a> {
+    files: BTreeMap<&'a str, BlobOid>,
+    dirs: BTreeMap<&'a str, Directory<'a>>,
+}
+
+impl<'a> Directory<'a> {
+    fn entry_insert_by_path(&mut self, path: &'a str, oid: BlobOid) {
+        match path.split_once('/') {
+            Some((dir, rest)) => self
+                .dirs
+                .entry(dir)
+                .or_default()
+                .entry_insert_by_path(rest, oid),
+            None => {
+                self.files.insert(path, oid);
+            }
+        }
+    }
+
+    fn tree_write(&self, git: &GitRepository) -> Result<TreeOid, SnapshotError> {
+        // Git compares directory names with a virtual '/' terminator.
+        let mut entries = BTreeMap::new();
+        for (name, oid) in &self.files {
+            entries.insert(
+                (*name).to_owned(),
+                ("100644", *name, oid.as_str().to_owned()),
+            );
+        }
+        for (name, dir) in &self.dirs {
+            entries.insert(
+                format!("{name}/"),
+                ("40000", *name, dir.tree_write(git)?.as_str().to_owned()),
+            );
+        }
+        let mut bytes = Vec::new();
+        for (mode, name, oid) in entries.values() {
+            bytes.extend_from_slice(format!("{mode} {name}\0").as_bytes());
+            let oid = ObjectId::from_hex(oid.as_bytes()).map_err(|_| {
+                SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+            })?;
+            bytes.extend_from_slice(oid.as_bytes());
+        }
+        tree_bytes_validate(&bytes, git.oid_len)?;
+        TreeOid::parse(&object_write(git, gix::objs::Kind::Tree, &bytes)?).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })
+    }
+}
+
+/// Writes exact bytes durably without filters or newline normalization.
+///
+/// # Arguments
+///
+/// * `git` — repository whose object store receives the blob.
+/// * `bytes` — exact payload written without filters or newline normalization.
+///
+/// # Errors
+/// Reports object identity, staging, synchronization or publication failures.
+fn blob_write(git: &GitRepository, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
+    BlobOid::parse(&object_write(git, gix::objs::Kind::Blob, bytes)?)
+        .map_err(|_| SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE))
+}
+
+fn object_write(
+    git: &GitRepository,
+    kind: gix::objs::Kind,
+    bytes: &[u8],
+) -> Result<String, SnapshotError> {
+    if let Some(oid) = object_reuse_existing(&git.repo, kind, bytes, &git.cleanup)? {
+        return Ok(oid.to_string());
+    }
+    let object = StagedObject::new_with_cleanup(&git.repo, kind, bytes, &git.cleanup)?;
+    let oid = object.object_get_oid().to_string();
+    object.object_publish()?;
+    Ok(oid)
+}
+
+/// Rejects duplicate, colliding, Git-metadata and excluded-root snapshot paths.
+///
+/// # Arguments
+///
+/// * `excluded_roots` — root-relative names that a snapshot path must not start with.
+/// * `paths` — complete snapshot paths checked as one set.
+///
+/// # Errors
+/// Reports invalid, duplicate or file-directory colliding paths as invalid requests.
+fn paths_validate(excluded_roots: &[&str], paths: &[&RepoPath]) -> Result<(), SnapshotError> {
+    let mut unique = BTreeSet::new();
+    for path in paths {
+        let path = path.as_str();
+        let mut parts = path.split('/');
+        if parts.clone().any(|part| part.eq_ignore_ascii_case(".git"))
+            || parts
+                .next()
+                .is_some_and(|root| excluded_roots.contains(&root))
+            || !unique.insert(path)
+        {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InvalidRequest,
+                "invalid snapshot paths",
+            ));
+        }
+    }
+    for path in &unique {
+        for (offset, character) in path.char_indices() {
+            if character == '/' && unique.contains(&path[..offset]) {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::InvalidRequest,
+                    "snapshot file and directory collide",
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Returns index and untracked paths after Git ignore filtering.

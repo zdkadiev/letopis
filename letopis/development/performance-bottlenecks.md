@@ -43,3 +43,47 @@ Earlier 10k embeddings-disabled pre-optimization medians: traverse 0.106s, check
 [Check and status](../../docs/zkit/letopis/checks/issue-65/native-followup/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/native-followup/report.md")
 [100k bounded hybrid](../../docs/zkit/letopis/checks/issue-65/bounded-search/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/report.md")
 [10k bounded hybrid](../../docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md")
+
+## Optimization mechanisms {#optimizations}
+<!-- letopis: {"created_at":1794155240,"source_snapshot":"662f576b823ad39c52163622c18e696d88787e4a"} -->
+
+Five changes produced the measurements above; their campaigns are separate and
+must not be pooled.
+
+**Git loose objects.** The writer computes the OID, looks for an existing loose
+object, verifies its kind and identity, syncs the object file and parent chain
+and rechecks write activity before reuse. Packed or absent objects and any
+integrity or I/O failure keep the ordinary staging path.
+[reuse](../../src/git/durability.rs#L183-L222 "letopis:type=external;path=src/git/durability.rs#L183-L222")
+[call site](../../src/git/objects.rs#L264-L269 "letopis:type=external;path=src/git/objects.rs#L264-L269")
+
+**Tree validation.** After a fresh read verifies an object's type and identity,
+`tree_bytes_get_by_oid` skips structural validation for an OID already retained
+in a bounded reader-owned set of 4096 identities. Full snapshot audits still
+validate tree structure directly; overflow stops retaining rather than skipping
+fresh checks.
+[reader](../../src/git/reader.rs#L150-L165 "letopis:type=external;path=src/git/reader.rs#L150-L165")
+
+**Markdown scanning.** Element bounds advance the line offset incrementally and
+count line breaks only over the new byte range. Search independently reuses one
+bounded successful `ParsedFile` when a binding's fresh capture has the same path
+and SHA-256; missing, invalid, unmarked or oversized observations clear it.
+[layout](../../src/markdown/parser.rs#L204-L237 "letopis:type=external;path=src/markdown/parser.rs#L204-L237")
+[parse reuse](../../src/service/search.rs#L325-L361 "letopis:type=external;path=src/service/search.rs#L325-L361")
+
+**Vector index.** New databases build a packed exact flat/cos index. Preparation
+rebuilds any non-flat model in one immediate transaction, rechecks after taking
+the writer and leaves read-only or query-only handles unchanged.
+[schema](../../src/storage/vectors.sql#L24-L25 "letopis:type=external;path=src/storage/vectors.sql#L24-L25")
+[preparation](../../src/storage/vector_index.rs#L18-L43 "letopis:type=external;path=src/storage/vector_index.rs#L18-L43")
+
+**Bounded search.** The per-channel and final limit defaults to 100 and is capped
+at 100. Both FTS and vector SQL apply the bound after joins and deterministic
+ordering, before Rust decoding; filtering and fusion use only that union, with
+no refill.
+[limit](../../src/service/types.rs#L21-L24 "letopis:type=external;path=src/service/types.rs#L21-L24")
+[service cap](../../src/service/search.rs#L105-L105 "letopis:type=external;path=src/service/search.rs#L105-L105")
+[text SQL](../../src/storage/cache.rs#L549-L575 "letopis:type=external;path=src/storage/cache.rs#L549-L575")
+[vector SQL](../../src/storage/vector.rs#L673-L712 "letopis:type=external;path=src/storage/vector.rs#L673-L712")
+
+[measurements](#measurements "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#measurements")
