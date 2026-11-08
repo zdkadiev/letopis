@@ -1,0 +1,763 @@
+{
+  "status": "PASS",
+  "platforms": [
+    "macOS arm64",
+    "Linux arm64"
+  ],
+  "host_storage_acceptance": {
+    "status": "PASS",
+    "commands": [
+      {
+        "argv": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "source-commit.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "git",
+          "status",
+          "--short"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "source-dirty.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+          "-B",
+          "tests/storage/check_schema.py",
+          "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "schema-parity.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests/storage",
+          "-p",
+          "test_runner.py",
+          "-v"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "runner-tests.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "rustc",
+          "-vV"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "version-rustc.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "--version"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "version-cargo.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "git",
+          "--version"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "version-git.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+          "--version"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "version-python3.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "uname",
+          "-a"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "version-uname.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "make",
+          "verify",
+          "V=1"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "rust-check.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--test",
+          "embedding_provider",
+          "attempt_obeys_real_sixty_second_deadline",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "provider-real-deadline.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "doc",
+          "--locked",
+          "--offline",
+          "--no-deps"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "rustdoc.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "storage::native::tests::native_capabilities_match_pinned_stack",
+          "--",
+          "--nocapture"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "native.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "--example",
+          "storage_check",
+          "--message-format=json"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "build.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "otool",
+          "-L",
+          "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-ixuanuuy/storage_check"
+        ],
+        "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+        "log": "dynamic.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-ixuanuuy/storage_check",
+          "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-ixuanuuy/scratch"
+        ],
+        "cwd": "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-ixuanuuy",
+        "log": "standalone.log",
+        "exit_code": 0
+      }
+    ]
+  },
+  "linux_storage_acceptance": {
+    "status": "PASS",
+    "commands": [
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "tests/storage/check_schema.py",
+          "/repo"
+        ],
+        "cwd": "/repo",
+        "log": "schema-parity.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests/storage",
+          "-p",
+          "test_runner.py",
+          "-v"
+        ],
+        "cwd": "/repo",
+        "log": "runner-tests.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "rustc",
+          "-vV"
+        ],
+        "cwd": "/repo",
+        "log": "version-rustc.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "--version"
+        ],
+        "cwd": "/repo",
+        "log": "version-cargo.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "git",
+          "--version"
+        ],
+        "cwd": "/repo",
+        "log": "version-git.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "--version"
+        ],
+        "cwd": "/repo",
+        "log": "version-python3.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "uname",
+          "-a"
+        ],
+        "cwd": "/repo",
+        "log": "version-uname.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "make",
+          "verify",
+          "V=1"
+        ],
+        "cwd": "/repo",
+        "log": "rust-check.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--test",
+          "embedding_provider",
+          "attempt_obeys_real_sixty_second_deadline",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "cwd": "/repo",
+        "log": "provider-real-deadline.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "doc",
+          "--locked",
+          "--offline",
+          "--no-deps"
+        ],
+        "cwd": "/repo",
+        "log": "rustdoc.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "storage::native::tests::native_capabilities_match_pinned_stack",
+          "--",
+          "--nocapture"
+        ],
+        "cwd": "/repo",
+        "log": "native.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "--example",
+          "storage_check",
+          "--message-format=json"
+        ],
+        "cwd": "/repo",
+        "log": "build.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "ldd",
+          "/tmp/tk9-standalone-p89ze9t8/storage_check"
+        ],
+        "cwd": "/repo",
+        "log": "dynamic.log",
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "/tmp/tk9-standalone-p89ze9t8/storage_check",
+          "/tmp/tk9-standalone-p89ze9t8/scratch"
+        ],
+        "cwd": "/tmp/tk9-standalone-p89ze9t8",
+        "log": "standalone.log",
+        "exit_code": 0
+      }
+    ]
+  },
+  "common_native_inputs_verified": 228,
+  "focused_linux_invocations": [
+    {
+      "args": [
+        "config"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "config"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "traverse"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "check"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "--version"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "check"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "status"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "traverse"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "check"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "config"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "check"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "embed",
+        "--drain"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "embed",
+        "--drain"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "status"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "config"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "index",
+        "--full"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "embed",
+        "--drain"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "init"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "index",
+        "--full"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "search"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "--help"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "inspect"
+      ],
+      "execve_count": 1
+    },
+    {
+      "args": [
+        "check"
+      ],
+      "execve_count": 1
+    }
+  ],
+  "mutations": {
+    "count": 22,
+    "results": [
+      {
+        "mutation": "task1-mutation-default",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.01s"
+      },
+      {
+        "mutation": "task1-mutation-identity",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.01s"
+      },
+      {
+        "mutation": "task1-mutation-validation",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.00s"
+      },
+      {
+        "mutation": "task2-mutation-mode",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 607 filtered out; finished in 0.11s"
+      },
+      {
+        "mutation": "task2-mutation-ordering",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 607 filtered out; finished in 0.09s"
+      },
+      {
+        "mutation": "task2-mutation-parent",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 607 filtered out; finished in 0.01s"
+      },
+      {
+        "mutation": "task3-mutation-commit",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 616 filtered out; finished in 0.21s"
+      },
+      {
+        "mutation": "task3-mutation-locked-selection",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 616 filtered out; finished in 0.22s"
+      },
+      {
+        "mutation": "task3-mutation-locked",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 616 filtered out; finished in 0.20s"
+      },
+      {
+        "mutation": "task3-mutation-preliminary",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 616 filtered out; finished in 0.18s"
+      },
+      {
+        "mutation": "task4-mutation-helper-patterns",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 1.04s"
+      },
+      {
+        "mutation": "task4-mutation-identity",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.20s"
+      },
+      {
+        "mutation": "task4-mutation-inspect-capture",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 619 filtered out; finished in 0.01s"
+      },
+      {
+        "mutation": "task4-mutation-inspect-pin",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 619 filtered out; finished in 0.01s"
+      },
+      {
+        "mutation": "task4-mutation-io",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.86s"
+      },
+      {
+        "mutation": "task4-mutation-mode",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.11s"
+      },
+      {
+        "mutation": "task4-mutation-patterns",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.98s"
+      },
+      {
+        "mutation": "task4-mutation-scope",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.93s"
+      },
+      {
+        "mutation": "task5-mutation-invalid-embedding",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.08s"
+      },
+      {
+        "mutation": "task5-mutation-maintenance-output",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.91s"
+      },
+      {
+        "mutation": "task5-mutation-maintenance-policy",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 1.51s"
+      },
+      {
+        "mutation": "task5-mutation-malformed-foreground",
+        "behavioral_failure_confirmed": true,
+        "result": "0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 6.47s"
+      }
+    ]
+  },
+  "raw_receipts": ".artifacts/issue-97/final-20261106T140628Z",
+  "host_effective_uid": 502
+}

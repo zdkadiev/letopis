@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
 # Initialization, configuration and status
 
 `init` discovers the repository and validates an existing configuration before
@@ -8,7 +8,10 @@ state. Existing configuration is not silently overwritten.
 
 `config` observes the current configuration through non-creating filesystem access.
 It parses the document and validates provider settings when an embedding model is
-configured; it does not run background embedding work.
+configured; it does not run background embedding work. The full configuration
+also contains discovery policy with effective defaults. Discovery does not enter
+the embedding identity, and invalid embedding settings do not prevent discovery
+when the JSON root and discovery section remain valid.
 
 `status` observes the last published revision, diagnostics, embedding backlog and
 failures, configuration validity and lock state. It reads a status view if one is
@@ -28,6 +31,8 @@ execution observes the config file and reconciles vector state through storage.
 The status/config read paths report observations and do not perform this reset.
 
 [Initialization](../../src/service/init.rs "letopis:type=external;path=src/service/init.rs")
+
+[Configuration values](../../src/service/types.rs "letopis:type=external;path=src/service/types.rs")
 
 [Configuration reader](../../src/service/configuration.rs "letopis:type=external;path=src/service/configuration.rs")
 

@@ -264,7 +264,7 @@ fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes:
                 .zip(hashes)
                 .zip([FIRST_VECTOR, SECOND_VECTOR])
             {
-                let node = StorageRead::nodes_get_by_id(
+                let node = StorageRead::nodes_get_by_uri(
                     read,
                     &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
                 )
@@ -296,7 +296,7 @@ fn get_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
                 ["a.md", "b.md"]
                     .into_iter()
                     .map(|id| {
-                        let node = StorageRead::nodes_get_by_id(
+                        let node = StorageRead::nodes_get_by_uri(
                             read,
                             &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
                         )

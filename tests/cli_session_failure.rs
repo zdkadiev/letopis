@@ -9,7 +9,7 @@ use std::path::Path;
 mockall::mock! {
     ReadyWork {}
     impl EmbeddingExecutor for ReadyWork {
-        fn has_work(&mut self) -> CommandResult<bool>;
+        fn is_work_available(&mut self) -> CommandResult<bool>;
         fn drain(&mut self) -> CommandResult<()>;
     }
 }
@@ -21,7 +21,10 @@ fn reports_a_safe_warning_when_the_child_cannot_create_its_session() {
     let executable = Path::new("/usr/bin/true");
     assert!(executable.is_file());
     let mut tasks = MockReadyWork::new();
-    tasks.expect_has_work().times(1).returning(|| Ok(true));
+    tasks
+        .expect_is_work_available()
+        .times(1)
+        .returning(|| Ok(true));
     tasks.expect_drain().times(0);
     let mut background = wire_background_runner(root.path(), executable, Some(&mut tasks)).unwrap();
     // When

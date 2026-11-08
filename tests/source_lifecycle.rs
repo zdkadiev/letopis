@@ -304,7 +304,7 @@ fn remove_fixture_cache(repo: &DocumentRepo) {
 }
 
 fn write_preserved_files(repo: &DocumentRepo) {
-    repo.write(".letopis/config.json", b"{\"fixture\":\"preserve\"}\n");
+    repo.write(".letopis/config.json", br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#);
     repo.write(".letopis/index.lock", b"fixture-index-lock\n");
     repo.write(".letopis/embed.lock", b"fixture-embed-lock\n");
 }

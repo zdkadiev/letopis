@@ -430,7 +430,7 @@ fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
     );
     let Err(error) = storage
         .cache
-        .with_write_tx(|| storage.cache.get_publication_revision())
+        .with_write_tx(|| storage.cache.project_get_revision())
         .map_err(TransactionError::into_inner)
     else {
         panic!("competing cache writer was accepted");

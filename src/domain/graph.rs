@@ -7,8 +7,13 @@ pub(crate) const INCLUDES_EDGE_TYPE: &str = "includes";
 /// A validated edge type, including the system types includes and external.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgeType(String);
+
 impl EdgeType {
-    /// Validate the X-4 lowercase ASCII type grammar.
+    /// Parses a type name using the X-4 lowercase ASCII grammar.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the candidate type name to validate.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidType`] unless the name starts with a lowercase
@@ -23,7 +28,8 @@ impl EdgeType {
         }
         Ok(Self(raw.into()))
     }
-    /// The validated type name.
+
+    /// Returns the validated type name.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -37,8 +43,9 @@ pub enum EdgeTarget {
     /// An external source address.
     Source(SourceUri),
 }
+
 impl EdgeTarget {
-    /// The target's normalized identity.
+    /// Returns the target's normalized identity.
     pub fn as_str(&self) -> &str {
         match self {
             Self::Knowledge(k) => k.as_str(),
@@ -54,8 +61,17 @@ pub struct Edge {
     target: EdgeTarget,
     edge_type: EdgeType,
 }
+
 impl Edge {
-    /// Reject self-loops and source/knowledge target mismatches; dangling targets are allowed.
+    /// Creates an edge, rejecting self-loops and target/type mismatches.
+    /// Dangling targets are allowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` — the knowledge element that owns the edge.
+    /// * `target` — the declared edge endpoint, either another knowledge element or a source
+    ///   address.
+    /// * `edge_type` — the validated relation type that determines the allowed target kind.
     ///
     /// # Errors
     /// Returns [`ValueError::SelfLoop`] when source and target identities match,
@@ -78,15 +94,18 @@ impl Edge {
             edge_type,
         })
     }
-    /// The containing knowledge element.
+
+    /// Returns the containing knowledge element.
     pub fn get_source(&self) -> &KnowledgeId {
         &self.source
     }
-    /// The declared target, whether or not it currently exists.
+
+    /// Returns the declared target, whether or not it currently exists.
     pub fn get_target(&self) -> &EdgeTarget {
         &self.target
     }
-    /// The declared relation type.
+
+    /// Returns the declared relation type.
     pub fn get_edge_type(&self) -> &EdgeType {
         &self.edge_type
     }
@@ -100,7 +119,14 @@ pub enum ElementKind {
     /// An element with an outgoing `includes` edge.
     Metavertex,
 }
-/// An element is a metavertex exactly when it has an outgoing includes edge.
+
+/// Returns an element's kind from its outgoing includes edges.
+/// The kind is `Metavertex` exactly when an outgoing includes edge exists.
+///
+/// # Arguments
+///
+/// * `id` — the element whose outgoing edges are inspected.
+/// * `edges` — the full edge set searched for an outgoing includes edge from `id`.
 pub fn derive_element_kind(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
     if edges
         .iter()
@@ -120,6 +146,7 @@ pub struct ElementMetadata {
     /// Git tree of the source snapshot declared by the author, if any.
     pub source_snapshot: Option<TreeOid>,
 }
+
 /// One knowledge element's metadata and exact source coordinates; no stored text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
@@ -144,20 +171,29 @@ pub struct Graph {
     elements: Vec<EdgeTarget>,
     edges: Option<Vec<Edge>>,
 }
+
 impl Graph {
-    /// Package the service's already deduplicated traversal result without I/O.
+    /// Creates a graph from an already deduplicated traversal result without I/O.
+    ///
+    /// # Arguments
+    ///
+    /// * `elements` — selected target identities in BFS discovery order, already deduplicated.
+    /// * `edges` — requested original edges, or `None` when edges were not requested.
     pub(crate) fn new(elements: Vec<EdgeTarget>, edges: Option<Vec<Edge>>) -> Self {
         Self { elements, edges }
     }
-    /// Return selected identities in BFS discovery order.
+
+    /// Returns selected identities in BFS discovery order.
     pub fn get_elements(&self) -> &[EdgeTarget] {
         &self.elements
     }
-    /// Return requested edges in first-encounter order, or absent when unrequested.
+
+    /// Returns requested edges in first-encounter order, or none when unrequested.
     pub fn get_edges(&self) -> Option<&[Edge]> {
         self.edges.as_deref()
     }
-    /// Transfer selected identities and optional original edges to their consumer.
+
+    /// Returns the selected identities and optional original edges, consuming the graph.
     pub fn into_parts(self) -> (Vec<EdgeTarget>, Option<Vec<Edge>>) {
         (self.elements, self.edges)
     }

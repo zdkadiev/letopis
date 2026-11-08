@@ -14,6 +14,7 @@ struct Problem<'a> {
     message: &'static str,
     details: &'a BTreeMap<String, Value>,
 }
+
 #[derive(Serialize)]
 struct Success<'a> {
     ok: bool,
@@ -21,11 +22,13 @@ struct Success<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     warnings: Vec<Problem<'a>>,
 }
+
 #[derive(Serialize)]
 struct Failure<'a> {
     ok: bool,
     error: Problem<'a>,
 }
+
 #[derive(Serialize)]
 #[serde(untagged)]
 enum ResultBody<'a> {
@@ -61,6 +64,7 @@ enum ResultBody<'a> {
     Drained {},
     Help(&'a str),
 }
+
 #[derive(Serialize)]
 struct Element<'a> {
     path: &'a str,
@@ -68,6 +72,7 @@ struct Element<'a> {
     lines: Option<[u64; 2]>,
     hash: Option<String>,
 }
+
 #[derive(Serialize)]
 struct Lock {
     name: &'static str,
@@ -78,7 +83,14 @@ struct Lock {
 #[derive(Serialize)]
 struct ConfigurationOutput<'a> {
     embedding_model: EmbeddingModelOutput<'a>,
+    discovery: DiscoveryOutput,
 }
+
+#[derive(Serialize)]
+struct DiscoveryOutput {
+    respect_gitignore: bool,
+}
+
 #[derive(Serialize)]
 struct EmbeddingModelOutput<'a> {
     enabled: bool,
@@ -107,8 +119,13 @@ struct TraversedEdge<'a> {
     edge_type: &'a str,
 }
 
-/// Write and flush one complete X-1 envelope to the caller-owned output.
-/// Returns 0 for a fully written success, or 1 for command, encoding or I/O failure.
+/// Writes one complete X-1 envelope to the caller-owned output and flushes it.
+/// Returns 0 for a fully written success, or 1 for a command, encoding or I/O failure.
+///
+/// # Arguments
+///
+/// * `output` — the caller-owned writer that receives the complete envelope.
+/// * `response` — the typed command result to encode and write.
 pub(crate) fn response_write(
     mut output: impl Write,
     response: CommandResult<CommandResponse>,
@@ -125,10 +142,17 @@ pub(crate) fn response_write(
     }
     exit
 }
-/// Serialize one complete response: the X-1 envelope with its final newline, or plain help text.
+
+/// Encodes one complete response as the X-1 envelope with its final newline, or
+/// as plain help text.
+///
+/// # Arguments
+///
+/// * `response` — the typed command result to encode as an envelope or as plain
+///   help text.
 ///
 /// # Errors
-/// Returns a serialization error without emitting any response bytes.
+/// Returns a serialization error and writes no response bytes.
 pub(crate) fn response_encode(
     response: CommandResult<CommandResponse>,
 ) -> Result<(Vec<u8>, u8), serde_json::Error> {
@@ -172,7 +196,7 @@ fn result_build(result: &ResponseResult) -> ResultBody<'_> {
         ResponseResult::Initialized => ResultBody::Initialized {},
         ResponseResult::Index(outcome) => ResultBody::Index {
             revision: outcome.revision,
-            published: outcome.published,
+            published: outcome.is_published,
             files_updated: outcome.files_updated,
             files_removed: outcome.files_removed,
             invalid_files_updated: outcome.invalid_files_updated,
@@ -213,6 +237,7 @@ fn result_build(result: &ResponseResult) -> ResultBody<'_> {
         ResponseResult::Drained => ResultBody::Drained {},
     }
 }
+
 fn lock_build(lock: &HeldLock) -> Lock {
     Lock {
         name: match lock.name {
@@ -222,11 +247,12 @@ fn lock_build(lock: &HeldLock) -> Lock {
         pid: lock.pid.get(),
     }
 }
+
 fn configuration_build(configuration: &Configuration) -> ConfigurationOutput<'_> {
     let config = configuration.get_embedding_config();
     ConfigurationOutput {
         embedding_model: EmbeddingModelOutput {
-            enabled: configuration.get_enabled(),
+            enabled: configuration.is_enabled(),
             provider: config.map(|config| provider_name_get(config.get_provider())),
             model: config.map(EmbeddingConfig::get_model),
             parameters: config
@@ -234,14 +260,19 @@ fn configuration_build(configuration: &Configuration) -> ConfigurationOutput<'_>
                 .unwrap_or_else(|| Value::Object(Map::new())),
             max_retries: configuration.get_max_retries(),
         },
+        discovery: DiscoveryOutput {
+            respect_gitignore: configuration.get_discovery().is_gitignore_respected(),
+        },
     }
 }
+
 fn provider_name_get(provider: ProviderKind) -> &'static str {
     match provider {
         ProviderKind::Ollama => "ollama",
         ProviderKind::Openai => "openai",
     }
 }
+
 fn link_build(link: &SearchLink) -> Link<'_> {
     Link {
         element_id: link.element_id.as_str(),
@@ -251,6 +282,7 @@ fn link_build(link: &SearchLink) -> Link<'_> {
         flags: link.flags.iter().map(flag_get).collect(),
     }
 }
+
 fn traversal_link_build(link: &TraversalLink) -> Link<'_> {
     Link {
         element_id: link.element_id.as_str(),
@@ -260,6 +292,7 @@ fn traversal_link_build(link: &TraversalLink) -> Link<'_> {
         flags: link.flags.iter().map(flag_get).collect(),
     }
 }
+
 fn edge_build(edge: &Edge) -> TraversedEdge<'_> {
     TraversedEdge {
         source: edge.get_source().as_str(),
@@ -267,6 +300,7 @@ fn edge_build(edge: &Edge) -> TraversedEdge<'_> {
         edge_type: edge.get_edge_type().as_str(),
     }
 }
+
 fn flag_get(flag: &SearchFlag) -> &'static str {
     match flag {
         SearchFlag::Stale => "stale",
@@ -274,6 +308,7 @@ fn flag_get(flag: &SearchFlag) -> &'static str {
         SearchFlag::SourceNotFound => "source_not_found",
     }
 }
+
 fn element_build(element: &InspectedElement) -> Element<'_> {
     Element {
         path: element.path.as_str(),
@@ -283,6 +318,7 @@ fn element_build(element: &InspectedElement) -> Element<'_> {
         hash: element.hash.as_ref().map(Sha256::to_hex),
     }
 }
+
 fn problem_build(problem: &CommandProblem) -> Problem<'_> {
     Problem {
         code: error_code_get(problem.code),
@@ -290,6 +326,7 @@ fn problem_build(problem: &CommandProblem) -> Problem<'_> {
         details: &problem.details,
     }
 }
+
 fn error_code_get(kind: CommandErrorKind) -> &'static str {
     match kind {
         CommandErrorKind::InvalidRequest => "invalid_request",

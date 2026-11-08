@@ -38,7 +38,7 @@ fn text_hash_shares_one_vector() {
                     .unwrap();
             }
 
-            cache.get_publication_revision()
+            cache.project_get_revision()
         })
         .map_err(TransactionError::into_inner);
     assert_eq!(cache_result.unwrap(), 1);
@@ -49,7 +49,7 @@ fn text_hash_shares_one_vector() {
             let unit = &storage.vectors;
             let again = unit.store_vector(&hash, &[0.0, 1.0, 0.0], 3).unwrap();
             assert_eq!(again.row_id, row);
-            assert!(!again.inserted);
+            assert!(!again.is_inserted);
 
             Ok::<_, StorageError>(())
         })
@@ -197,7 +197,7 @@ fn current_node_hash_excludes_old_vector() {
                 .nodes_upsert_by_id(&support::build_knowledge("a.md", "new"))
                 .unwrap();
 
-            cache.get_publication_revision()
+            cache.project_get_revision()
         })
         .unwrap();
     storage
@@ -338,7 +338,7 @@ fn cache_and_vector_writers_are_independent() {
 
             // When / Then: the cache writer can commit after the independent vector write.
 
-            Ok::<_, StorageError>((cache_unit.get_publication_revision()?, key))
+            Ok::<_, StorageError>((cache_unit.project_get_revision()?, key))
         })
         .map_err(TransactionError::into_inner);
     let (revision, key) = cache_unit_result.unwrap();
@@ -355,7 +355,7 @@ fn cache_and_vector_writers_are_independent() {
             let reused = unit.store_vector(&identity, &[0.0, 1.0, 0.0], 3).unwrap();
             // Then: rebuilding the cache reuses the same persisted vector key.
             assert_eq!(reused.row_id, key.row_id);
-            assert!(!reused.inserted);
+            assert!(!reused.is_inserted);
 
             Ok::<_, StorageError>(())
         })
@@ -387,7 +387,7 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
                     .unwrap();
             }
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
     for (text, vector) in [
@@ -469,7 +469,7 @@ fn publish_hash<C: CacheDatabase, V: VectorDatabase>(storage: &Databases<C, V>, 
             let unit = &storage.cache;
             unit.nodes_upsert_by_id(&node).unwrap();
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
 }

@@ -10,7 +10,6 @@ mod refs;
 mod repository;
 mod tree;
 mod validation;
-mod worktree;
 
 /// Command-owned Git write resources for foreground cancellation.
 pub(crate) use cleanup::GitWriteCleanup;

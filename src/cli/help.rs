@@ -4,15 +4,6 @@ use std::ffi::OsString;
 const HELP_FLAG: &str = "--help";
 const VERSION_FLAG: &str = "--version";
 
-/// Help for one public command. `example` is the bare JSON request body.
-#[derive(Debug)]
-pub(super) struct CommandHelp {
-    pub(super) name: &'static str,
-    pub(super) summary: &'static str,
-    pub(super) details: &'static str,
-    pub(super) example: &'static str,
-}
-
 /// Public commands in display order; `embed --drain` is internal and absent.
 pub(super) const COMMANDS: [CommandHelp; 8] = [
     CommandHelp {
@@ -155,10 +146,14 @@ Result:
 const CONFIG_DETAILS: &str = r#"Input (JSON object): {} (no fields)
 
 Result: {"embedding_model": {"enabled", "provider", "model",
-                             "parameters", "max_retries"}}, or null.
+                             "parameters", "max_retries"},
+         "discovery": {"respect_gitignore"}}, or null.
   Reads .letopis/config.json without changing it. The old flat format must be
   migrated manually under embedding_model. Disabled settings are still
-  validated locally. Edit the file directly; there is no setter command.
+  validated locally. Discovery defaults to respect_gitignore:true; false also
+  admits untracked paths hidden by standard Git ignores. .letopis/ignore applies
+  root-relative Gitignore patterns to tracked and untracked candidates.
+  Edit the files directly; there is no setter command.
 "#;
 
 const CONTRACT: &str = r#"
@@ -181,11 +176,26 @@ Examples:
   letopis traverse --help
 "#;
 
-/// Return the text for `--help`, `--version` or `<command> --help`.
+/// Help for one public command. `example` is the bare JSON request body.
+#[derive(Debug)]
+pub(super) struct CommandHelp {
+    pub(super) name: &'static str,
+    pub(super) summary: &'static str,
+    pub(super) details: &'static str,
+    pub(super) example: &'static str,
+}
+
+/// Returns the plain-text help or version for the exact `--help`, `--version`
+/// and `<command> --help` arguments.
 ///
-/// Only these exact argv forms match, so every other invocation, including
-/// non-UTF-8 arguments, keeps its existing request handling. Pure: reads no
+/// Only these exact forms match; every other invocation, including non-UTF-8
+/// arguments, returns `None` and keeps its existing request handling. Reads no
 /// input and touches no repository or service.
+///
+/// # Arguments
+///
+/// * `args` — the full argv slice; only the exact `--help`, `--version` and
+///   `<command> --help` forms are recognized.
 pub(crate) fn help_get_by_args(args: &[OsString]) -> Option<String> {
     let args = args
         .iter()

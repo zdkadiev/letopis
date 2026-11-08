@@ -1,0 +1,85 @@
+{
+  "schema_sha256": "8be478f9157a2265c86766b8710a460dc601d8d5e3a1d2cbe76c8ed6a806f311",
+  "status": "PASS",
+  "cases": [
+    {
+      "name": "default",
+      "response": {
+        "ok": true,
+        "result": {
+          "embedding_model": {
+            "enabled": false,
+            "provider": null,
+            "model": null,
+            "parameters": {},
+            "max_retries": 0
+          },
+          "discovery": {
+            "respect_gitignore": true
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "disabled",
+      "response": {
+        "ok": true,
+        "result": {
+          "embedding_model": {
+            "enabled": false,
+            "provider": null,
+            "model": null,
+            "parameters": {},
+            "max_retries": 0
+          },
+          "discovery": {
+            "respect_gitignore": false
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "missing section",
+      "response": {
+        "ok": true,
+        "result": {
+          "embedding_model": {
+            "enabled": false,
+            "provider": null,
+            "model": null,
+            "parameters": {},
+            "max_retries": 0
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "missing member",
+      "response": {
+        "ok": true,
+        "result": {
+          "embedding_model": {
+            "enabled": false,
+            "provider": null,
+            "model": null,
+            "parameters": {},
+            "max_retries": 0
+          },
+          "discovery": {}
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "missing file",
+      "response": {
+        "ok": true,
+        "result": null
+      },
+      "valid": true
+    }
+  ]
+}

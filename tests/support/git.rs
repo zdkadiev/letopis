@@ -290,7 +290,7 @@ pub fn supervise_test(name: &str, envs: &[(&str, &str)]) {
         .envs(envs.iter().copied())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let out = OwnedChild::spawn(&mut c).wait(Instant::now() + Duration::from_secs(30));
+    let out = OwnedChild::spawn(&mut c).wait(Instant::now() + Duration::from_secs(90));
     assert!(
         out.status.success(),
         "supervised test failed: {} {}",

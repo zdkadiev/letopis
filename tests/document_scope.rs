@@ -34,7 +34,7 @@ fn scoped_refresh_preserves_outside_owners() {
         outcome,
         RefreshOutcome {
             revision: 2,
-            published: true,
+            is_published: true,
             files_updated: 1,
             files_removed: 0,
             invalid_files_updated: 0,
@@ -59,7 +59,7 @@ fn scoped_refresh_preserves_outside_owners() {
         unchanged,
         RefreshOutcome {
             revision: 2,
-            published: false,
+            is_published: false,
             files_updated: 0,
             files_removed: 0,
             invalid_files_updated: 0,
@@ -109,7 +109,7 @@ fn scoped_full_reparses_selected_file_and_leaves_other_file_untouched() {
     // Then: both forced publications reparse one owner, retaining the outside row.
     assert_eq!((first.revision, first.files_updated), (2, 1));
     assert_eq!((second.revision, second.files_updated), (3, 1));
-    assert!(first.published && second.published);
+    assert!(first.is_published && second.is_published);
     assert_eq!(
         repo.get_state().get_file("outside.md"),
         before.get_file("outside.md")
@@ -133,7 +133,11 @@ fn unmatched_scoped_refresh_does_not_remove_cached_owners() {
 
     // Then: the cached owner remains, and the revision does not advance.
     assert_eq!(
-        (outcome.revision, outcome.published, outcome.files_removed),
+        (
+            outcome.revision,
+            outcome.is_published,
+            outcome.files_removed
+        ),
         (1, false, 0)
     );
     assert_eq!(repo.search("KnownToken"), ["owner.md"]);

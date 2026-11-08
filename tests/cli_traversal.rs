@@ -236,7 +236,7 @@ fn binary_uses_no_inference_with_fully_seeded_backlog() {
     assert!(
         !wire_embedding_executor(repo.get_root())
             .unwrap()
-            .has_work()
+            .is_work_available()
             .unwrap()
     );
     let response = invoke(
@@ -250,7 +250,7 @@ fn binary_uses_no_inference_with_fully_seeded_backlog() {
     assert!(
         !wire_embedding_executor(repo.get_root())
             .unwrap()
-            .has_work()
+            .is_work_available()
             .unwrap()
     );
 }

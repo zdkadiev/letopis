@@ -47,7 +47,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
             let matches = read.text_index_get_by_expression(FINAL_MARKER).unwrap();
             assert_eq!(matches.len(), 1);
             assert_eq!(matches[0].id.as_str(), "long.md");
-            let node = StorageRead::nodes_get_by_id(
+            let node = StorageRead::nodes_get_by_uri(
                 read,
                 &EdgeTarget::Knowledge(KnowledgeId::parse("long.md").unwrap()),
             )

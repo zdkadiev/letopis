@@ -1,6 +1,6 @@
 use super::{
-    cache::{SOURCE_KIND, map_invalid_value},
-    connection::map_sqlite,
+    cache::SOURCE_KIND,
+    connection::STORAGE_FAILURE,
     query::{
         EmbedFailures, Meta, Nodes, QueryErrorRow, Schemas, VectorIndex, VectorKeys, build_query,
     },
@@ -93,6 +93,7 @@ impl VectorStorage {
             )),
         }
     }
+
     fn vector_keys_get_by_search_hash(&self, search_hash: &Sha256) -> StorageResult<i64> {
         let connection = self.get_write_connection()?;
         let (sql, values) = build_query(
@@ -103,7 +104,7 @@ impl VectorStorage {
         )?;
         connection
             .query_row(&sql, params_from_iter(values), |r| r.get(0))
-            .map_err(map_sqlite)
+            .map_err(StorageError::from)
     }
 }
 
@@ -233,9 +234,7 @@ impl VectorDatabase for VectorStorage {
                     .from_table(VectorIndex::Table)
                     .and_where(Expr::col(VectorIndex::Rowid).in_subquery(orphan_keys)),
             )?;
-            connection
-                .execute(&sql, params_from_iter(values))
-                .map_err(map_sqlite)?;
+            connection.execute(&sql, params_from_iter(values))?;
             let (sql, values) = build_query(
                 Query::delete().from_table(VectorKeys::Table).and_where(
                     Expr::exists(build_current_nodes_query(Expr::col((
@@ -245,9 +244,7 @@ impl VectorDatabase for VectorStorage {
                     .not(),
                 ),
             )?;
-            connection
-                .execute(&sql, params_from_iter(values))
-                .map_err(map_sqlite)?;
+            connection.execute(&sql, params_from_iter(values))?;
             let (sql, values) = build_query(
                 Query::delete().from_table(EmbedFailures::Table).and_where(
                     Expr::exists(build_current_nodes_query(Expr::col((
@@ -257,9 +254,7 @@ impl VectorDatabase for VectorStorage {
                     .not(),
                 ),
             )?;
-            connection
-                .execute(&sql, params_from_iter(values))
-                .map_err(map_sqlite)?;
+            connection.execute(&sql, params_from_iter(values))?;
             Ok(())
         })();
         self.record(result)
@@ -284,7 +279,13 @@ impl VectorDatabase for VectorStorage {
                     .into_table(EmbedFailures::Table)
                     .columns([EmbedFailures::SearchHash, EmbedFailures::Attempts])
                     .values([Expr::val(search_hash.to_hex()), Expr::val(1)])
-                    .map_err(map_invalid_value)?
+                    .map_err(|error| {
+                        StorageError::new_with_cause(
+                            StorageErrorKind::InternalError,
+                            "invalid persisted storage value",
+                            error,
+                        )
+                    })?
                     .on_conflict(
                         OnConflict::column(EmbedFailures::SearchHash)
                             .value(
@@ -298,7 +299,7 @@ impl VectorDatabase for VectorStorage {
             connection
                 .execute(&sql, params_from_iter(values))
                 .map(|changed| changed == 1)
-                .map_err(map_sqlite)
+                .map_err(StorageError::from)
         })();
         self.record(result)
     }
@@ -319,7 +320,7 @@ impl VectorDatabase for VectorStorage {
             connection
                 .execute(&sql, params_from_iter(values))
                 .map(|changed| changed == 1)
-                .map_err(map_sqlite)
+                .map_err(StorageError::from)
         })();
         self.record(result)
     }
@@ -333,16 +334,20 @@ impl VectorDatabase for VectorStorage {
                     .into_table(QueryErrorRow::Table)
                     .columns([QueryErrorRow::Id, QueryErrorRow::At, QueryErrorRow::Error])
                     .values([Expr::val(1), Expr::val(at), Expr::val(error)])
-                    .map_err(map_invalid_value)?
+                    .map_err(|error| {
+                        StorageError::new_with_cause(
+                            StorageErrorKind::InternalError,
+                            "invalid persisted storage value",
+                            error,
+                        )
+                    })?
                     .on_conflict(
                         OnConflict::column(QueryErrorRow::Id)
                             .update_columns([QueryErrorRow::At, QueryErrorRow::Error])
                             .to_owned(),
                     ),
             )?;
-            connection
-                .execute(&sql, params_from_iter(values))
-                .map_err(map_sqlite)?;
+            connection.execute(&sql, params_from_iter(values))?;
             Ok(())
         })();
         self.record(result)
@@ -356,9 +361,7 @@ impl VectorDatabase for VectorStorage {
                     .from_table(QueryErrorRow::Table)
                     .and_where(Expr::col(QueryErrorRow::Id).eq(1)),
             )?;
-            connection
-                .execute(&sql, params_from_iter(values))
-                .map_err(map_sqlite)?;
+            connection.execute(&sql, params_from_iter(values))?;
             Ok(())
         })();
         self.record(result)
@@ -376,18 +379,25 @@ impl VectorDatabase for VectorStorage {
             validate_dimensions(connection, dimensions)?;
             let inserted = vector_keys_upsert_by_search_hash(connection, search_hash)?;
             let row_id = self.vector_keys_get_by_search_hash(search_hash)?;
-            let key = StoredVectorKey { row_id, inserted };
-            if key.inserted {
+            let key = StoredVectorKey {
+                row_id,
+                is_inserted: inserted,
+            };
+            if key.is_inserted {
                 let (sql, values) = build_query(
                     Query::insert()
                         .into_table(VectorIndex::Table)
                         .columns([VectorIndex::Rowid, VectorIndex::Vector])
                         .values([Expr::val(key.row_id), Expr::val(bytes)])
-                        .map_err(map_invalid_value)?,
+                        .map_err(|error| {
+                            StorageError::new_with_cause(
+                                StorageErrorKind::InternalError,
+                                "invalid persisted storage value",
+                                error,
+                            )
+                        })?,
                 )?;
-                connection
-                    .execute(&sql, params_from_iter(values))
-                    .map_err(map_sqlite)?;
+                connection.execute(&sql, params_from_iter(values))?;
             } else {
                 let (sql, values) = build_query(
                     Query::select()
@@ -397,8 +407,7 @@ impl VectorDatabase for VectorStorage {
                 )?;
                 let exists = connection
                     .query_row(&sql, params_from_iter(values), |_| Ok(()))
-                    .optional()
-                    .map_err(map_sqlite)?;
+                    .optional()?;
                 if exists.is_none() {
                     return Err(StorageError::new(
                         StorageErrorKind::InternalError,
@@ -411,9 +420,7 @@ impl VectorDatabase for VectorStorage {
                     .from_table(EmbedFailures::Table)
                     .and_where(Expr::col(EmbedFailures::SearchHash).eq(search_hash.to_hex())),
             )?;
-            connection
-                .execute(&sql, params_from_iter(values))
-                .map_err(map_sqlite)?;
+            connection.execute(&sql, params_from_iter(values))?;
             Ok(key)
         })();
         self.record(result)
@@ -425,8 +432,11 @@ fn reset_vectors(
     observed: Option<&Sha256>,
     identity: &Sha256,
 ) -> StorageResult<VectorOutcome<bool>> {
-    let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
-        .map_err(map_sqlite)?;
+    let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate).map_err(
+        |error| {
+            StorageError::new_with_cause(StorageErrorKind::InternalError, STORAGE_FAILURE, error)
+        },
+    )?;
     let current = decode_config_identity(meta_get_by_id(&tx, VectorSchema::Main)?)?;
     if current.as_ref() == Some(identity) {
         return Ok(VectorOutcome::Current(false));
@@ -434,32 +444,40 @@ fn reset_vectors(
     if current.as_ref() != observed {
         return Ok(VectorOutcome::ConfigChanged);
     }
-    tx.execute_batch(RESET_INDEX).map_err(map_sqlite)?;
+    tx.execute_batch(RESET_INDEX)?;
     let (sql, values) = build_query(Query::delete().from_table(VectorKeys::Table))?;
-    tx.execute(&sql, params_from_iter(values))
-        .map_err(map_sqlite)?;
+    tx.execute(&sql, params_from_iter(values))?;
     let (sql, values) = build_query(Query::delete().from_table(EmbedFailures::Table))?;
-    tx.execute(&sql, params_from_iter(values))
-        .map_err(map_sqlite)?;
+    tx.execute(&sql, params_from_iter(values))?;
     let (sql, values) = build_query(
         Query::insert()
             .into_table(Meta::Table)
             .columns([Meta::Id, Meta::ConfigIdentity])
             .values([Expr::val(1), Expr::val(identity.to_hex())])
-            .map_err(map_invalid_value)?
+            .map_err(|error| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "invalid persisted storage value",
+                    error,
+                )
+            })?
             .on_conflict(
                 OnConflict::column(Meta::Id)
                     .update_column(Meta::ConfigIdentity)
                     .to_owned(),
             ),
     )?;
-    tx.execute(&sql, params_from_iter(values))
-        .map_err(map_sqlite)?;
-    tx.commit().map_err(map_sqlite)?;
+    tx.execute(&sql, params_from_iter(values))?;
+    tx.commit()?;
     Ok(VectorOutcome::Current(true))
 }
 
-/// Read the raw identity text from the selected database.
+/// Returns the raw identity text from the selected database.
+///
+/// # Arguments
+///
+/// * `connection` — the connection holding the selected database.
+/// * `schema` — which vector database to read, main or the attached `vec`.
 ///
 /// # Errors
 /// Reports database failures; interpreting malformed text belongs to the caller.
@@ -479,10 +497,14 @@ pub(super) fn meta_get_by_id(
     connection
         .query_row(&sql, params_from_iter(values), |row| row.get(0))
         .optional()
-        .map_err(map_sqlite)
+        .map_err(StorageError::from)
 }
 
-/// Decode an optional persisted configuration identity.
+/// Decodes an optional persisted configuration identity.
+///
+/// # Arguments
+///
+/// * `identity` — the optional raw identity text to decode as a SHA-256 hash.
 ///
 /// # Errors
 /// Reports malformed hashes with the established metadata diagnostic.
@@ -523,8 +545,7 @@ pub(super) fn vector_index_config_get_by_id(
     };
     let value: Option<i64> = connection
         .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
-        .optional()
-        .map_err(map_sqlite)?;
+        .optional()?;
     value
         .map(|value| {
             let size = usize::try_from(value).map_err(|_| {
@@ -558,7 +579,13 @@ fn vector_keys_upsert_by_search_hash(
             .into_table(VectorKeys::Table)
             .columns([VectorKeys::SearchHash])
             .values([Expr::val(search_hash.to_hex())])
-            .map_err(map_invalid_value)?
+            .map_err(|error| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "invalid persisted storage value",
+                    error,
+                )
+            })?
             .on_conflict(
                 OnConflict::column(VectorKeys::SearchHash)
                     .do_nothing()
@@ -568,10 +595,15 @@ fn vector_keys_upsert_by_search_hash(
     connection
         .execute(&sql, params_from_iter(values))
         .map(|changed| changed == 1)
-        .map_err(map_sqlite)
+        .map_err(StorageError::from)
 }
 
-/// Read and decode the native vector joined through its current key.
+/// Returns the decoded native vector joined through its current key.
+///
+/// # Arguments
+///
+/// * `connection` — the connection with the `vec` schema attached.
+/// * `search_hash` — the search hash whose stored vector is read.
 ///
 /// # Errors
 /// Reports missing or malformed native rows and database failures.
@@ -597,8 +629,7 @@ pub(super) fn vector_keys_get_by_search_hash(
         .query_row(&sql, params_from_iter(values), |r| {
             r.get::<_, Option<Vec<u8>>>(0)
         })
-        .optional()
-        .map_err(map_sqlite)?;
+        .optional()?;
     value
         .map(|bytes| {
             decode_vector(&bytes.ok_or_else(|| {
@@ -631,7 +662,7 @@ fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
     Ok(values)
 }
 
-pub(super) fn get_nearest_vectors(
+pub(super) fn vector_index_get_nearest_by_vector(
     connection: &Connection,
     query: &[f32],
     dimensions: usize,
@@ -652,7 +683,7 @@ fn vector_keys_get(connection: &Connection) -> StorageResult<i64> {
     )?;
     connection
         .query_row(&sql, params_from_iter(values), |r| r.get(0))
-        .map_err(map_sqlite)
+        .map_err(StorageError::from)
 }
 
 fn vector_index_get_by_vector(
@@ -660,27 +691,23 @@ fn vector_index_get_by_vector(
     bytes: &[u8],
     count: i64,
 ) -> StorageResult<Vec<VectorMatch>> {
-    let mut statement = connection
-        .prepare(
-            "select n.uri, k.search_hash, v.distance
+    let mut statement = connection.prepare(
+        "select n.uri, k.search_hash, v.distance
          from vec.vector_index(?1, ?2) v
          join vec.vector_keys k on k.row_id = v.rowid
          join nodes n on n.search_hash = k.search_hash
          where n.kind <> ?3
          order by v.distance, n.uri",
-        )
-        .map_err(map_sqlite)?;
-    let rows = statement
-        .query_map(params![bytes, format!("{{K:{count}}}"), SOURCE_KIND], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, f64>(2)?,
-            ))
-        })
-        .map_err(map_sqlite)?;
+    )?;
+    let rows = statement.query_map(params![bytes, format!("{{K:{count}}}"), SOURCE_KIND], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, f64>(2)?,
+        ))
+    })?;
     rows.map(|row| {
-        let (id, search_hash, distance) = row.map_err(map_sqlite)?;
+        let (id, search_hash, distance) = row?;
         Ok(VectorMatch {
             id: KnowledgeId::parse(&id).map_err(|_| {
                 StorageError::new(
@@ -710,8 +737,8 @@ fn encode_vector(vector: &[f32], dimensions: usize) -> StorageResult<Vec<u8>> {
     Ok(vector.iter().flat_map(|v| v.to_ne_bytes()).collect())
 }
 
-fn encode_unsigned(value: u64) -> StorageResult<i64> {
-    i64::try_from(value).map_err(|cause| {
+fn encode_unsigned(integer: u64) -> StorageResult<i64> {
+    i64::try_from(integer).map_err(|cause| {
         StorageError::new_with_cause(
             StorageErrorKind::InvalidRequest,
             "unsupported diagnostic number",
@@ -737,8 +764,7 @@ pub(super) fn embed_failures_get_by_search_hash(
         .query_row(&sql, params_from_iter(values), |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
         })
-        .optional()
-        .map_err(map_sqlite)?;
+        .optional()?;
     value
         .map(|(attempts, error)| {
             let attempts = decode_unsigned(attempts)?;
@@ -773,8 +799,7 @@ pub(super) fn query_error_get_by_id(
         .query_row(&sql, params_from_iter(values), |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
         })
-        .optional()
-        .map_err(map_sqlite)?;
+        .optional()?;
     value
         .map(|(at, error)| {
             Ok(QueryError {
@@ -785,16 +810,16 @@ pub(super) fn query_error_get_by_id(
         .transpose()
 }
 
-fn decode_unsigned(value: i64) -> StorageResult<u64> {
-    u64::try_from(value).map_err(|_| {
+fn decode_unsigned(integer: i64) -> StorageResult<u64> {
+    u64::try_from(integer).map_err(|_| {
         StorageError::new(StorageErrorKind::InternalError, "invalid stored diagnostic")
     })
 }
 
-pub(super) fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+pub(super) fn nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
     connection: &Connection,
     max_attempts: u64,
-    id: Option<&KnowledgeId>,
+    uri: Option<&KnowledgeId>,
 ) -> StorageResult<Option<EmbeddingWork>> {
     if max_attempts == 0 {
         return Err(StorageError::new(
@@ -811,20 +836,31 @@ pub(super) fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
         .and_where(Expr::exists(build_failure_threshold_query(max_attempts)).not())
         .order_by(Nodes::Uri, Order::Asc)
         .limit(1);
-    if let Some(id) = id {
-        query.and_where(Expr::col(Nodes::Uri).gt(id.as_str()));
+    if let Some(uri) = uri {
+        query.and_where(Expr::col(Nodes::Uri).gt(uri.as_str()));
     }
     let (sql, values) = build_query(&query)?;
     let row = connection
         .query_row(&sql, params_from_iter(values), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })
-        .optional()
-        .map_err(map_sqlite)?;
-    row.map(|(id, hash)| {
+        .optional()?;
+    row.map(|(uri, hash)| {
         Ok(EmbeddingWork {
-            id: KnowledgeId::parse(&id).map_err(map_invalid_value)?,
-            search_hash: Sha256::parse(&hash).map_err(map_invalid_value)?,
+            id: KnowledgeId::parse(&uri).map_err(|error| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "invalid persisted storage value",
+                    error,
+                )
+            })?,
+            search_hash: Sha256::parse(&hash).map_err(|error| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "invalid persisted storage value",
+                    error,
+                )
+            })?,
         })
     })
     .transpose()
@@ -851,25 +887,33 @@ fn build_current_nodes_query(hash: Expr) -> SelectStatement {
         .to_owned()
 }
 
-/// Count distinct current non-source knowledge hashes in SQL.
+/// Returns the count of distinct current non-source knowledge hashes in SQL.
+///
+/// # Arguments
+///
+/// * `connection` — the connection with the `cache` schema attached.
 ///
 /// # Errors
 /// Reports database failures or invalid aggregate values.
 pub(super) fn nodes_get_by_kind(connection: &Connection) -> StorageResult<u64> {
-    nodes_get_by_kind_and_search_hash(connection, HashCoverage::All)
+    nodes_count_by_kind(connection, HashCoverage::All)
 }
 
-/// Validate native rows and count distinct current hashes with vector keys.
+/// Returns the count of distinct current hashes with vector keys after verifying native rows.
+///
+/// # Arguments
+///
+/// * `connection` — the connection with the `cache` and `vec` schemas attached.
 ///
 /// # Errors
 /// Reports missing native rows, invalid counts and database failures.
-pub(super) fn get_vector_coverage(connection: &Connection) -> StorageResult<u64> {
+pub(super) fn nodes_get_coverage_by_kind(connection: &Connection) -> StorageResult<u64> {
     verify_current_vectors(connection)?;
-    nodes_get_by_kind_and_search_hash(connection, HashCoverage::Stored)
+    nodes_count_by_kind(connection, HashCoverage::Stored)
 }
 
 fn verify_current_vectors(connection: &Connection) -> StorageResult<()> {
-    if vector_keys_get_by_rowid_and_kind_and_search_hash(connection)?.is_some() {
+    if vector_key_orphan_get(connection)?.is_some() {
         return Err(StorageError::new(
             StorageErrorKind::InternalError,
             "invalid stored vector data",
@@ -878,9 +922,7 @@ fn verify_current_vectors(connection: &Connection) -> StorageResult<()> {
     Ok(())
 }
 
-fn vector_keys_get_by_rowid_and_kind_and_search_hash(
-    connection: &Connection,
-) -> StorageResult<Option<i64>> {
+fn vector_key_orphan_get(connection: &Connection) -> StorageResult<Option<i64>> {
     let (sql, values) = build_query(
         Query::select()
             .column((VectorKeys::Table, VectorKeys::RowId))
@@ -908,13 +950,10 @@ fn vector_keys_get_by_rowid_and_kind_and_search_hash(
     connection
         .query_row(&sql, params_from_iter(values), |row| row.get(0))
         .optional()
-        .map_err(map_sqlite)
+        .map_err(StorageError::from)
 }
 
-fn nodes_get_by_kind_and_search_hash(
-    connection: &Connection,
-    coverage: HashCoverage,
-) -> StorageResult<u64> {
+fn nodes_count_by_kind(connection: &Connection, coverage: HashCoverage) -> StorageResult<u64> {
     let mut query = Query::select();
     query
         .expr(Expr::col(Nodes::SearchHash).count_distinct())
@@ -924,13 +963,22 @@ fn nodes_get_by_kind_and_search_hash(
         query.and_where(Expr::exists(build_vector_key_exists_query()));
     }
     let (sql, values) = build_query(&query)?;
-    let count: i64 = connection
-        .query_row(&sql, params_from_iter(values), |row| row.get(0))
-        .map_err(map_sqlite)?;
-    u64::try_from(count).map_err(map_invalid_value)
+    let count: i64 = connection.query_row(&sql, params_from_iter(values), |row| row.get(0))?;
+    u64::try_from(count).map_err(|error| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InternalError,
+            "invalid persisted storage value",
+            error,
+        )
+    })
 }
 
-/// Read current uncovered failures, decoding every row before applying the threshold.
+/// Returns current uncovered failures, decoding every row before applying the threshold.
+///
+/// # Arguments
+///
+/// * `connection` — the connection with the `cache` and `vec` schemas attached.
+/// * `max_attempts` — the attempt threshold at or above which failures are returned.
 ///
 /// # Errors
 /// Reports malformed hashes or attempts and database failures.
@@ -961,37 +1009,52 @@ pub(super) fn embed_failures_get_by_kind_and_search_hash_and_attempts(
             ))
             .order_by(EmbedFailures::SearchHash, Order::Asc),
     )?;
-    let mut statement = connection.prepare(&sql).map_err(map_sqlite)?;
-    let rows = statement
-        .query_map(params_from_iter(values), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, Option<String>>(2)?,
-            ))
-        })
-        .map_err(map_sqlite)?;
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(params_from_iter(values), |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, Option<String>>(2)?,
+        ))
+    })?;
     // Decode every candidate before filtering: a low malformed count is still corruption.
     let mut exhausted = Vec::new();
     for row in rows {
-        let (hash, attempts, error) = row.map_err(map_sqlite)?;
-        let attempts = u64::try_from(attempts).map_err(map_invalid_value)?;
-        if attempts == 0 {
-            return Err(StorageError::new(
-                StorageErrorKind::InternalError,
-                "invalid stored embedding attempts",
-            ));
-        }
-        let search_hash = Sha256::parse(&hash).map_err(map_invalid_value)?;
-        if attempts >= max_attempts {
-            exhausted.push(EmbeddingFailure {
-                search_hash,
-                attempts,
-                error,
-            });
+        let failure = decode_embedding_failure(row?)?;
+        if failure.attempts >= max_attempts {
+            exhausted.push(failure);
         }
     }
     Ok(exhausted)
+}
+
+fn decode_embedding_failure(
+    (hash, attempts, error): (String, i64, Option<String>),
+) -> StorageResult<EmbeddingFailure> {
+    let attempts = u64::try_from(attempts).map_err(|error| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InternalError,
+            "invalid persisted storage value",
+            error,
+        )
+    })?;
+    if attempts == 0 {
+        return Err(StorageError::new(
+            StorageErrorKind::InternalError,
+            "invalid stored embedding attempts",
+        ));
+    }
+    Ok(EmbeddingFailure {
+        search_hash: Sha256::parse(&hash).map_err(|error| {
+            StorageError::new_with_cause(
+                StorageErrorKind::InternalError,
+                "invalid persisted storage value",
+                error,
+            )
+        })?,
+        attempts,
+        error,
+    })
 }
 
 fn build_vector_key_exists_query() -> SelectStatement {
@@ -1006,297 +1069,5 @@ fn build_vector_key_exists_query() -> SelectStatement {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::VectorStorage;
-    use crate::service::TransactionError;
-    use crate::{
-        domain::Sha256,
-        service::{StorageError, VectorDatabase, VectorOutcome},
-    };
-    use rusqlite::Connection;
-
-    #[test]
-    fn malformed_identity_skips_vector_scopes_without_decoding_it() {
-        // Given: persisted identity text is malformed rather than a valid SHA-256.
-        let connection = Connection::open_in_memory().unwrap();
-        connection.execute_batch("create table meta(id integer primary key,config_identity text); insert into meta values(1,'malformed')").unwrap();
-        let storage = VectorStorage::new(connection);
-        let expected = Sha256::digest(b"current");
-        // When: both scope kinds compare the persisted identity before entering callbacks.
-        let read = storage
-            .with_read_tx(&expected, || -> Result<(), StorageError> {
-                panic!("mismatched read must skip callback")
-            })
-            .unwrap();
-        let write = storage
-            .with_write_tx(&expected, || -> Result<(), StorageError> {
-                panic!("mismatched write must skip callback")
-            })
-            .unwrap();
-        // Then: malformed text remains a configuration mismatch, not a decoding failure.
-        assert_eq!(read, VectorOutcome::ConfigChanged);
-        assert_eq!(write, VectorOutcome::ConfigChanged);
-    }
-
-    #[test]
-    fn failed_reset_cleanup_reports_failure_and_disables_the_connection() {
-        use super::super::utils::set_rollback_denial;
-        // Given: SQLite refuses rollback of a reset with an obsolete observation.
-        let connection = Connection::open_in_memory().unwrap();
-        connection
-            .execute_batch("create table meta(id integer primary key,config_identity text)")
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        let observed = Sha256::digest(b"obsolete observation");
-        let desired = Sha256::digest(b"desired configuration");
-        set_rollback_denial(&storage.connection, true);
-        // When: reset skips its mutations but SQLite cannot close its transaction.
-        let result = storage.reset_vectors(Some(&observed), &desired);
-        set_rollback_denial(&storage.connection, false);
-        storage.connection.execute_batch("rollback").unwrap();
-        // Then: cleanup failure is an error and external repair cannot reenable this owner.
-        assert!(result.is_err());
-        let retry = storage.with_read_tx(&desired, || -> Result<(), StorageError> {
-            panic!("disabled storage must not execute callbacks")
-        });
-        assert!(matches!(retry, Err(TransactionError::Storage(_))));
-    }
-
-    #[test]
-    fn reset_is_rejected_inside_an_active_vector_scope() {
-        // Given: a vector transaction for the current configuration.
-        let connection = Connection::open_in_memory().unwrap();
-        let identity = Sha256::digest(b"current");
-        connection
-            .execute_batch("create table meta(id integer primary key,config_identity text)")
-            .unwrap();
-        connection
-            .execute("insert into meta values(1,?1)", [identity.to_hex()])
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        // When: a service tries to reset identity from within its write scope.
-        let result = storage.with_write_tx(&identity, || -> Result<(), StorageError> {
-            assert!(
-                storage
-                    .reset_vectors(Some(&identity), &Sha256::digest(b"other"))
-                    .is_err()
-            );
-            Ok(())
-        });
-        // Then: the reset is rejected and the enclosing scope cannot commit.
-        assert!(matches!(result, Err(TransactionError::Storage(_))));
-    }
-
-    #[test]
-    fn reads_embedding_failure_from_vector_database_inside_scope() {
-        // Given: a primary vector database with a recorded failed attempt.
-        let connection = Connection::open_in_memory().unwrap();
-        let identity = Sha256::digest(b"current");
-        let hash = Sha256::digest(b"text");
-        connection.execute_batch("create table meta(id integer primary key,config_identity text); create table embed_failures(search_hash text primary key,attempts integer,error text)").unwrap();
-        connection
-            .execute("insert into meta values(1,?1)", [identity.to_hex()])
-            .unwrap();
-        connection
-            .execute(
-                "insert into embed_failures values(?1,2,'safe failure')",
-                [hash.to_hex()],
-            )
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        // When: a service reads the failure in a matching scope.
-        let outcome = storage
-            .with_read_tx(&identity, || {
-                storage.embed_failures_get_by_search_hash(&hash)
-            })
-            .unwrap();
-        // Then: the stored hash, attempt count and safe error are returned.
-        let VectorOutcome::Current(Some(failure)) = outcome else {
-            panic!("failure missing")
-        };
-        assert_eq!(failure.search_hash, hash);
-        assert_eq!(failure.attempts, 2);
-        assert_eq!(failure.error.as_deref(), Some("safe failure"));
-    }
-
-    #[test]
-    fn reads_query_error_from_vector_database_inside_scope() {
-        // Given: the primary vector database contains a query failure.
-        let connection = Connection::open_in_memory().unwrap();
-        let identity = Sha256::digest(b"current");
-        connection.execute_batch("create table meta(id integer primary key,config_identity text); create table query_error(id integer primary key,at integer,error text); insert into query_error values(1,42,'safe failure')").unwrap();
-        connection
-            .execute("insert into meta values(1,?1)", [identity.to_hex()])
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        // When: a service reads within the matching vector scope.
-        let outcome = storage
-            .with_read_tx(&identity, || storage.query_error_get_by_id())
-            .unwrap();
-        // Then: it receives the stored query error from the primary database.
-        let VectorOutcome::Current(Some(error)) = outcome else {
-            panic!("query error missing")
-        };
-        assert_eq!(error.at, 42);
-        assert_eq!(error.error, "safe failure");
-    }
-
-    #[test]
-    fn vector_read_scope_rejects_mismatched_identity_without_calling_operation() {
-        // Given: a vector database configured for one identity.
-        let connection = Connection::open_in_memory().unwrap();
-        let current = Sha256::digest(b"current");
-        connection
-            .execute_batch("create table meta(id integer primary key,config_identity text)")
-            .unwrap();
-        connection
-            .execute("insert into meta values(1,?1)", [current.to_hex()])
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        // When: a read is requested for another configuration.
-        let result = storage
-            .with_read_tx(&Sha256::digest(b"other"), || -> Result<(), StorageError> {
-                panic!("mismatched read callback ran")
-            });
-        // Then: the caller receives the ordinary changed-configuration outcome.
-        assert!(matches!(result, Ok(VectorOutcome::ConfigChanged)));
-    }
-
-    #[test]
-    fn caught_vector_write_error_rolls_back_earlier_changes() {
-        // Given: a vector database with no query_error table.
-        let connection = Connection::open_in_memory().unwrap();
-        let identity = Sha256::digest(b"current");
-        connection.execute_batch("create table meta(id integer primary key,config_identity text); create table sample(value integer)").unwrap();
-        connection
-            .execute("insert into meta values(1,?1)", [identity.to_hex()])
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        // When: the caller catches a real failing vector write.
-        let result = storage.with_write_tx(&identity, || -> Result<(), StorageError> {
-            storage
-                .get_write_connection()?
-                .execute_batch("insert into sample values(9)")
-                .unwrap();
-            assert!(storage.query_error_upsert_by_id(1, "safe").is_err());
-            Ok(())
-        });
-        // Then: the transaction cannot commit the earlier write.
-        assert!(matches!(result, Err(TransactionError::Storage(_))));
-        assert_eq!(
-            storage
-                .connection
-                .query_row("select count(*) from sample", [], |row| row
-                    .get::<_, i64>(0))
-                .unwrap(),
-            0
-        );
-    }
-
-    #[test]
-    fn incompatible_nested_identity_skips_callback_and_keeps_outer_work() {
-        // Given: a vector database with one selected configuration identity.
-        let connection = Connection::open_in_memory().unwrap();
-        let identity = Sha256::digest(b"current");
-        connection.execute_batch("create table meta(id integer primary key,config_identity text); create table sample(value integer)").unwrap();
-        connection
-            .execute("insert into meta values(1,?1)", [identity.to_hex()])
-            .unwrap();
-        let storage = VectorStorage::new(connection);
-        // When: an incompatible nested request occurs inside compatible work.
-        let result = storage.with_write_tx(&identity, || -> Result<(), StorageError> {
-            let skipped = storage
-                .with_write_tx(&Sha256::digest(b"other"), || -> Result<(), StorageError> {
-                    panic!("incompatible callback ran")
-                })
-                .unwrap();
-            assert!(matches!(skipped, VectorOutcome::ConfigChanged));
-            storage
-                .get_write_connection()?
-                .execute_batch("insert into sample values(9)")
-                .unwrap();
-            Ok(())
-        });
-        // Then: the compatible outer operation commits normally.
-        assert!(matches!(result, Ok(VectorOutcome::Current(()))));
-        assert_eq!(
-            storage
-                .connection
-                .query_row("select value from sample", [], |r| r.get::<_, i64>(0))
-                .unwrap(),
-            9
-        );
-    }
-}
-
-#[cfg(test)]
-mod query_tests {
-    use super::{
-        VectorSchema, VectorStorage, decode_vector, meta_get_by_id, vector_index_config_get_by_id,
-    };
-    use crate::{
-        domain::Sha256,
-        service::{StorageError, StorageErrorKind, VectorDatabase},
-        storage::{native::register_vec1, schema::bootstrap_vectors},
-    };
-    use rusqlite::Connection;
-    use tempfile::TempDir;
-
-    #[test]
-    fn gets_identity_and_dimensions_from_selected_schema() {
-        // Given: independent main and attached databases have distinct vector metadata.
-        let root = TempDir::new().unwrap();
-        let path = root.path().join("attached.db");
-        let main_identity = Sha256::digest(b"main");
-        let attached_identity = Sha256::digest(b"attached");
-        register_vec1().unwrap();
-        let mut main = Connection::open_in_memory().unwrap();
-        let mut attached = Connection::open(&path).unwrap();
-        bootstrap_vectors(&mut main).unwrap();
-        bootstrap_vectors(&mut attached).unwrap();
-        let main = VectorStorage::new(main);
-        let attached = VectorStorage::new(attached);
-        for (storage, identity, vector) in [
-            (&main, &main_identity, vec![1.0, 0.0]),
-            (&attached, &attached_identity, vec![1.0, 0.0, 0.0]),
-        ] {
-            storage.reset_vectors(None, identity).unwrap();
-            storage
-                .with_write_tx(identity, || -> Result<_, StorageError> {
-                    storage.store_vector(identity, &vector, vector.len())
-                })
-                .unwrap();
-        }
-        let main = main.get_test_connection();
-        main.execute("attach database ?1 as vec", [path.to_str().unwrap()])
-            .unwrap();
-
-        // When: metadata is retrieved through each explicit schema selector.
-        let main_id = meta_get_by_id(main, VectorSchema::Main).unwrap();
-        let attached_id = meta_get_by_id(main, VectorSchema::Attached).unwrap();
-        let main_dimensions = vector_index_config_get_by_id(main, VectorSchema::Main).unwrap();
-        let attached_dimensions =
-            vector_index_config_get_by_id(main, VectorSchema::Attached).unwrap();
-
-        // Then: neither identity nor native dimensions leak across schema locations.
-        assert_eq!(main_id, Some(main_identity.to_hex()));
-        assert_eq!(attached_id, Some(attached_identity.to_hex()));
-        assert_eq!(main_dimensions.unwrap().get(), 2);
-        assert_eq!(attached_dimensions.unwrap().get(), 3);
-    }
-
-    #[test]
-    fn rejects_empty_or_partially_encoded_stored_vectors() {
-        // Given: retain a valid component before a truncated trailing component.
-        let mut truncated = 1.0_f32.to_ne_bytes().to_vec();
-        truncated.push(0);
-        for bytes in [Vec::new(), vec![0], truncated] {
-            // When: malformed stored bytes are decoded.
-            let error = decode_vector(&bytes).unwrap_err();
-            // Then: incomplete bytes cannot silently become a shorter vector.
-            assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
-        }
-        // When / Then: complete finite components still decode without loss.
-        assert_eq!(decode_vector(&1.0_f32.to_ne_bytes()).unwrap(), vec![1.0]);
-    }
-}
+#[path = "vector_test.rs"]
+mod tests;

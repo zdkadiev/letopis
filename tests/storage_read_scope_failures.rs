@@ -68,7 +68,7 @@ fn rejected_revision_accessor_does_not_poison_read_scope() {
 
     // When: the callback catches the read-only accessor's precondition error.
     let result = storage.cache.with_read_tx(|| {
-        let error = storage.cache.get_publication_revision().unwrap_err();
+        let error = storage.cache.project_get_revision().unwrap_err();
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         Ok::<_, StorageError>(())
     });

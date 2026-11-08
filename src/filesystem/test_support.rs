@@ -12,12 +12,37 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
+
 const CHILD_ROOT: &str = "LETOPIS_FS_PRIVATE_TEST_ROOT";
+
 const CHILD_ACTION: &str = "LETOPIS_FS_PRIVATE_TEST_ACTION";
+
 const CHILD_TARGET: &str = "LETOPIS_FS_PRIVATE_TEST_TARGET";
-const DEADLINE: Duration = Duration::from_secs(10);
+
+// Real subprocesses may be starved on a loaded host; the bound still detects hangs.
+const DEADLINE: Duration = Duration::from_secs(30);
 
 pub(super) struct Fixture(pub PathBuf);
+
+pub(super) struct Mutator {
+    child: OwnedProcess,
+    root: PathBuf,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProcessGroup {
+    Inherited,
+    Owned,
+}
+
+struct OwnedProcess {
+    child: Child,
+    output: fs::File,
+    group: Option<Pid>,
+}
+
+struct CleanupGroup(Pid);
+
 impl Fixture {
     pub fn new() -> Self {
         let root = std::env::temp_dir().join(format!(
@@ -28,6 +53,7 @@ impl Fixture {
         fs::create_dir(&root).unwrap();
         Self(root)
     }
+
     pub fn spawn_mutator(&self, target: &str, action: &str) -> Mutator {
         let mut command = Command::new(std::env::current_exe().unwrap());
         command
@@ -47,36 +73,24 @@ impl Fixture {
         }
     }
 }
+
 impl Drop for Fixture {
     fn drop(&mut self) {
         fs::remove_dir_all(&self.0).unwrap();
     }
 }
-pub(super) struct Mutator {
-    child: OwnedProcess,
-    root: PathBuf,
-}
+
 impl Mutator {
     pub fn resume(&self) {
         fs::write(self.root.join("resume"), b"go").unwrap();
         wait_for(&self.root.join("done"));
     }
+
     pub fn finish(&mut self) {
         self.child.wait_success(DEADLINE);
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum ProcessGroup {
-    Inherited,
-    Owned,
-}
-
-struct OwnedProcess {
-    child: Child,
-    output: fs::File,
-    group: Option<Pid>,
-}
 impl OwnedProcess {
     fn spawn(command: &mut Command, mode: ProcessGroup) -> Self {
         let output = tempfile::tempfile().unwrap();
@@ -96,6 +110,7 @@ impl OwnedProcess {
             group,
         }
     }
+
     fn wait_success(&mut self, deadline: Duration) {
         let start = Instant::now();
         loop {
@@ -111,17 +126,20 @@ impl OwnedProcess {
             std::thread::sleep(Duration::from_millis(5));
         }
     }
+
     fn terminate_group(&mut self) {
         if let Some(group) = self.group.take() {
             let _ = kill_process_group(group, Signal::KILL);
         }
     }
+
     fn terminate(&mut self) {
         // Reexecuted parents own a group; mutators and external children inherit it.
         self.terminate_group();
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+
     fn get_capture(&mut self) -> String {
         self.output.seek(SeekFrom::Start(0)).unwrap();
         let mut bytes = Vec::new();
@@ -132,13 +150,24 @@ impl OwnedProcess {
         String::from_utf8_lossy(&bytes).into_owned()
     }
 }
+
 impl Drop for OwnedProcess {
     fn drop(&mut self) {
         self.terminate();
     }
 }
 
+impl Drop for CleanupGroup {
+    fn drop(&mut self) {
+        let _ = kill_process_group(self.0, Signal::KILL);
+    }
+}
+
 /// Reexecutes potentially blocking syscalls under a parent deadline and reap guard.
+///
+/// # Arguments
+///
+/// * `name` — the test name reexecuted in the child; the environment marker prevents recursive reexecution.
 pub(super) fn run_bounded(name: &str) -> bool {
     const CASE: &str = "LETOPIS_FS_BOUNDED_CASE";
     if std::env::var(CASE).ok().as_deref() == Some(name) {
@@ -157,6 +186,10 @@ pub(super) fn run_bounded(name: &str) -> bool {
 
 /// Supervise only this fixture as an unprivileged child when the parent is root.
 /// The child creates its fixture under /tmp, away from a root-private TMPDIR/cwd.
+///
+/// # Arguments
+///
+/// * `name` — the test name reexecuted in the child; the environment marker prevents recursive reexecution.
 pub(super) fn run_bounded_unprivileged(name: &str) -> bool {
     const CASE: &str = "LETOPIS_FS_UNPRIVILEGED_CASE";
     const UNPRIVILEGED_ID: u32 = 65534;
@@ -205,6 +238,10 @@ pub(super) fn run_bounded_unprivileged(name: &str) -> bool {
 }
 
 /// Create a FIFO under the same deadline and cleanup guard as other fixture children.
+///
+/// # Arguments
+///
+/// * `path` — the destination path at which the FIFO is created.
 pub(super) fn create_fifo(path: &Path) {
     let mut child = OwnedProcess::spawn(Command::new("mkfifo").arg(path), ProcessGroup::Inherited);
     child.wait_success(DEADLINE);
@@ -221,13 +258,6 @@ fn hold_descendant_lease(root: &Path) {
     );
     fs::write(root.join("nested-ready"), b"ready").unwrap();
     std::thread::sleep(Duration::from_secs(30));
-}
-
-struct CleanupGroup(Pid);
-impl Drop for CleanupGroup {
-    fn drop(&mut self) {
-        let _ = kill_process_group(self.0, Signal::KILL);
-    }
 }
 
 fn wait_for(path: &Path) {

@@ -3,8 +3,13 @@ use super::ValueError;
 /// A lexically normalized path relative to the Git root; no filesystem access.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RepoPath(String);
+
 impl RepoPath {
-    /// Resolve dot components and reject absolute paths, C0 controls and root escapes.
+    /// Parses a root-relative path, normalizing dot components and rejecting unsafe forms.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the candidate root-relative path to normalize.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for absolute paths, C0 control characters,
@@ -28,7 +33,8 @@ impl RepoPath {
         }
         Ok(Self(parts.join("/")))
     }
-    /// Normalized path preserving case and Unicode.
+
+    /// Returns the normalized path, preserving case and Unicode.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -37,8 +43,13 @@ impl RepoPath {
 /// An explicit X-4 heading anchor, excluding source line-range syntax.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Anchor(String);
+
 impl Anchor {
-    /// Validate ASCII anchor grammar and its reserved line-range form.
+    /// Parses an anchor, rejecting invalid ASCII grammar and the reserved line-range form.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the candidate anchor text without the hash separator.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidAnchor`] unless the anchor starts with an
@@ -48,7 +59,7 @@ impl Anchor {
         let reserved = raw
             .strip_prefix('L')
             .and_then(|r| r.split_once("-L"))
-            .is_some_and(|(a, b)| contains_only_ascii_digits(a) && contains_only_ascii_digits(b));
+            .is_some_and(|(a, b)| is_ascii_digits_only(a) && is_ascii_digits_only(b));
         if !raw.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
             || !raw
                 .bytes()
@@ -59,16 +70,23 @@ impl Anchor {
         }
         Ok(Self(raw.into()))
     }
-    /// Validated anchor without the hash separator.
+
+    /// Returns the validated anchor without the hash separator.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
+
 /// Identity of a whole Markdown file or an anchored knowledge section.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct KnowledgeId(String);
+
 impl KnowledgeId {
-    /// Parse a root-relative Markdown path and optional explicit anchor.
+    /// Parses a root-relative Markdown path and optional explicit anchor.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the identity text, optionally containing a `#` and explicit anchor.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for an invalid path or a path without
@@ -81,7 +99,13 @@ impl KnowledgeId {
         };
         Self::new(RepoPath::parse(path)?, anchor)
     }
-    /// Build a knowledge identity from validated components.
+
+    /// Creates a knowledge identity from validated components.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` — the validated root-relative Markdown path.
+    /// * `anchor` — the validated optional heading anchor to append.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] when the path does not end in `.md`
@@ -97,12 +121,13 @@ impl KnowledgeId {
         }
         Ok(Self(result))
     }
-    /// Canonical identity, including its optional anchor.
+
+    /// Returns the canonical identity, including its optional anchor.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
-fn contains_only_ascii_digits(s: &str) -> bool {
+fn is_ascii_digits_only(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())
 }

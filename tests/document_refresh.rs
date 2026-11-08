@@ -17,7 +17,7 @@ fn refresh_publishes_regular_file_and_skips_symlink() {
     // When: the corpus is refreshed.
     let outcome = documents.refresh(&[]).unwrap();
     // Then: the regular file is published and the symlink is absent from files.
-    assert!(outcome.published);
+    assert!(outcome.is_published);
     assert_eq!(outcome.files_updated, 1);
     let state = repo.get_state();
     assert_eq!(state.files.len(), 1);
@@ -34,9 +34,9 @@ fn publish_initial_empty_cache_once() {
     let second = documents.refresh(&[]).unwrap();
     // Then.
     assert_eq!(first.revision, 1);
-    assert!(first.published);
+    assert!(first.is_published);
     assert_eq!(second.revision, first.revision);
-    assert!(!second.published);
+    assert!(!second.is_published);
     assert_eq!(
         (
             second.files_updated,
@@ -111,7 +111,7 @@ fn handle_tracked_rename_deletion_and_unmarked_transitions() {
     // When / Then
     assert_eq!((renamed.files_updated, renamed.files_removed), (1, 1));
     assert_eq!(repo.search("OldToken"), ["new.md"]);
-    assert!(!documents.refresh(&[]).unwrap().published);
+    assert!(!documents.refresh(&[]).unwrap().is_published);
     repo.write("new.md", "UnmarkedToken\n");
     documents.refresh(&[]).unwrap();
     assert!(repo.get_state().nodes.is_empty());
@@ -122,7 +122,7 @@ fn handle_tracked_rename_deletion_and_unmarked_transitions() {
     repo.remove("new.md");
     assert_eq!(documents.refresh(&[]).unwrap().files_removed, 1);
     assert!(repo.get_state().files.is_empty());
-    assert!(!documents.refresh(&[]).unwrap().published);
+    assert!(!documents.refresh(&[]).unwrap().is_published);
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn retain_invalid_projection_while_publishing_valid_peer_and_repair() {
     assert_eq!(repo.search("RetainedToken"), ["a.md"]);
     assert_eq!(repo.search("AfterToken"), ["b.md"]);
     assert!(repo.search("BeforeToken OR BadToken").is_empty());
-    assert!(!documents.refresh(&[]).unwrap().published);
+    assert!(!documents.refresh(&[]).unwrap().is_published);
     assert_eq!(repo.get_state(), invalid);
     repo.write("a.md", build_whole(1, "RepairedToken"));
     repo.remove("new-invalid.md");
@@ -378,7 +378,7 @@ fn recalculate_source_minimum_after_referrer_edit_and_preserve_unaffected_source
     // Then
     assert_eq!(source.created_at, 8);
     assert_eq!(after.get_node("other.txt"), before.get_node("other.txt"));
-    assert!(!documents.refresh(&[]).unwrap().published);
+    assert!(!documents.refresh(&[]).unwrap().is_published);
 }
 
 #[test]
@@ -445,7 +445,10 @@ fn simultaneous_document_openers_initialize_and_publish_once() {
     });
     // Then: initialization succeeds for both; publication happens exactly once.
     assert_eq!(
-        outcomes.iter().filter(|outcome| outcome.published).count(),
+        outcomes
+            .iter()
+            .filter(|outcome| outcome.is_published)
+            .count(),
         1
     );
     assert!(outcomes.iter().all(|outcome| outcome.revision == 1));

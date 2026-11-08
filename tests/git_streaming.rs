@@ -209,9 +209,10 @@ fn run_reader(binary: &Path, root: &Path, oid: &str, expected: ReadExpectation) 
         String::from_utf8_lossy(&result.stderr)
     );
     let stdout = String::from_utf8_lossy(&result.stdout);
+    // Libtest may prefix its progress text on the same line before the receipt.
     let receipt = stdout
         .lines()
-        .find(|line| line.starts_with("READER_RECEIPT "))
+        .find(|line| line.contains("READER_RECEIPT "))
         .expect("private reader executed");
     println!("{receipt}");
 }

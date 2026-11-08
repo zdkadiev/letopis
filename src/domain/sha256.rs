@@ -4,8 +4,13 @@ use sha2::Digest;
 /// SHA-256 of exact input bytes, without normalization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Sha256([u8; 32]);
+
 impl Sha256 {
-    /// Decode exactly 64 lowercase hexadecimal characters.
+    /// Parses exactly 64 lowercase hexadecimal characters.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the lowercase hexadecimal hash text to decode.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidHash`] for a malformed hash.
@@ -25,11 +30,16 @@ impl Sha256 {
         Ok(Self(bytes))
     }
 
-    /// Hash the supplied bytes exactly.
+    /// Hashes the supplied bytes exactly.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` — the exact input bytes to hash without normalization.
     pub fn digest(bytes: &[u8]) -> Self {
         Self(sha2::Sha256::digest(bytes).into())
     }
-    /// Encode lowercase hex without adding a codec dependency.
+
+    /// Returns the hash as lowercase hexadecimal text.
     pub fn to_hex(&self) -> String {
         const HEX: &[u8; 16] = b"0123456789abcdef";
         let mut out = String::with_capacity(64);

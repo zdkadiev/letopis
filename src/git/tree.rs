@@ -1,4 +1,4 @@
-use super::constants::{BLOB_KIND, OBJECT_INTEGRITY_MESSAGE, TREE_KIND};
+use super::constants::OBJECT_INTEGRITY_MESSAGE;
 use crate::service::{SnapshotError, SnapshotErrorKind};
 
 /// Borrow the raw metadata for one decoded tree entry.
@@ -9,32 +9,12 @@ pub(super) struct TreeEntry<'a> {
     pub(super) oid: &'a [u8],
 }
 
-/// Decode verified tree bytes with Git's `canon_mode` type rules, skipping gitlinks.
+/// Returns one raw tree entry without imposing strict mode, name or ordering rules.
 ///
-/// # Errors
-/// Returns `InternalError` for malformed entry boundaries or octal modes.
-pub(super) fn tree_children_get(
-    mut bytes: &[u8],
-    oid_len: usize,
-) -> Result<Vec<(String, String)>, SnapshotError> {
-    let mut children = Vec::new();
-    while !bytes.is_empty() {
-        let (entry, remaining) = tree_entry_get(bytes, oid_len)?;
-        let kind = match entry.mode & 0o170000 {
-            0o100000 | 0o120000 => Some(BLOB_KIND),
-            0o040000 => Some(TREE_KIND),
-            _ => None,
-        };
-        if let Some(kind) = kind {
-            let oid: String = entry.oid.iter().map(|byte| format!("{byte:02x}")).collect();
-            children.push((oid, kind.into()));
-        }
-        bytes = remaining;
-    }
-    Ok(children)
-}
-
-/// Read one raw entry without imposing strict mode, name or ordering rules.
+/// # Arguments
+///
+/// * `bytes` — tree bytes positioned at one entry descriptor.
+/// * `oid_len` — hexadecimal object ID length used to frame the entry's identity.
 ///
 /// # Errors
 /// Returns `InternalError` for malformed entry boundaries or octal modes.

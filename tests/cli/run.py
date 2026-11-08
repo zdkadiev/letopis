@@ -19,10 +19,10 @@ SCHEMA = 'docs/zkit/letopis/contracts/schemas/X-1-cli.yaml'
 LOCK_TESTS = (
     'filesystem::local::tests::index_owner_writes_pid_after_acquiring_lock',
     'filesystem::local::tests::std_file_and_rustix_locks_exclude_each_other_for_both_names',
-    'filesystem::lock::tests::lock_open_rejects_replacement_and_never_recreates_observed_deletion',
-    'filesystem::lock::tests::owner_drop_unlocks_while_duplicate_descriptor_remains_open',
-    'filesystem::lock::tests::retries_interrupted_lock_acquisition_until_success',
-    'filesystem::lock_tests::lock_observation_is_read_only_and_ownership_persists_until_drop',
+    'filesystem::local::tests::lock_open_rejects_replacement_and_never_recreates_observed_deletion',
+    'filesystem::local::tests::owner_drop_unlocks_while_duplicate_descriptor_remains_open',
+    'filesystem::local::tests::retries_interrupted_lock_acquisition_until_success',
+    'filesystem::local::tests::lock_tests::lock_observation_is_read_only_and_ownership_persists_until_drop',
 )
 
 

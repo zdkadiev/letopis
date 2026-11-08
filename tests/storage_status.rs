@@ -38,7 +38,7 @@ fn observes_distinct_hashes_coverage_and_filtered_failures() {
         .with_status_read_tx(|| {
             Ok::<_, StorageError>((
                 status.nodes_get_by_kind()?,
-                status.get_vector_coverage()?,
+                status.nodes_get_coverage_by_kind()?,
                 status.embed_failures_get_by_kind_and_search_hash_and_attempts(1)?,
                 status.embed_failures_get_by_kind_and_search_hash_and_attempts(2)?,
             ))
@@ -125,7 +125,7 @@ fn publish<C: CacheDatabase, V: VectorDatabase>(writer: &Databases<C, V>, rows: 
                     .unwrap();
             }
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
 }

@@ -94,7 +94,7 @@ fn direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response() {
 
 #[test]
 fn missing_invalid_or_empty_work_never_launches_a_product() {
-    // Given
+    // Given: published work and missing, malformed or empty embedding configuration.
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
         body: SUCCESS.into(),
@@ -113,9 +113,23 @@ fn missing_invalid_or_empty_work_never_launches_a_product() {
             }
             _ => {}
         }
-        // When / Then: a production readiness check must return before even probing.
-        fixture.finish_foreground(&mut fixture.spawn_foreground());
-        // When / Then
+        // When: the real foreground path refreshes before considering a drain.
+        if state == "invalid" {
+            let before = fixture.capture_corpus();
+            let mut child = fixture.spawn_foreground();
+            child.send_input(b"exit\n");
+            let output = child.collect_output(WAIT);
+            // Then: malformed discovery fails closed without leaking config or changing the index.
+            assert!(!output.status.success(), "{output:?}");
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("invalid discovery configuration")
+            );
+            assert!(!String::from_utf8_lossy(&output.stderr).contains(SECRET));
+            assert_eq!(fixture.capture_corpus(), before);
+        } else {
+            fixture.finish_foreground(&mut fixture.spawn_foreground());
+        }
+        // Then: readiness never probes/spawns work, including direct unavailable drain.
         assert!(
             !fixture.repo.get_root().join(".letopis/embed.lock").exists(),
             "{state}"
@@ -208,7 +222,7 @@ fn identity_reset_during_product_http_discards_the_late_result() {
         next.get_configuration().unwrap(),
         ConfigState::Ready(_)
     ));
-    assert!(EmbeddingExecutor::has_work(&mut next).unwrap());
+    assert!(EmbeddingExecutor::is_work_available(&mut next).unwrap());
     barrier.release();
     assert_success(&child.collect_output(WAIT));
     // Then old work did not publish into the new identity; a fresh drain can finish.

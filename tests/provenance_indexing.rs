@@ -73,7 +73,7 @@ fn retain_newly_available_basis_without_markdown_change() {
         // When
         let second = refresh(&repo);
         // Then
-        assert!(!second.published);
+        assert!(!second.is_published);
         assert_eq!(second.revision, first.revision);
         assert_eq!(repo.get_state(), before);
         assert!(has_exact_service_ref(&repo, &tree));

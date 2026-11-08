@@ -25,7 +25,7 @@ fn pages_neighbors_in_type_and_identity_order() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("./root.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("./root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -74,7 +74,7 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("root.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -113,7 +113,7 @@ fn keeps_incoming_edges_in_original_orientation() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("b.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("b.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -146,7 +146,7 @@ fn filters_incoming_modes_and_types_before_limiting() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("b.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("b.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -189,7 +189,7 @@ fn retains_one_snapshot_across_pages() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("root.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -214,7 +214,7 @@ fn retains_one_snapshot_across_pages() {
                         ))
                         .unwrap();
 
-                    write.get_publication_revision()
+                    write.project_get_revision()
                 })
                 .unwrap();
             request.after = Some(&cursor);
@@ -265,14 +265,14 @@ fn bounds_large_degrees_and_rejects_excessive_page_limits() {
                     .unwrap();
             }
 
-            write.get_publication_revision()
+            write.project_get_revision()
         })
         .unwrap();
     storage
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("c.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("c.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -319,7 +319,7 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
                 ("https://Host/A?q=1#L0-L9", "https://Host/A?q=1#L0-L9", true),
             ] {
                 // When: a local, ranged or opaque URL address is resolved.
-                let node = GraphRead::nodes_get_by_id(read, &parse_address(raw))
+                let node = GraphRead::nodes_get_by_uri(read, &parse_address(raw))
                     .unwrap()
                     .unwrap();
                 // Then: resolved references preserve normalized addresses and stored node kinds.
@@ -327,7 +327,7 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
                 assert_eq!(matches!(node.element, EdgeTarget::Source(_)), source);
             }
             assert!(
-                GraphRead::nodes_get_by_id(read, &parse_address("absent.md"))
+                GraphRead::nodes_get_by_uri(read, &parse_address("absent.md"))
                     .unwrap()
                     .is_none()
             );
@@ -354,11 +354,11 @@ fn does_not_decode_unselected_node_metadata() {
             let read = &storage.cache;
             // When / Then: reference and neighbor retrieval succeed without decoding unselected columns.
             assert!(
-                GraphRead::nodes_get_by_id(read, &parse_address("a.md"))
+                GraphRead::nodes_get_by_uri(read, &parse_address("a.md"))
                     .unwrap()
                     .is_some()
             );
-            let key = GraphRead::nodes_get_by_id(read, &parse_address("root.md"))
+            let key = GraphRead::nodes_get_by_uri(read, &parse_address("root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -413,7 +413,7 @@ fn build_fixture(
                     .unwrap();
             }
 
-            write.get_publication_revision()
+            write.project_get_revision()
         })
         .unwrap();
     storage

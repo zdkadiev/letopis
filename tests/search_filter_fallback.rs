@@ -98,7 +98,10 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
         ["a.md", "b.md"]
     );
     // Given: missing or invalid embedding configuration.
-    repo.write(".letopis/config.json", b"PRIVATE invalid configuration");
+    repo.write(
+        ".letopis/config.json",
+        br#"{"embedding_model":null,"discovery":{"respect_gitignore":true}}"#,
+    );
     // When / Then: filtered lexical search runs; results remain available without provider requests.
     assert_eq!(
         get_ids(&invoke_search(&repo, &build_input(&basis))),
@@ -388,7 +391,7 @@ fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
             let read = &storage.cache;
             assert_eq!(read.meta_get_by_id().unwrap(), Some(config.get_identity()));
             assert_eq!(
-                read.nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                read.nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                     &config.get_identity(),
                     1,
                     None

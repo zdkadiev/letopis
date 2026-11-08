@@ -56,3 +56,19 @@ Private refs не создают/дописывают reflogs; существу�
 2026-10-18, проверка официальных manuals: [rev-parse](https://git-scm.com/docs/git-rev-parse), [cat-file](https://git-scm.com/docs/git-cat-file), [ls-tree](https://git-scm.com/docs/git-ls-tree), [hash-object](https://git-scm.com/docs/git-hash-object), [mktree](https://git-scm.com/docs/git-mktree), [update-ref](https://git-scm.com/docs/git-update-ref), [gc](https://git-scm.com/docs/git-gc), [config](https://git-scm.com/docs/git-config).
 
 Manuals подтверждают форматы и назначение команд, raw/no-filters, точный тип объекта, запись дерева и удержание достижимых refs. Они не подтверждают наш crash-протокол. У update-ref документированы атомарность одной ref и условия транзакции; конкурентный читатель нескольких refs не обязан видеть их как единый снимок. Гарантия NFR-1 не объявляется выполненной. Новых Git-проб, коммитов и измерений для этой проверки не выполнялось.
+
+## Worktree exclusion policy — issue #97, 2026-11-06
+
+`GitWorktreeListing::worktree_paths_get_by_ignore_mode_and_patterns` consumes a standard-exclusion mode and a
+root-relative Gitignore-pattern byte buffer. Standard mode matches the existing
+`ls-files -z --cached --others --exclude-standard` oracle; Disabled mode omits
+standard sources. Supplied patterns apply to the tracked/untracked union,
+including deleted tracked entries, with Git directory precedence and negation.
+Paths remain NUL-framed bytes until application selection/decoding. Sparse index
+expansion and repository safety are unchanged; no Git index or user ref is edited.
+
+GitRepository uses existing pinned gix inside the process. It does not know
+Letopis config filenames, Markdown extensions, provider state or filesystem
+consumer roles. Application code reads those files through generic confined
+filesystem methods and selects protected roots. Git CLI is only the independent
+fixture/oracle, never a product fallback. See [acceptance](../checks/issue-97/report.md).

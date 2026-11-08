@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
 # Git snapshot storage
 
 `GitRepository` discovers a non-bare worktree in process through the pinned gix
@@ -10,6 +10,9 @@ The snapshot interface writes blobs, assembles trees and reads a blob by tree an
 repository-relative path. Trees identify immutable Git content; a snapshot tree is
 not necessarily a commit or the current Git index. `inspect` uses this interface
 to construct a tree containing captured knowledge and addressed local sources.
+Its discovery observation is checked around final pin, so an author policy edit
+during capture cannot return a successful snapshot selected under mixed policy.
+A surviving external binding can still address an excluded knowledge-owner path.
 
 `tree_retain_by_oid` validates a tree root and durably retains its exact ref without
 walking all descendants. `tree_pin_by_oid` additionally validates the reachable closure on each call

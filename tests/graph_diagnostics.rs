@@ -187,7 +187,7 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     let problems = diagnostics.find_problems(&[]).unwrap();
 
     assert_eq!(publication.revision, 2);
-    assert!(publication.published);
+    assert!(publication.is_published);
     assert_eq!(old.project_get_by_id().unwrap(), 1);
     assert_findings(
         &problems,

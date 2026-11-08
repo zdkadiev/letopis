@@ -13,6 +13,37 @@ snapshots before publication. A full audit failure preserves the previous cache.
 A successful routine read or an existing retention ref is not proof that every
 source object is intact. Inspect fully verifies its own newly captured reading tree.
 
+## Discovery settings
+
+Add `"discovery":{"respect_gitignore":false}` beside `embedding_model` in
+`.letopis/config.json` to admit Git-ignored untracked Markdown. The default is
+true; omitting the section/member uses that default. False disables all standard
+ignore sources, including `info/exclude` and global Git excludes. `config` returns
+the effective section, and `init` includes it in newly generated config while
+preserving existing valid file bytes.
+
+Create `.letopis/ignore` only when needed. Its Gitignore patterns use the repository
+root as their base and filter tracked paths too. For example:
+
+```gitignore
+/vendor/
+notes/*
+!notes/keep.md
+```
+
+The parent must remain eligible for a child negation to work. `notes/` plus
+`!notes/keep.md` still excludes the child. No pattern can admit `.git`/`.letopis`
+components or a path missing from the Git candidate union. A missing ignore file
+means no additional rules; `init` and indexing do not create it.
+
+Refreshing commands use the same policy, including all index modes. An exclusion
+removes cached owner rows/projections at the next relevant refresh. Scoped index
+leaves outside owners untouched; `check.paths` only filters findings. External
+source bindings and retained historical snapshots are separate from discovery.
+Config/status/init/drain do not refresh membership. A policy edit during prepared
+publication or inspection causes a safe failure/retry; it cannot publish a mixed
+policy. Discovery changes never enter embedding identity or reset retained state.
+
 ## Initialize, configure, observe, and reindex
 
 Interactive commands use an empty request without waiting for stdin. An open pipe
@@ -52,8 +83,10 @@ or both configured. `max_retries` is required, and `0` means one attempt. Retain
 provider settings are validated locally even when `enabled:false`.
 
 Malformed content makes `config` fail with exit 1 and
-`error.code:"embedding_failed"`; it never echoes the file. Search stays on FTS while
-the configuration is invalid, and `status` reports `invalid_embedding_config`.
+`error.code:"embedding_failed"`; it never echoes the file. Valid discovery with
+invalid embedding settings still allows FTS. Malformed JSON, invalid discovery
+settings and unsafe/unreadable policy files stop refresh; `status` reports its
+existing `invalid_embedding_config` problem.
 A valid `enabled:false` also searches with FTS but preserves vectors and retry
 state, reports zero embedding backlog/failed counters and hides stored execution
 failures; enabling the same settings reveals them without resetting vectors.

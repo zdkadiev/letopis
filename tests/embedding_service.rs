@@ -1,6 +1,7 @@
 use crate::support::storage::get_current;
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
+use support::reading::ReadingRepo;
 use support::storage::{Databases, open_storage};
 mod support;
 use letopis::{
@@ -18,6 +19,14 @@ use rusqlite::{Connection, types::Value};
 use std::{fs, num::NonZeroUsize, thread};
 use support::embedding::{FixtureReply, HttpFixture, ResponseBarrier};
 use tempfile::TempDir;
+
+#[derive(Debug, PartialEq)]
+struct DiscoveryEmbeddingState {
+    identity: Option<Sha256>,
+    vector: VectorOutcome<Option<Vec<f32>>>,
+    failure: VectorOutcome<Option<EmbeddingFailure>>,
+    query_error: Option<QueryError>,
+}
 
 struct Fixture {
     root: TempDir,
@@ -118,7 +127,7 @@ impl Fixture {
                 })
                 .unwrap();
 
-                unit.get_publication_revision()
+                unit.project_get_revision()
             })
             .unwrap();
         element.search_hash
@@ -266,6 +275,57 @@ impl<T> Drop for Operation<T> {
             }
         }
     }
+}
+
+#[test]
+fn discovery_only_changes_preserve_embedding_state() {
+    use letopis::service::Refresher;
+    // Given: two owners share a seeded vector, durable failure and query diagnostic.
+    let repo = ReadingRepo::new();
+    let server = start_success();
+    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
+    for path in ["a.md", "b.md"] {
+        repo.write_knowledge(path, "StableNeedle");
+    }
+    let mut refresher = letopis::wire_document_refresher(repo.get_root()).unwrap();
+    refresher.refresh(&[]).unwrap();
+    let hash = seed_discovery_embedding_state(&repo, &config);
+    let before = get_discovery_embedding_state(&repo, &config, &hash);
+    assert_eq!(
+        before.vector,
+        VectorOutcome::Current(Some(vec![1., 2., 3.]))
+    );
+    assert_eq!(
+        before.failure,
+        VectorOutcome::Current(Some(EmbeddingFailure {
+            search_hash: hash,
+            attempts: 1,
+            error: Some("preserved failure".into())
+        }))
+    );
+    // When: discovery toggles without changing membership and later removes one shared owner.
+    for respect_gitignore in [false, true] {
+        let mut raw: serde_json::Value = serde_json::from_slice(
+            &fs::read(repo.get_root().join(".letopis/config.json")).unwrap(),
+        )
+        .unwrap();
+        raw["discovery"] = serde_json::json!({"respect_gitignore":respect_gitignore});
+        repo.write(".letopis/config.json", &serde_json::to_vec(&raw).unwrap());
+        assert!(!refresher.refresh(&[]).unwrap().is_published);
+        let mut embedder = letopis::wire_embedding_executor(repo.get_root()).unwrap();
+        assert!(matches!(
+            embedder.get_configuration().unwrap(),
+            ConfigState::Ready(_)
+        ));
+        // Then: readiness preserves the existing vector, attempts, identity and query error.
+        assert_eq!(get_discovery_embedding_state(&repo, &config, &hash), before);
+    }
+    // When: the next refresh excludes just one of the shared owners.
+    repo.write(".letopis/ignore", b"b.md\n");
+    assert_eq!(refresher.refresh(&[]).unwrap().files_removed, 1);
+    // Then: the surviving hash keeps its state and enumeration never calls HTTP.
+    assert_eq!(get_discovery_embedding_state(&repo, &config, &hash), before);
+    assert!(server.take_requests().is_empty());
 }
 
 #[test]
@@ -708,7 +768,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
                         Ok::<_, StorageError>(
                             scope_databases
                                 .cache
-                                .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                                .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                                     &config.get_identity(),
                                     1,
                                     None,
@@ -897,7 +957,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     assert!(
         storage
             .cache
-            .with_read_tx(|| StorageRead::nodes_get_by_id(&storage.cache, &id))
+            .with_read_tx(|| StorageRead::nodes_get_by_uri(&storage.cache, &id))
             .unwrap()
             .is_some()
     );
@@ -1216,4 +1276,61 @@ fn open_service_at(root: &std::path::Path) -> impl Embedder + use<> {
     let (vectors, cache) =
         letopis::open_storage(&root.join("cache"), &root.join("vectors")).unwrap();
     wire_embedder(root, std::rc::Rc::new(cache), std::rc::Rc::new(vectors)).unwrap()
+}
+
+fn seed_discovery_embedding_state(repo: &ReadingRepo, config: &EmbeddingConfig) -> Sha256 {
+    repo.seed_vectors(config, &[("a.md", &[1., 2., 3.])]);
+    let storage = repo.open_storage();
+    let node = storage
+        .cache
+        .with_read_tx(|| {
+            storage
+                .cache
+                .nodes_get_by_uri(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+        })
+        .unwrap()
+        .unwrap();
+    let NodeMetadata::Knowledge(node) = node.metadata else {
+        panic!("knowledge fixture")
+    };
+    let hash = node.search_hash;
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            storage
+                .vectors
+                .embed_failures_upsert_by_search_hash_and_attempts(&hash, 1)?;
+            storage
+                .vectors
+                .embed_failures_update_by_search_hash(&hash, "preserved failure")?;
+            storage
+                .vectors
+                .query_error_upsert_by_id(7, "preserved query")
+        })
+        .map(get_current)
+        .unwrap();
+    hash
+}
+
+fn get_discovery_embedding_state(
+    repo: &ReadingRepo,
+    config: &EmbeddingConfig,
+    hash: &Sha256,
+) -> DiscoveryEmbeddingState {
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| -> Result<DiscoveryEmbeddingState, StorageError> {
+            Ok(DiscoveryEmbeddingState {
+                identity: storage.cache.meta_get_by_id()?,
+                vector: storage
+                    .cache
+                    .vector_keys_get_by_search_hash(&config.get_identity(), hash)?,
+                failure: storage
+                    .cache
+                    .embed_failures_get_by_search_hash(&config.get_identity(), hash)?,
+                query_error: storage.cache.query_error_get_by_id()?,
+            })
+        })
+        .unwrap()
 }

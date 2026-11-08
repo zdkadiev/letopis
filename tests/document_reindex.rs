@@ -65,7 +65,7 @@ fn reindex_initializes_empty_and_invalid_corpus_without_inventing_history() {
             assert!(!state.get_file("a.md").valid);
             assert_eq!(repo.search("BravoToken"), ["b.md"]);
         }
-        assert!(!service.refresh(&[]).unwrap().published);
+        assert!(!service.refresh(&[]).unwrap().is_published);
         assert_eq!(service.reindex(&[]).unwrap().revision, 2);
     }
 }

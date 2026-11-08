@@ -318,7 +318,7 @@ fn get_search_hash(repo: &ReadingRepo) -> Sha256 {
         .with_read_tx(|| {
             Ok::<_, StorageError>({
                 let read = &storage.cache;
-                let node = StorageRead::nodes_get_by_id(
+                let node = StorageRead::nodes_get_by_uri(
                     read,
                     &EdgeTarget::Knowledge(
                         KnowledgeId::parse("knowledge.md").expect("knowledge id"),

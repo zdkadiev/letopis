@@ -13,7 +13,7 @@ pub enum TransactionError<E> {
 }
 
 impl TransactionError<StorageError> {
-    /// Consume a storage-only scope error while retaining its original classification and cause.
+    /// Returns the storage error with its classification and cause.
     pub fn into_inner(self) -> StorageError {
         match self {
             Self::Operation(error) | Self::Storage(error) => error,
@@ -40,7 +40,9 @@ impl<E: Error + 'static> Error for TransactionError<E> {
 }
 
 impl<E> TransactionError<TransactionError<E>> {
-    /// Remove an internal transaction-error layer while preserving its source.
+    /// Removes one nested transaction-error layer.
+    ///
+    /// The inner error is preserved.
     pub fn flatten(self) -> TransactionError<E> {
         match self {
             Self::Storage(error) | Self::Operation(TransactionError::Storage(error)) => {
@@ -99,7 +101,7 @@ pub enum DiagnosticKind {
 }
 
 impl DiagnosticKind {
-    /// Return the fixed parser message without document contents.
+    /// Returns the fixed parser message.
     pub fn get_message(&self) -> &'static str {
         match self {
             Self::InvalidUtf8 => "Markdown is not UTF-8",
@@ -115,7 +117,7 @@ impl DiagnosticKind {
         }
     }
 
-    /// Return the stable machine-readable parser reason.
+    /// Returns the stable parser reason code.
     pub fn get_code(&self) -> &'static str {
         match self {
             Self::InvalidUtf8 => "invalid_utf8",
@@ -168,7 +170,12 @@ pub struct CommandError {
 }
 
 impl CommandError {
-    /// Create an error from safe static context.
+    /// Creates a command error with a fixed message.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` — Public failure classification.
+    /// * `message` — Static diagnostic message.
     pub fn new(kind: CommandErrorKind, message: &'static str) -> Self {
         Self {
             kind,
@@ -176,7 +183,16 @@ impl CommandError {
             cause: None,
         }
     }
-    /// Retain an internal cause without including it in Display or Debug.
+
+    /// Creates a command error with a private cause.
+    ///
+    /// The cause is not included in Display or Debug.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` — Public failure classification.
+    /// * `message` — Static diagnostic message.
+    /// * `cause` — Internal cause kept only for `Error::source`.
     pub fn new_with_cause(
         kind: CommandErrorKind,
         message: &'static str,
@@ -188,11 +204,13 @@ impl CommandError {
             cause: Some(Box::new(cause)),
         }
     }
-    /// Return the stable public classification.
+
+    /// Returns the public failure classification.
     pub fn get_kind(&self) -> CommandErrorKind {
         self.kind
     }
-    /// Return the safe static diagnostic.
+
+    /// Returns the static diagnostic message.
     pub fn get_message(&self) -> &'static str {
         self.message
     }
@@ -265,11 +283,23 @@ pub struct EmbeddingError {
 }
 
 impl EmbeddingError {
-    /// Construct a fixed safe diagnostic.
+    /// Creates an embedding error with a fixed message.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` — Embedding failure classification.
     pub fn new(kind: EmbeddingErrorKind) -> Self {
         Self { kind, cause: None }
     }
-    /// Preserve a cause privately without exposing its payload through error chains.
+
+    /// Creates an embedding error with a private cause.
+    ///
+    /// The cause payload stays hidden from error chains.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` — Embedding failure classification.
+    /// * `cause` — Cause kept private from public diagnostics.
     pub fn new_with_cause(
         kind: EmbeddingErrorKind,
         cause: impl Error + Send + Sync + 'static,
@@ -281,7 +311,8 @@ impl EmbeddingError {
             }),
         }
     }
-    /// Return the stable failure classification.
+
+    /// Returns the embedding failure classification.
     pub fn get_kind(&self) -> EmbeddingErrorKind {
         self.kind
     }
@@ -367,6 +398,7 @@ impl SnapshotError {
             cause: None,
         }
     }
+
     pub(crate) fn new_with_cause(
         message: &'static str,
         cause: impl Error + Send + Sync + 'static,
@@ -377,11 +409,15 @@ impl SnapshotError {
             cause: Some(Box::new(cause)),
         }
     }
-    /// Classification suitable for application error mapping.
+
+    /// Returns the snapshot failure classification.
     pub fn get_kind(&self) -> SnapshotErrorKind {
         self.kind
     }
-    /// Static operation context, without repository paths or file bytes.
+
+    /// Returns the static operation message.
+    ///
+    /// The message contains no repository paths or file bytes.
     pub fn get_message(&self) -> &str {
         self.message
     }
@@ -430,6 +466,7 @@ impl StorageError {
             cause: None,
         }
     }
+
     pub(crate) fn new_with_cause(
         kind: StorageErrorKind,
         message: &'static str,
@@ -441,11 +478,15 @@ impl StorageError {
             cause: Some(Box::new(cause)),
         }
     }
-    /// Classification suitable for application error mapping.
+
+    /// Returns the storage failure classification.
     pub fn get_kind(&self) -> StorageErrorKind {
         self.kind
     }
-    /// Safe static context without SQL or parameter payloads.
+
+    /// Returns the static operation message.
+    ///
+    /// The message contains no SQL or parameter payloads.
     pub fn get_message(&self) -> &str {
         self.message
     }
@@ -508,7 +549,7 @@ impl FileError {
         }
     }
 
-    /// Return the classification without exposing paths or file bytes.
+    /// Returns the file failure classification.
     pub fn get_kind(&self) -> FileErrorKind {
         self.kind
     }
@@ -572,6 +613,7 @@ impl DocumentError {
             cause: None,
         }
     }
+
     pub(crate) fn new_with_cause(
         kind: DocumentErrorKind,
         message: &'static str,
@@ -583,11 +625,15 @@ impl DocumentError {
             cause: Some(Box::new(cause)),
         }
     }
-    /// Classification for application error mapping.
+
+    /// Returns the document failure classification.
     pub fn get_kind(&self) -> DocumentErrorKind {
         self.kind
     }
-    /// Fixed context without paths, document bytes or subprocess output.
+
+    /// Returns the fixed context message.
+    ///
+    /// The message contains no paths, document bytes or subprocess output.
     pub fn get_message(&self) -> &str {
         self.message
     }
@@ -665,7 +711,12 @@ pub struct ServiceError {
 }
 
 impl ServiceError {
-    /// Construct an error from a service setup kind and private cause.
+    /// Creates a service error with a private cause.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` — Service setup classification.
+    /// * `cause` — Private setup cause kept for `Error::source`.
     pub(crate) fn new_with_cause(
         kind: ServiceErrorKind,
         cause: impl Error + Send + Sync + 'static,
@@ -675,7 +726,8 @@ impl ServiceError {
             cause: Some(Box::new(cause)),
         }
     }
-    /// Return the service setup classification.
+
+    /// Returns the service setup classification.
     pub fn get_kind(&self) -> ServiceErrorKind {
         self.kind
     }
@@ -710,29 +762,40 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 pub struct GitError {
     cause: Box<dyn Error + Send + Sync>,
 }
+
 impl fmt::Debug for GitError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("GitError").finish_non_exhaustive()
     }
 }
+
 impl GitError {
-    /// Preserve a Git/library cause without exposing raw paths in public diagnostics.
+    /// Creates a Git error with a private cause.
+    ///
+    /// Raw paths stay out of public diagnostics.
+    ///
+    /// # Arguments
+    ///
+    /// * `cause` — Git library error kept private.
     pub(crate) fn new(cause: impl Error + Send + Sync + 'static) -> Self {
         Self {
             cause: Box::new(cause),
         }
     }
 }
+
 impl fmt::Display for GitError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("cannot enumerate Git worktree paths")
     }
 }
+
 impl Error for GitError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(self.cause.as_ref())
     }
 }
+
 /// Result of Git worktree/index observations.
 pub type GitResult<T> = Result<T, GitError>;
 
@@ -742,7 +805,13 @@ pub struct ProcessError {
 }
 
 impl ProcessError {
-    /// Preserve the I/O cause without exposing it in Display or Debug.
+    /// Creates a process error with the I/O cause.
+    ///
+    /// The cause is not shown in Display or Debug.
+    ///
+    /// # Arguments
+    ///
+    /// * `cause` — I/O failure kept only for `Error::source`.
     pub fn new(cause: io::Error) -> Self {
         Self { cause }
     }
@@ -772,70 +841,5 @@ impl Error for ProcessError {
 pub type ProcessResult<T> = Result<T, ProcessError>;
 
 #[cfg(test)]
-mod error_tests {
-    use super::{DocumentError, DocumentErrorKind, ProcessError, ServiceError, ServiceErrorKind};
-    use std::{error::Error, io};
-
-    #[test]
-    fn process_error_preserves_its_io_cause_without_exposing_private_payload() {
-        // Given: process creation reports an I/O failure containing private details.
-        let error = ProcessError::new(io::Error::other("PRIVATE_PROCESS_CAUSE"));
-        // When: callers format the public failure.
-        let display = error.to_string();
-        let debug = format!("{error:?}");
-        // Then: public diagnostics are fixed, while the original cause remains inspectable.
-        assert_eq!(display, "cannot spawn process");
-        assert!(!debug.contains("PRIVATE_PROCESS_CAUSE"));
-        let cause = error.source().unwrap().downcast_ref::<io::Error>().unwrap();
-        assert_eq!(cause.kind(), io::ErrorKind::Other);
-        assert_eq!(cause.to_string(), "PRIVATE_PROCESS_CAUSE");
-    }
-
-    #[test]
-    fn preserves_document_context_without_exposing_its_private_cause() {
-        // Given: callers supply safe operation context and a separate raw cause.
-        let context = "safe document operation context";
-        let error = DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            context,
-            io::Error::other("PRIVATE_DOCUMENT_CAUSE"),
-        );
-        // When
-        let message = error.get_message();
-        let display = error.to_string();
-        let debug = format!("{error:?}");
-        // Then: public context remains useful while the cause stays internal.
-        assert_eq!(message, context);
-        assert_eq!(display, context);
-        assert!(debug.contains(context));
-        assert!(!debug.contains("PRIVATE_DOCUMENT_CAUSE"));
-        assert!(
-            error
-                .source()
-                .unwrap()
-                .to_string()
-                .contains("PRIVATE_DOCUMENT_CAUSE")
-        );
-    }
-
-    #[test]
-    fn service_error_keeps_kind_without_exposing_private_cause() {
-        // Given
-        let error = ServiceError::new_with_cause(
-            ServiceErrorKind::Initialization,
-            io::Error::other("PRIVATE_SERVICE_CAUSE"),
-        );
-        // When
-        let diagnostic = format!("{error:?}");
-        // Then
-        assert_eq!(error.get_kind(), ServiceErrorKind::Initialization);
-        assert!(!diagnostic.contains("PRIVATE_SERVICE_CAUSE"));
-        assert!(
-            error
-                .source()
-                .unwrap()
-                .to_string()
-                .contains("PRIVATE_SERVICE_CAUSE")
-        );
-    }
-}
+#[path = "error_test.rs"]
+mod tests;
