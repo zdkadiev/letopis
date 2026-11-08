@@ -1,4 +1,4 @@
-use super::map_service_error;
+use super::map_service_error_to_command_error;
 use crate::service::{CommandErrorKind, ServiceError, ServiceErrorKind};
 use std::{error::Error, io};
 
@@ -9,7 +9,7 @@ fn maps_each_service_kind_and_keeps_causes_private() {
     for (service_kind, command_kind, message) in SERVICE_MAPPINGS {
         let error =
             ServiceError::new_with_cause(service_kind, io::Error::other("PRIVATE_SERVICE_CAUSE"));
-        let mapped = map_service_error(error);
+        let mapped = map_service_error_to_command_error(error);
         assert_eq!(mapped.get_kind(), command_kind, "{service_kind:?}");
         assert_eq!(mapped.get_message(), message, "{service_kind:?}");
         assert!(!format!("{mapped:?}").contains("PRIVATE_SERVICE_CAUSE"));

@@ -461,7 +461,7 @@ impl GraphRead for GeneratedRead {
             ));
         }
         if request.after.is_none() {
-            self.expanded.borrow_mut().push(request.node.get_value());
+            self.expanded.borrow_mut().push(request.node.get_handle());
         }
         if let Some(degree) = self.degree {
             return Ok(generate_star_page(degree, self.page_size, request));
@@ -558,7 +558,7 @@ fn is_matched_by_filter(edge: &Edge, request: &NeighborPageRequest<'_>) -> bool 
 
 fn select_neighbor(edge: Edge, request: &NeighborPageRequest<'_>) -> Option<GraphNeighbor> {
     let ids = ["a.md", "b.md", "c.md", "d.md", "code.rs"];
-    let anchor = ids[usize::try_from(request.node.get_value() - 1).unwrap()];
+    let anchor = ids[usize::try_from(request.node.get_handle() - 1).unwrap()];
     let reached = match request.direction {
         NeighborDirection::Outgoing if edge.get_source().as_str() == anchor => {
             edge.get_target().as_str()
@@ -588,7 +588,7 @@ fn generate_star_page(
     request: &NeighborPageRequest<'_>,
 ) -> Vec<GraphNeighbor> {
     assert_eq!(
-        request.node.get_value(),
+        request.node.get_handle(),
         1,
         "node cap must prevent expanding the star"
     );

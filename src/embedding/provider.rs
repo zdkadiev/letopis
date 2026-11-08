@@ -217,7 +217,7 @@ fn ollama_vectors_compute(
     decode_vectors(
         items,
         texts.len(),
-        dimensions.or(config.get_dimensions()),
+        dimensions.or(config.get_dimensions_by_parameters()),
         ProviderKind::Ollama,
     )
 }
@@ -258,7 +258,7 @@ fn openai_vectors_compute(
     decode_vectors(
         items,
         texts.len(),
-        dimensions.or(config.get_dimensions()),
+        dimensions.or(config.get_dimensions_by_parameters()),
         ProviderKind::Openai,
     )
 }
@@ -312,7 +312,7 @@ fn prepare_body(
         || texts.iter().any(|text| text.is_empty())
         || dimensions.is_some_and(|size| !(MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(&size.get()))
         || dimensions
-            .zip(config.get_dimensions())
+            .zip(config.get_dimensions_by_parameters())
             .is_some_and(|(expected, requested)| expected != requested)
     {
         return Err(EmbeddingError::new(EmbeddingErrorKind::Input));

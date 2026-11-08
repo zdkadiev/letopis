@@ -1,14 +1,14 @@
 use super::MAX_SEARCH_LIMIT;
 use super::utils::is_current_knowledge;
-use super::utils::map_document_error;
-use super::utils::map_document_file;
+use super::utils::map_document_error_to_command_error;
+use super::utils::map_file_result_to_document_result;
 use super::{
-    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
-    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile,
-    ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag,
-    SearchLink, SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
-    SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
-    VectorOutcome,
+    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, DocumentError,
+    Embedder, EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata,
+    ParsedFile, ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters,
+    SearchFlag, SearchLink, SearchRequest, Searcher, SnapshotError, SnapshotErrorKind,
+    SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch,
+    TransactionError, VectorMatch, VectorOutcome,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid};
 use std::path::Path;
@@ -105,17 +105,14 @@ impl<
         let limit = request.limit.min(MAX_SEARCH_LIMIT);
         self.refresher
             .refresh(&[])
-            .map_err(|cause| map_document_error(cause, "cannot search knowledge"))?;
+            .map_err(map_document_error_to_search_command_error)?;
         self.provenance
             .validate_revisions(&request.filters.source_revisions)
-            .map_err(map_revision_error)?;
-        let config = self.embeddings.get_configuration().map_err(|error| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot search knowledge",
-                error,
-            )
-        })?;
+            .map_err(map_snapshot_error_to_command_error)?;
+        let config = self
+            .embeddings
+            .get_configuration()
+            .map_err(map_error_to_search_command_error)?;
         let cache = Rc::clone(&self.cache);
         cache
             .with_read_tx(|| {
@@ -132,39 +129,31 @@ impl<
                 .find_vector_candidates(captured, &request.query, limit)?;
                 let text_matches = read
                     .text_index_get_by_expression(&expression, limit)
-                    .map_err(|error| {
-                        CommandError::new_with_cause(
-                            CommandErrorKind::InternalError,
-                            "cannot search knowledge",
-                            error,
-                        )
-                    })?;
+                    .map_err(map_error_to_search_command_error)?;
                 validate_metrics(&text_matches, &vector_matches)?;
-                let metadata = candidates.get_candidate_metadata(&text_matches, &vector_matches)?;
+                let metadata = candidates
+                    .get_candidate_metadata_by_text_matches_and_vector_matches(
+                        &text_matches,
+                        &vector_matches,
+                    )?;
                 let eligibility = SearchEligibility {
                     storage_read: read,
                     filesystem: &self.filesystem,
                     markdown: &self.markdown,
                     provenance: &self.provenance,
                 };
-                let links = eligibility.get_eligible_links(&metadata, &request.filters)?;
+                let links = eligibility
+                    .get_eligible_links_by_metadata_and_filters(&metadata, &request.filters)?;
                 let eligible = links.keys().cloned().collect();
                 let ranked = rank_candidates(&text_matches, &vector_matches, &eligible, limit)?;
                 get_ranked_links(links, ranked)
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                ),
-            })
+            .map_err(map_transaction_error_to_search_command_error)
     }
 }
 
 impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_, F, M, P> {
-    fn get_eligible_links(
+    fn get_eligible_links_by_metadata_and_filters(
         &self,
         metadata: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
         filters: &SearchFilters,
@@ -177,19 +166,15 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
             last_parsed: None,
         };
         for (id, node) in metadata {
-            let sources = self.get_source_bindings(id)?;
+            let sources = self.get_source_bindings_by_id(id)?;
             if !Self::is_matched_by_sources(&mut comparisons, node, &sources, filters)? {
                 continue;
             }
             let mut link = current.build_link(
                 node,
-                self.storage_read.project_get_by_id().map_err(|error| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot search knowledge",
-                        error,
-                    )
-                })?,
+                self.storage_read
+                    .project_get_by_id()
+                    .map_err(map_error_to_search_command_error)?,
             )?;
             let observed = self
                 .provenance
@@ -197,13 +182,7 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
                     source_snapshot: node.source_snapshot.as_ref(),
                     sources: &sources,
                 })
-                .map_err(|error| {
-                    CommandError::new_with_cause(
-                        CommandErrorKind::InternalError,
-                        "cannot search knowledge",
-                        error,
-                    )
-                })?;
+                .map_err(map_error_to_search_command_error)?;
             link.flags.extend(observed.flags);
             if filters.is_matched_by_flags(&link.flags) {
                 links.insert(id.clone(), link);
@@ -248,7 +227,7 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
                     source,
                     revision,
                 })
-                .map_err(map_revision_error)?;
+                .map_err(map_snapshot_error_to_command_error)?;
             if comparison == SourceRevisionComparison::Equal {
                 return Ok(true);
             }
@@ -256,17 +235,11 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
         Ok(false)
     }
 
-    fn get_source_bindings(&self, id: &KnowledgeId) -> CommandResult<BTreeSet<SourceUri>> {
+    fn get_source_bindings_by_id(&self, id: &KnowledgeId) -> CommandResult<BTreeSet<SourceUri>> {
         Ok(self
             .storage_read
             .edges_get_by_source_id(Some(id))
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?
+            .map_err(map_error_to_search_command_error)?
             .into_iter()
             .filter_map(|edge| match edge.get_target() {
                 EdgeTarget::Source(source) => Some(source.clone()),
@@ -279,21 +252,11 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
 impl CurrentKnowledge<'_> {
     fn build_link(&mut self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
         let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?;
-        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?;
+            .map_err(map_error_to_search_command_error)?;
+        let file = map_file_result_to_document_result(
+            self.filesystem.file_get_by_path(Path::new(path.as_str())),
+        )
+        .map_err(map_error_to_search_command_error)?;
         let current = if let Some(file) = file {
             self.is_current(node, &path, &file.bytes)
         } else {
@@ -378,13 +341,7 @@ impl<E: Embedder> QueryCandidates<'_, E> {
                 config,
                 dimensions: Some(dimensions),
             })
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?;
+            .map_err(map_error_to_search_command_error)?;
         let QueryEmbedding::Available { identity, vector } = result else {
             return Ok(Vec::new());
         };
@@ -400,13 +357,8 @@ impl<E: Embedder> QueryCandidates<'_, E> {
         match self
             .storage_read
             .vector_index_get_by_vector(&identity, &vector, dimensions.get(), limit)
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })? {
+            .map_err(map_error_to_search_command_error)?
+        {
             VectorOutcome::Current(matches) => Ok(matches),
             VectorOutcome::ConfigChanged => Ok(Vec::new()),
         }
@@ -421,31 +373,23 @@ impl CandidateReads<'_> {
         let ConfigState::Ready(config) = state else {
             return Ok(None);
         };
-        if self.storage_read.meta_get_by_id().map_err(|error| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot search knowledge",
-                error,
-            )
-        })? != Some(config.get_identity())
+        if self
+            .storage_read
+            .meta_get_by_id()
+            .map_err(map_error_to_search_command_error)?
+            != Some(config.get_identity())
         {
             return Ok(None);
         }
         let VectorOutcome::Current(Some(dimensions)) = self
             .storage_read
             .vector_index_config_get_by_id(&config.get_identity())
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?
+            .map_err(map_error_to_search_command_error)?
         else {
             return Ok(None);
         };
         if config
-            .get_dimensions()
+            .get_dimensions_by_parameters()
             .is_some_and(|size| size != dimensions)
         {
             return Ok(None);
@@ -453,14 +397,14 @@ impl CandidateReads<'_> {
         Ok(Some((config, dimensions)))
     }
 
-    fn get_candidate_metadata(
+    fn get_candidate_metadata_by_text_matches_and_vector_matches(
         &self,
         text_matches: &[TextMatch],
         vector_matches: &[VectorMatch],
     ) -> CommandResult<BTreeMap<KnowledgeId, KnowledgeMetadata>> {
         let mut metadata = BTreeMap::new();
         for hit in text_matches {
-            let candidate = self.get_knowledge(&hit.id)?;
+            let candidate = self.get_candidate_metadata_by_id(&hit.id)?;
             if candidate.row_id != hit.row_id {
                 return Err(CommandError::new(
                     CommandErrorKind::InternalError,
@@ -470,7 +414,7 @@ impl CandidateReads<'_> {
             metadata.insert(hit.id.clone(), candidate.metadata);
         }
         for hit in vector_matches {
-            let candidate = self.get_knowledge(&hit.id)?;
+            let candidate = self.get_candidate_metadata_by_id(&hit.id)?;
             if candidate.metadata.search_hash != hit.search_hash {
                 return Err(CommandError::new(
                     CommandErrorKind::InternalError,
@@ -482,20 +426,12 @@ impl CandidateReads<'_> {
         Ok(metadata)
     }
 
-    fn get_knowledge(&self, id: &KnowledgeId) -> CommandResult<CandidateMetadata> {
+    fn get_candidate_metadata_by_id(&self, id: &KnowledgeId) -> CommandResult<CandidateMetadata> {
         let stored = self
             .storage_read
             .nodes_get_by_uri(&EdgeTarget::Knowledge(id.clone()))
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?
-            .ok_or_else(|| {
-                CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
-            })?;
+            .map_err(map_error_to_search_command_error)?
+            .ok_or_else(build_invalid_search_index_error)?;
         let NodeMetadata::Knowledge(node) = stored.metadata else {
             return Err(CommandError::new(
                 CommandErrorKind::InternalError,
@@ -586,7 +522,7 @@ fn build_fts_expression(query: &str) -> Option<String> {
     Some(tokens.join(" AND "))
 }
 
-fn map_revision_error(cause: SnapshotError) -> CommandError {
+fn map_snapshot_error_to_command_error(cause: SnapshotError) -> CommandError {
     let kind = match cause.get_kind() {
         SnapshotErrorKind::NotFound => CommandErrorKind::NotFound,
         SnapshotErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
@@ -659,9 +595,9 @@ fn get_ranked_links(
     ranked
         .into_iter()
         .map(|id| {
-            links.remove(&id).ok_or_else(|| {
-                CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
-            })
+            links
+                .remove(&id)
+                .ok_or_else(build_invalid_search_index_error)
         })
         .collect()
 }
@@ -710,9 +646,7 @@ fn rank_channel<'a>(
         let rank = index
             .checked_add(1)
             .and_then(NonZeroUsize::new)
-            .ok_or_else(|| {
-                CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
-            })?;
+            .ok_or_else(build_invalid_search_index_error)?;
         *weight = calculate_rank_weight(rank)?;
     }
     Ok(channel)
@@ -726,14 +660,51 @@ fn rank_channel<'a>(
 ///
 /// * `rank` — Positive one-based rank whose reciprocal becomes the channel weight.
 fn calculate_rank_weight(rank: NonZeroUsize) -> CommandResult<f64> {
-    let rank = u32::try_from(rank.get()).map_err(|error| {
-        CommandError::new_with_cause(
-            CommandErrorKind::InternalError,
-            "cannot search knowledge",
-            error,
-        )
-    })?;
+    let rank = u32::try_from(rank.get()).map_err(map_error_to_search_command_error)?;
     Ok(1.0 / f64::from(rank))
+}
+
+/// Converts a failure raised while searching knowledge to a command error.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from a search step.
+fn map_error_to_search_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot search knowledge",
+        cause,
+    )
+}
+
+/// Converts a document failure to a search command error.
+///
+/// # Arguments
+///
+/// * `cause` — Document failure from a search step.
+fn map_document_error_to_search_command_error(cause: DocumentError) -> CommandError {
+    map_document_error_to_command_error(cause, "cannot search knowledge")
+}
+
+/// Converts a transaction failure from the search read to a command error.
+///
+/// # Arguments
+///
+/// * `error` — Transaction failure from the pinned read.
+fn map_transaction_error_to_search_command_error(
+    error: TransactionError<CommandError>,
+) -> CommandError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => map_error_to_search_command_error(error),
+    }
+}
+
+/// Builds the error reported for inconsistent search index data.
+fn build_invalid_search_index_error() -> CommandError {
+    CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
 }
 
 #[cfg(test)]

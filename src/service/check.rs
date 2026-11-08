@@ -1,7 +1,10 @@
-use super::utils::map_document_error;
+use super::utils::{
+    map_document_error_to_command_error, map_storage_error_to_check_corpus_command_error,
+};
 use super::{
     CacheDatabase, CheckReport, Checker, CommandError, CommandErrorKind, CommandResult,
-    GraphDiagnostics, Refresher, SourceProvenance, utils::CheckObservations,
+    DocumentError, GraphDiagnostics, Refresher, SourceProvenance, TransactionError,
+    utils::CheckObservations,
 };
 use crate::domain::RepoPath;
 use std::{fmt, rc::Rc};
@@ -53,18 +56,15 @@ impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckServi
         } else {
             self.refresher.refresh(&[])
         }
-        .map_err(|cause| map_document_error(cause, "cannot refresh corpus for check"))?;
+        .map_err(map_check_document_error_to_command_error)?;
         self.cache
             .with_read_tx(|| {
                 let view: &dyn super::StorageRead = self.cache.as_ref();
                 if paths.is_empty()
-                    && view.project_get_by_id().map_err(|cause| {
-                        CommandError::new_with_cause(
-                            CommandErrorKind::InternalError,
-                            "cannot read corpus for check",
-                            cause,
-                        )
-                    })? != outcome.revision
+                    && view
+                        .project_get_by_id()
+                        .map_err(map_storage_error_to_check_corpus_command_error)?
+                        != outcome.revision
                 {
                     return Err(CommandError::new(
                         CommandErrorKind::InternalError,
@@ -79,14 +79,30 @@ impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckServi
                 let errors = observations.collect_check_problems(paths)?;
                 Ok(CheckReport { errors })
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot read corpus for check",
-                    error,
-                ),
-            })
+            .map_err(map_transaction_error_to_check_corpus_command_error)
+    }
+}
+
+/// Converts a document failure from the corpus refresh to a check command error.
+///
+/// # Arguments
+///
+/// * `cause` — Document failure from the refresh.
+fn map_check_document_error_to_command_error(cause: DocumentError) -> CommandError {
+    map_document_error_to_command_error(cause, "cannot refresh corpus for check")
+}
+
+/// Converts a transaction failure from the check read to a command error.
+///
+/// # Arguments
+///
+/// * `error` — Transaction failure from the pinned read.
+fn map_transaction_error_to_check_corpus_command_error(
+    error: TransactionError<CommandError>,
+) -> CommandError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => map_storage_error_to_check_corpus_command_error(error),
     }
 }
 

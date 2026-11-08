@@ -61,6 +61,9 @@ impl Fixture {
     ///
     /// * `target` — child-relative path of the file the mutation applies to.
     /// * `action` — mutation kind the child performs before signaling completion.
+    ///
+    /// # Returns
+    /// The started mutator child.
     pub fn spawn_mutator(&self, target: &str, action: &str) -> Mutator {
         let mut command = Command::new(std::env::current_exe().unwrap());
         command

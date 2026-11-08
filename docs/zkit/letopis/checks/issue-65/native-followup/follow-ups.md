@@ -32,7 +32,7 @@ URIs. First query after copying the fixture: 89.680 s; repeat calls: 30.766 and
 Native CPU profile: eligibility 95.33%, Markdown parsing 47.33%, historical
 hashing 25.52%, live source hashing 7.81%, native vector retrieval 1.86%. Scopes
 overlap and cannot be added. `get_nearest_vectors` requests K equal to stored
-vector count; `get_eligible_links` validates candidates before final ranking and
+vector count; `get_eligible_links_by_metadata_and_filters` validates candidates before final ranking and
 limit. Repeatedly parsing whole files and observing provenance is confirmed work,
 not evidence that it may safely be skipped.
 

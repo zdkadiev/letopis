@@ -25,6 +25,9 @@ impl SourceUri {
     /// * `raw` — the source address, either a local path with optional line range or an
     ///   HTTP/HTTPS address.
     ///
+    /// # Returns
+    /// The parsed source address.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for invalid local paths or remote
     /// addresses without `://` and a nonempty authority, or with controls,
@@ -87,6 +90,9 @@ impl LocalSource {
     /// # Arguments
     ///
     /// * `bytes` — the complete file contents from which the selected slice is taken.
+    ///
+    /// # Returns
+    /// The selected bytes, or `None` for an empty or incomplete line range.
     pub fn select_bytes<'a>(&self, bytes: &'a [u8]) -> Option<&'a [u8]> {
         let Some(lines) = self.lines else {
             return Some(bytes);

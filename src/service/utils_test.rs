@@ -30,7 +30,7 @@ fn discovery_permission_failure_is_not_treated_as_absence() {
         git: &git,
         filesystem: &files,
     }
-    .get_candidates(&[]);
+    .get_candidate_observation_by_paths(&[]);
     // Then: permission failure stops enumeration without exposing the private cause.
     let error = result.unwrap_err();
     assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);

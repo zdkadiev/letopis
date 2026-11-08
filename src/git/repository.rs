@@ -1,7 +1,9 @@
 use super::{
     cleanup::GitWriteCleanup,
     constants::{BLOB_KIND, FOREIGN_OID_FORMAT, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
-    durability::{StagedObject, object_reuse_existing, ref_lock_is_busy, ref_retain_by_oid},
+    durability::{
+        StagedObject, loose_object_get_by_content, loose_object_sync_by_oid, ref_lock_is_busy,
+    },
     reader::{ObjectReader, VerifiedObject},
     tree::tree_entry_get,
     validation::tree_bytes_validate,
@@ -10,8 +12,8 @@ use crate::service::GitIgnoreMode;
 use crate::{
     domain::{BlobOid, RepoPath, TreeOid},
     service::{
-        GitError, GitResult, GitSnapshots, GitWorktreeListing, RetainedTree, SnapshotEntry,
-        SnapshotError, SnapshotErrorKind, SnapshotFile, SnapshotState, SnapshotVerifier,
+        GitError, GitResult, GitSnapshots, GitWorktreeListing, SnapshotEntry, SnapshotError,
+        SnapshotErrorKind, SnapshotFile, SnapshotState, SnapshotVerifier,
     },
 };
 use gix::{
@@ -120,7 +122,7 @@ impl GitRepository {
                 reduced: options,
             },
         )
-        .map_err(|error| repository_classify_open_error(&error))?
+        .map_err(repository_classify_open_error)?
         .to_thread_local();
         worktree_verify_start_path(&repo, start_path)?;
         repo.objects.unset_object_cache();
@@ -197,14 +199,14 @@ impl GitSnapshots for GitRepository {
         blob_get_by_tree_oid_and_path(self, tree, path)
     }
 
-    fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
+    fn ref_update_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
         self.objects_verify_self_contained()?;
-        tree_retain_by_oid(self, tree)
+        ref_update_by_oid(self, tree)
     }
 
-    fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+    fn tree_sync_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
         self.objects_verify_self_contained()?;
-        tree_pin_by_oid(self, tree)
+        tree_sync_by_oid(self, tree)
     }
 }
 
@@ -232,7 +234,11 @@ impl GitWorktreeListing for GitRepository {
     }
 }
 
-fn repository_classify_open_error(error: &gix::Error) -> SnapshotError {
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "map_err passes the error by value to the mapper"
+)]
+fn repository_classify_open_error(error: gix::Error) -> SnapshotError {
     if error
         .downcast_any_ref::<gix::discover::upwards::Error>()
         .is_some()
@@ -506,39 +512,39 @@ fn tree_build(
 ///
 /// # Arguments
 ///
-/// * `git` — repository that verifies the root and retains the snapshot ref.
-/// * `oid` — identity of the root tree to validate and retain.
+/// * `git` — repository that verifies the root and updates the snapshot ref.
+/// * `oid` — identity of the root tree to validate and update its ref.
 ///
 /// # Errors
 /// Reports an invalid or missing root and ref lock, write, sync or confirmation failures.
-fn tree_retain_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
+fn ref_update_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
     tree_validate_by_oid(git, oid)?;
-    tree_ref_retain_by_oid(git, oid)
+    ref_upsert_by_oid(git, oid)
 }
 
-/// Verifies the entire closure on every call and then durably retains its root.
+/// Verifies the entire closure on every call and then updates the snapshot ref.
 ///
 /// # Arguments
 ///
-/// * `git` — repository that verifies the closure and retains the snapshot ref.
-/// * `oid` — identity of the root tree to verify and pin.
+/// * `git` — repository that verifies the closure and updates the snapshot ref.
+/// * `oid` — identity of the root tree to verify and update its ref.
 ///
 /// # Errors
 /// Reports an invalid or missing root, a corrupt reachable object or closure type conflict,
 /// and ref lock, write, sync or confirmation failures.
-fn tree_pin_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+fn tree_sync_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
     tree_validate_by_oid(git, oid)?;
     tree_verify_closure_by_oid(git, oid)?;
-    tree_ref_retain_by_oid(git, oid)?;
-    Ok(RetainedTree::new(oid.clone()))
+    ref_upsert_by_oid(git, oid)?;
+    Ok(())
 }
 
-fn tree_ref_retain_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
+fn ref_upsert_by_oid(git: &GitRepository, oid: &TreeOid) -> Result<(), SnapshotError> {
     let oid = ObjectId::from_hex(oid.as_str().as_bytes()).map_err(|_| {
         SnapshotError::new(SnapshotErrorKind::InternalError, "invalid Git identity")
     })?;
     for attempt in 0..REF_LOCK_ATTEMPTS {
-        match ref_retain_by_oid(&git.repo, oid, &git.cleanup) {
+        match super::durability::ref_update_by_oid(&git.repo, oid, &git.cleanup) {
             Err(error) if ref_lock_is_busy(&error) && attempt + 1 < REF_LOCK_ATTEMPTS => {
                 thread::sleep(REF_RETRY_DELAY);
             }
@@ -684,7 +690,8 @@ fn object_write(
     kind: gix::objs::Kind,
     bytes: &[u8],
 ) -> Result<String, SnapshotError> {
-    if let Some(oid) = object_reuse_existing(&git.repo, kind, bytes, &git.cleanup)? {
+    if let Some(oid) = loose_object_get_by_content(&git.repo, kind, bytes, &git.cleanup)? {
+        loose_object_sync_by_oid(&git.repo, oid, &git.cleanup)?;
         return Ok(oid.to_string());
     }
     let object = StagedObject::new_with_cleanup(&git.repo, kind, bytes, &git.cleanup)?;

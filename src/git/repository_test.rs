@@ -136,7 +136,7 @@ fn assembly_checks_unique_oids_once_without_weakening_supplied_or_final_validati
         let tree = git.tree_assemble(&entries).unwrap();
         // Then: exactly one addressed verification occurs in this assembly.
         assert_eq!(git.reader.borrow().object_get_read_count() - before, 1);
-        git.tree_pin_by_oid(&tree).unwrap();
+        git.tree_sync_by_oid(&tree).unwrap();
         // Given: valid compressed bytes replace that blob under its old identity.
         let other = git.blob_write(b"corrupt substitute").unwrap();
         repo.replace_loose_object(oid.as_str(), other.as_str());
@@ -146,7 +146,7 @@ fn assembly_checks_unique_oids_once_without_weakening_supplied_or_final_validati
             SnapshotErrorKind::InternalError
         );
         assert_eq!(
-            git.tree_pin_by_oid(&tree).unwrap_err().get_kind(),
+            git.tree_sync_by_oid(&tree).unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
         );
     }
@@ -179,9 +179,9 @@ fn snapshots_work_without_git_executable() {
         }])
         .unwrap();
     let empty = git.tree_create(&[]).unwrap();
-    git.tree_retain_by_oid(&tree).unwrap();
-    git.tree_pin_by_oid(&tree).unwrap();
-    git.tree_pin_by_oid(&captured).unwrap();
+    git.ref_update_by_oid(&tree).unwrap();
+    git.tree_sync_by_oid(&tree).unwrap();
+    git.tree_sync_by_oid(&captured).unwrap();
     // Then: old and new snapshots remain usable, with exact bytes and raw worktree path membership.
     assert_eq!(
         git.tree_verify_by_oid(&tree).unwrap(),
@@ -247,7 +247,7 @@ fn strong_pin_rejects_malformed_nested_trees_like_git() {
             );
             let root = crate::domain::TreeOid::parse(&root).unwrap();
             // When: strong pin audits the nested closure.
-            let error = git.tree_pin_by_oid(&root).unwrap_err();
+            let error = git.tree_sync_by_oid(&root).unwrap_err();
             // Then: Git structural checks remain mandatory before publishing a ref.
             assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
             assert!(
@@ -345,7 +345,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
                 bytes: b"newline repository isolation\0",
             }])
             .unwrap();
-        git.tree_pin_by_oid(&tree).unwrap();
+        git.tree_sync_by_oid(&tree).unwrap();
         let objects_after = parent.run_git_successfully(
             &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
             None,
@@ -421,7 +421,7 @@ fn root_verification_and_addressed_reads_reject_malformed_tree_structure() {
         let git = GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
         // When: each operation reaches this root without a full closure audit.
         let verified = git.tree_verify_by_oid(&oid).unwrap_err();
-        let retained = git.tree_retain_by_oid(&oid).unwrap_err();
+        let retained = git.ref_update_by_oid(&oid).unwrap_err();
         let addressed = git
             .blob_get_by_tree_oid_and_path(&oid, &RepoPath::parse("x").unwrap())
             .unwrap_err();
@@ -777,8 +777,8 @@ mod tree_reads {
             get_tree(&git, &oid).unwrap();
             let before = tree_validation_get_count();
             // When: two independent full closure audits retain that root.
-            git.tree_pin_by_oid(&tree).unwrap();
-            git.tree_pin_by_oid(&tree).unwrap();
+            git.tree_sync_by_oid(&tree).unwrap();
+            git.tree_sync_by_oid(&tree).unwrap();
             // Then: each full audit rechecks its tree body, independent of the memo.
             assert_eq!(tree_validation_get_count() - before, 2);
         }

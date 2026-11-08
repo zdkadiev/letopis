@@ -250,7 +250,9 @@ mod discovery_configuration_tests {
                 "c713040f35c46c21c7389aa69b25910ad51fb1ce6ceb26b378513ea5dec8748b"
             );
             assert_eq!(
-                configuration.get_discovery().is_gitignore_respected(),
+                configuration
+                    .get_discovery_config()
+                    .is_gitignore_respected(),
                 !discovery.contains("false")
             );
         }

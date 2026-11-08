@@ -2,8 +2,15 @@ use super::{
     BackgroundRunner, CommandError, CommandErrorKind, CommandProblem, CommandResult,
     EmbeddingExecutor, FileLocker, ProcessLauncher,
 };
+use std::collections::BTreeMap;
 
 const BACKGROUND_WARNING: &str = "cannot start background embedding drain";
+const BACKGROUND_PROBLEM: CommandProblem = CommandProblem {
+    code: CommandErrorKind::InternalError,
+    message: BACKGROUND_WARNING,
+    details: BTreeMap::new(),
+};
+const DRAIN_UNAVAILABLE_MESSAGE: &str = "operation unavailable in this build";
 
 pub(crate) struct BackgroundRunnerService<'a, F, P> {
     embedding_executor: Option<&'a mut dyn EmbeddingExecutor>,
@@ -39,36 +46,25 @@ impl<F: FileLocker, P: ProcessLauncher> BackgroundRunner for BackgroundRunnerSer
         {
             Ok(Some(lease)) => drop(lease),
             Ok(None) => return Ok(None),
-            Err(_) => {
-                return Ok(Some(CommandProblem {
-                    code: CommandErrorKind::InternalError,
-                    message: BACKGROUND_WARNING,
-                    details: Default::default(),
-                }));
-            }
+            Err(_) => return Ok(Some(BACKGROUND_PROBLEM.clone())),
         }
-        Ok(self
-            .process_launcher
-            .process_spawn()
-            .err()
-            .map(|_| CommandProblem {
-                code: CommandErrorKind::InternalError,
-                message: BACKGROUND_WARNING,
-                details: Default::default(),
-            }))
+        if self.process_launcher.process_spawn().is_err() {
+            return Ok(Some(BACKGROUND_PROBLEM.clone()));
+        }
+        Ok(None)
     }
 
     fn drain(&mut self) -> CommandResult<()> {
         self.embedding_executor
             .as_deref_mut()
-            .ok_or_else(|| {
-                CommandError::new(
-                    CommandErrorKind::InternalError,
-                    "operation unavailable in this build",
-                )
-            })?
+            .ok_or_else(build_drain_unavailable_error)?
             .drain()
     }
+}
+
+/// Builds the error reported when the build lacks a background drain.
+fn build_drain_unavailable_error() -> CommandError {
+    CommandError::new(CommandErrorKind::InternalError, DRAIN_UNAVAILABLE_MESSAGE)
 }
 
 #[cfg(test)]

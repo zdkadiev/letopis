@@ -235,17 +235,23 @@ fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
             // When / Then: candidate metadata is retrieved; mismatched rows and hashes are rejected.
             assert!(
                 CandidateReads { storage_read: read }
-                    .get_candidate_metadata(&[bad_row], &[])
+                    .get_candidate_metadata_by_text_matches_and_vector_matches(&[bad_row], &[])
                     .is_err()
             );
             assert!(
                 CandidateReads { storage_read: read }
-                    .get_candidate_metadata(&[], &[make_vector_match("a.md", 0.0)])
+                    .get_candidate_metadata_by_text_matches_and_vector_matches(
+                        &[],
+                        &[make_vector_match("a.md", 0.0)]
+                    )
                     .is_err()
             );
             assert!(
                 CandidateReads { storage_read: read }
-                    .get_candidate_metadata(&[make_text_match("missing.md", 0.0)], &[])
+                    .get_candidate_metadata_by_text_matches_and_vector_matches(
+                        &[make_text_match("missing.md", 0.0)],
+                        &[]
+                    )
                     .is_err()
             );
             assert_eq!(read.project_get_by_id().unwrap(), 1);
@@ -2053,7 +2059,7 @@ mod parse_reuse {
                     markdown: parser,
                     provenance: &NoSources,
                 }
-                .get_eligible_links(nodes, &SearchFilters::default())
+                .get_eligible_links_by_metadata_and_filters(nodes, &SearchFilters::default())
             })
             .map_err(|error| match error {
                 TransactionError::Operation(error) => error,

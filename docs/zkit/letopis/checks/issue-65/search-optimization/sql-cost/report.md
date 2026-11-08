@@ -24,9 +24,9 @@ Source locations refer to `source/`.
 | vector identity/config capture and checks | constant, not per-candidate | Constant only |
 | live file observation and Markdown parse | 100,000 | Outside this SQL experiment |
 
-`get_candidate_metadata` consumes FTS first, verifies each FTS row ID, then consumes every vector and verifies the current metadata search_hash. It populates the union before eligibility and ranking. Search hash/config checks are not accidental overhead and must remain.
+`get_candidate_metadata_by_text_matches_and_vector_matches` consumes FTS first, verifies each FTS row ID, then consumes every vector and verifies the current metadata search_hash. It populates the union before eligibility and ranking. Search hash/config checks are not accidental overhead and must remain.
 
-`get_eligible_links` iterates IDs in BTreeMap order: edge retrieval/decoding, source and revision filters, revision lookup, live knowledge read/parse, provenance observation, flags, then eligible-set fusion/limit. A revision cached eagerly before this loop would reorder errors; a correct lazy value must be initialized only after the first candidate passes source/revision filters, at the original revision lookup position. Its lifetime must be confined to that pinned operation. Do not cache live bytes, flags, or provenance as part of this change.
+`get_eligible_links_by_metadata_and_filters` iterates IDs in BTreeMap order: edge retrieval/decoding, source and revision filters, revision lookup, live knowledge read/parse, provenance observation, flags, then eligible-set fusion/limit. A revision cached eagerly before this loop would reorder errors; a correct lazy value must be initialized only after the first candidate passes source/revision filters, at the original revision lookup position. Its lifetime must be confined to that pinned operation. Do not cache live bytes, flags, or provenance as part of this change.
 
 `with_read_tx` pins both cache project and attached vector metadata before invoking the operation. Same-owner nested transactions join and only the outer owner finalizes. Identity comparisons before vector retrieval observe the pinned vector view. The public contract still requires source-revision preflight before inference and candidate-dependent empty exits.
 

@@ -176,6 +176,9 @@ impl CommandError {
     ///
     /// * `kind` — Public failure classification.
     /// * `message` — Static diagnostic message.
+    ///
+    /// # Returns
+    /// The command error.
     pub fn new(kind: CommandErrorKind, message: &'static str) -> Self {
         Self {
             kind,
@@ -193,6 +196,9 @@ impl CommandError {
     /// * `kind` — Public failure classification.
     /// * `message` — Static diagnostic message.
     /// * `cause` — Internal cause kept only for `Error::source`.
+    ///
+    /// # Returns
+    /// The command error with its private cause.
     pub fn new_with_cause(
         kind: CommandErrorKind,
         message: &'static str,
@@ -243,7 +249,7 @@ impl Error for CommandError {
 pub type CommandResult<T> = Result<T, CommandError>;
 
 /// A safe finding or per-call warning; details must never contain raw payloads.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandProblem {
     /// Stable X-1 code.
     pub code: CommandErrorKind,
@@ -288,6 +294,9 @@ impl EmbeddingError {
     /// # Arguments
     ///
     /// * `kind` — Embedding failure classification.
+    ///
+    /// # Returns
+    /// The embedding error.
     pub fn new(kind: EmbeddingErrorKind) -> Self {
         Self { kind, cause: None }
     }
@@ -300,6 +309,9 @@ impl EmbeddingError {
     ///
     /// * `kind` — Embedding failure classification.
     /// * `cause` — Cause kept private from public diagnostics.
+    ///
+    /// # Returns
+    /// The embedding error with its private cause.
     pub fn new_with_cause(
         kind: EmbeddingErrorKind,
         cause: impl Error + Send + Sync + 'static,
@@ -812,6 +824,9 @@ impl ProcessError {
     /// # Arguments
     ///
     /// * `cause` — I/O failure kept only for `Error::source`.
+    ///
+    /// # Returns
+    /// The process error.
     pub fn new(cause: io::Error) -> Self {
         Self { cause }
     }

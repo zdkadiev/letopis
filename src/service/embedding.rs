@@ -72,7 +72,10 @@ impl<
 > EmbeddingExecutor for EmbeddingService<C, V, F, M, P>
 {
     fn is_work_available(&mut self) -> CommandResult<bool> {
-        let ConfigState::Ready(config) = self.get_configuration().map_err(map_command)? else {
+        let ConfigState::Ready(config) = self
+            .get_configuration()
+            .map_err(map_embedding_error_to_command_error)?
+        else {
             return Ok(false);
         };
         let next = self
@@ -85,13 +88,13 @@ impl<
                         None,
                     )
             })
-            .map_err(map_storage_transaction)
-            .map_err(map_command)?;
+            .map_err(map_storage_transaction_error_to_embedding_error)
+            .map_err(map_embedding_error_to_command_error)?;
         Ok(matches!(next, VectorOutcome::Current(Some(_))))
     }
 
     fn drain(&mut self) -> CommandResult<()> {
-        match Embedder::drain(self).map_err(map_command)? {
+        match Embedder::drain(self).map_err(map_embedding_error_to_command_error)? {
             DrainOutcome::Complete
             | DrainOutcome::AlreadyRunning
             | DrainOutcome::Unavailable
@@ -112,10 +115,10 @@ impl<
         let observed = self
             .cache
             .with_read_tx(|| self.cache.meta_get_by_id())
-            .map_err(map_storage_transaction)?;
+            .map_err(map_storage_transaction_error_to_embedding_error)?;
         #[cfg(test)]
         tests::reach_checkpoint("observed");
-        let configuration = match self.get_config_file() {
+        let configuration = match self.get_configuration_by_file() {
             Ok(None) => return Ok(ConfigState::Missing),
             Err(error) => return Ok(ConfigState::Invalid(error.get_kind())),
             Ok(Some(configuration)) => {
@@ -136,9 +139,8 @@ impl<
         match self
             .vector_database
             .reset_vectors(observed.as_ref(), &config.get_identity())
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })? {
+            .map_err(map_error_to_embedding_internal_error)?
+        {
             VectorOutcome::Current(_) => Ok(ConfigState::Ready(config)),
             VectorOutcome::ConfigChanged => Ok(ConfigState::Changed),
         }
@@ -156,9 +158,7 @@ impl<
         let Some(_guard) = self
             .file_reader
             .lock_try_acquire_by_path(Path::new(EMBED_LOCK_PATH))
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })?
+            .map_err(map_error_to_embedding_internal_error)?
         else {
             return Ok(DrainOutcome::AlreadyRunning);
         };
@@ -170,7 +170,7 @@ impl<
         let ConfigState::Ready(config) = self.get_configuration()? else {
             return Ok(QueryEmbedding::Unavailable);
         };
-        let VectorOutcome::Current(dimensions) = self.get_dimensions(&config)? else {
+        let VectorOutcome::Current(dimensions) = self.get_dimensions_by_config(&config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
         self.embed_query_with_config(QueryEmbeddingRequest {
@@ -188,11 +188,11 @@ impl<
         if self.provider.config_validate(request.config).is_err() {
             return Ok(QueryEmbedding::Unavailable);
         }
-        let VectorOutcome::Current(_) = self.get_dimensions(request.config)? else {
+        let VectorOutcome::Current(_) = self.get_dimensions_by_config(request.config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
         let mut result = self.compute_vector(request.config, request.text, request.dimensions);
-        let VectorOutcome::Current(current) = self.get_dimensions(request.config)? else {
+        let VectorOutcome::Current(current) = self.get_dimensions_by_config(request.config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
         if let Ok(vector) = &result
@@ -215,46 +215,34 @@ impl<
     fn verify_query_scope(&self) -> EmbeddingResult<()> {
         self.cache
             .verify_transaction_scope(TransactionRequirement::ReadOnly)
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })?;
+            .map_err(map_error_to_embedding_internal_error)?;
         self.vector_database
             .verify_transaction_scope(TransactionRequirement::Inactive)
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })
+            .map_err(map_error_to_embedding_internal_error)
     }
 
     fn verify_drain_scope(&self) -> EmbeddingResult<()> {
         self.cache
             .verify_transaction_scope(TransactionRequirement::Inactive)
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })?;
+            .map_err(map_error_to_embedding_internal_error)?;
         self.vector_database
             .verify_transaction_scope(TransactionRequirement::Inactive)
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })
+            .map_err(map_error_to_embedding_internal_error)
     }
 
-    fn get_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
+    fn get_configuration_by_file(&self) -> EmbeddingResult<Option<Configuration>> {
         self.file_reader
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })?;
+            .map_err(map_error_to_embedding_internal_error)?;
         let bytes = self
             .file_reader
             .file_get_bytes_by_path(Path::new(CONFIG_PATH));
         // A directory replacement remains infrastructure failure even if the read also failed.
         self.file_reader
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
-            .map_err(|error| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-            })?;
+            .map_err(map_error_to_embedding_internal_error)?;
         bytes
-            .map_err(map_capture_error)?
+            .map_err(map_file_error_to_embedding_error)?
             .map(|bytes| Configuration::parse(&bytes))
             .transpose()
     }
@@ -280,7 +268,7 @@ impl<
                             after.as_ref(),
                         )
                 })
-                .map_err(map_storage_transaction)?;
+                .map_err(map_storage_transaction_error_to_embedding_error)?;
             let work = match next {
                 VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
                 VectorOutcome::Current(None) => return self.prune(config),
@@ -312,7 +300,7 @@ impl<
             .with_write_tx(&config.get_identity(), || {
                 self.vector_database.prune_unreferenced()
             })
-            .map_err(map_storage_transaction)?;
+            .map_err(map_storage_transaction_error_to_embedding_error)?;
         Ok(match outcome {
             VectorOutcome::Current(()) => DrainOutcome::Complete,
             VectorOutcome::ConfigChanged => DrainOutcome::ConfigChanged,
@@ -323,13 +311,11 @@ impl<
         #[cfg(test)]
         tests::reach_checkpoint("prepare");
         let path = RepoPath::parse(work.id.as_str().split('#').next().unwrap_or_default())
-            .map_err(|cause| {
-                EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
-            })?;
+            .map_err(map_error_to_embedding_internal_error)?;
         let Some(bytes) = self
             .file_reader
             .file_get_bytes_by_path(Path::new(path.as_str()))
-            .map_err(map_capture_error)?
+            .map_err(map_file_error_to_embedding_error)?
         else {
             return Ok(None);
         };
@@ -352,7 +338,7 @@ impl<
         work: &EmbeddingWork,
         text: EmbeddingResult<String>,
     ) -> EmbeddingResult<DrainOutcome> {
-        let VectorOutcome::Current(dimensions) = self.get_dimensions(config)? else {
+        let VectorOutcome::Current(dimensions) = self.get_dimensions_by_config(config)? else {
             return Ok(DrainOutcome::ConfigChanged);
         };
         match self.reserve(config, &work.search_hash)? {
@@ -380,7 +366,7 @@ impl<
         }
     }
 
-    fn get_dimensions(
+    fn get_dimensions_by_config(
         &self,
         config: &EmbeddingConfig,
     ) -> EmbeddingResult<VectorOutcome<Option<NonZeroUsize>>> {
@@ -388,7 +374,7 @@ impl<
             .with_read_tx(&config.get_identity(), || {
                 self.vector_database.vector_index_config_get_by_id()
             })
-            .map_err(map_storage_transaction)
+            .map_err(map_storage_transaction_error_to_embedding_error)
     }
 
     fn reserve(
@@ -404,7 +390,7 @@ impl<
                         config.get_max_attempts(),
                     )
             })
-            .map_err(map_storage_transaction)
+            .map_err(map_storage_transaction_error_to_embedding_error)
     }
 
     fn finish_failure(
@@ -425,15 +411,15 @@ impl<
                 self.vector_database
                     .embed_failures_get_by_search_hash(search_hash)
             })
-            .map_err(map_storage_transaction)?;
+            .map_err(map_storage_transaction_error_to_embedding_error)?;
         match failure {
             VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
             VectorOutcome::Current(Some(failure))
                 if failure.attempts < config.get_max_attempts() =>
             {
-                self.clock.clock_wait(RETRY_DELAY).map_err(|error| {
-                    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-                })?;
+                self.clock
+                    .clock_wait(RETRY_DELAY)
+                    .map_err(map_error_to_embedding_internal_error)?;
             }
             VectorOutcome::Current(_) => {}
         }
@@ -452,7 +438,7 @@ impl<
                     .embed_failures_update_by_search_hash(search_hash, &error.to_string())
                     .map(|_| ())
             })
-            .map_err(map_storage_transaction)
+            .map_err(map_storage_transaction_error_to_embedding_error)
     }
 
     fn compute_vector(
@@ -461,7 +447,7 @@ impl<
         text: &str,
         dimensions: Option<NonZeroUsize>,
     ) -> EmbeddingResult<Vec<f32>> {
-        let requested = config.get_dimensions().or(dimensions);
+        let requested = config.get_dimensions_by_parameters().or(dimensions);
         let mut vector_database =
             self.provider
                 .vectors_compute_by_texts(config, &[text], requested)?;
@@ -490,18 +476,9 @@ impl<
                 self.vector_database
                     .store_vector(search_hash, vector, vector.len())
                     .map(|_| ())
-                    .map_err(|error| {
-                        if error.get_kind() == StorageErrorKind::InvalidRequest {
-                            EmbeddingError::new_with_cause(
-                                EmbeddingErrorKind::InvalidResponse,
-                                error,
-                            )
-                        } else {
-                            EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-                        }
-                    })
+                    .map_err(map_storage_error_to_embedding_invalid_response_error)
             })
-            .map_err(map_embedding_transaction)
+            .map_err(map_embedding_transaction_error_to_embedding_error)
     }
 
     fn publish_query(
@@ -512,9 +489,9 @@ impl<
         let result = match result {
             Ok(vector) => Ok(vector),
             Err(error) => Err((
-                self.clock.clock_get_time_secs().map_err(|error| {
-                    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-                })?,
+                self.clock
+                    .clock_get_time_secs()
+                    .map_err(map_error_to_embedding_internal_error)?,
                 error,
             )),
         };
@@ -527,12 +504,7 @@ impl<
                         Ok(vector) => {
                             self.vector_database
                                 .query_error_delete_by_id()
-                                .map_err(|error| {
-                                    EmbeddingError::new_with_cause(
-                                        EmbeddingErrorKind::InternalError,
-                                        error,
-                                    )
-                                })?;
+                                .map_err(map_error_to_embedding_internal_error)?;
                             Ok(QueryEmbedding::Available {
                                 identity: config.get_identity(),
                                 vector,
@@ -541,18 +513,13 @@ impl<
                         Err((at, error)) => {
                             self.vector_database
                                 .query_error_upsert_by_id(at, &error.to_string())
-                                .map_err(|error| {
-                                    EmbeddingError::new_with_cause(
-                                        EmbeddingErrorKind::InternalError,
-                                        error,
-                                    )
-                                })?;
+                                .map_err(map_error_to_embedding_internal_error)?;
                             Ok(QueryEmbedding::Unavailable)
                         }
                     }
                 },
             )
-            .map_err(map_embedding_transaction)?;
+            .map_err(map_embedding_transaction_error_to_embedding_error)?;
         Ok(match outcome {
             VectorOutcome::Current(result) => result,
             VectorOutcome::ConfigChanged => QueryEmbedding::Unavailable,
@@ -560,7 +527,9 @@ impl<
     }
 }
 
-fn map_storage_transaction(error: TransactionError<StorageError>) -> EmbeddingError {
+fn map_storage_transaction_error_to_embedding_error(
+    error: TransactionError<StorageError>,
+) -> EmbeddingError {
     match error {
         TransactionError::Operation(error) | TransactionError::Storage(error) => {
             EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
@@ -568,7 +537,9 @@ fn map_storage_transaction(error: TransactionError<StorageError>) -> EmbeddingEr
     }
 }
 
-fn map_embedding_transaction(error: TransactionError<EmbeddingError>) -> EmbeddingError {
+fn map_embedding_transaction_error_to_embedding_error(
+    error: TransactionError<EmbeddingError>,
+) -> EmbeddingError {
     match error {
         TransactionError::Operation(error) => error,
         TransactionError::Storage(error) => {
@@ -577,7 +548,7 @@ fn map_embedding_transaction(error: TransactionError<EmbeddingError>) -> Embeddi
     }
 }
 
-fn map_command(error: EmbeddingError) -> CommandError {
+fn map_embedding_error_to_command_error(error: EmbeddingError) -> CommandError {
     let kind = if error.get_kind() == EmbeddingErrorKind::InternalError {
         CommandErrorKind::InternalError
     } else {
@@ -586,7 +557,7 @@ fn map_command(error: EmbeddingError) -> CommandError {
     CommandError::new_with_cause(kind, "embedding operation failed", error)
 }
 
-fn map_capture_error(cause: FileError) -> EmbeddingError {
+fn map_file_error_to_embedding_error(cause: FileError) -> EmbeddingError {
     // Legacy captures classify invalid/stale input separately from failed OS calls.
     // The file boundary retains OS causes even when a syscall reports deletion or NOFOLLOW.
     let kind = match cause.get_kind() {
@@ -598,6 +569,30 @@ fn map_capture_error(cause: FileError) -> EmbeddingError {
         _ => EmbeddingErrorKind::InternalError,
     };
     EmbeddingError::new_with_cause(kind, cause)
+}
+
+/// Converts an error to an internal embedding error.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from an embedding step.
+fn map_error_to_embedding_internal_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
+}
+
+/// Converts a rejected storage request to an invalid embedding response.
+///
+/// # Arguments
+///
+/// * `cause` — Storage failure whose kind selects the embedding classification.
+fn map_storage_error_to_embedding_invalid_response_error(cause: StorageError) -> EmbeddingError {
+    if cause.get_kind() == StorageErrorKind::InvalidRequest {
+        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidResponse, cause)
+    } else {
+        EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
+    }
 }
 
 #[cfg(test)]

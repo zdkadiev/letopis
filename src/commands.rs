@@ -77,7 +77,7 @@ fn run_index(
         IndexMode::Verified => documents.refresh_verified(&request.paths),
         IndexMode::Full => documents.reindex(&request.paths),
     }
-    .map_err(map_reindex_error)?;
+    .map_err(map_document_error_to_command_error)?;
     finish_foreground(ResponseResult::Index(outcome), &mut background)
 }
 
@@ -181,7 +181,7 @@ fn run_inspect(
     finish_foreground(ResponseResult::Inspect(inspection), &mut background)
 }
 
-fn map_reindex_error(cause: DocumentError) -> CommandError {
+fn map_document_error_to_command_error(cause: DocumentError) -> CommandError {
     let kind = match cause.get_kind() {
         DocumentErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
         DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
@@ -191,11 +191,11 @@ fn map_reindex_error(cause: DocumentError) -> CommandError {
 
 impl From<ServiceError> for CommandError {
     fn from(error: ServiceError) -> Self {
-        map_service_error(error)
+        map_service_error_to_command_error(error)
     }
 }
 
-fn map_service_error(error: ServiceError) -> CommandError {
+fn map_service_error_to_command_error(error: ServiceError) -> CommandError {
     let (kind, message) = match error.get_kind() {
         ServiceErrorKind::RepositoryRequired => {
             (CommandErrorKind::InvalidRequest, "Git repository required")

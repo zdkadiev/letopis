@@ -103,6 +103,9 @@ impl service::InitStorage for StorageInitializer {
 /// * `args` — process arguments excluding the executable name.
 /// * `input` — reader supplying the command request bytes.
 /// * `output` — writer that receives the single response envelope.
+///
+/// # Returns
+/// The process exit code of the executed request.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
     input: impl Read,
@@ -142,6 +145,9 @@ pub fn run_process_cli() -> u8 {
 /// # Arguments
 ///
 /// * `cache` — shared cache database observed through its read scopes.
+///
+/// # Returns
+/// Graph diagnostics over the supplied cache.
 pub fn wire_graph_diagnostics<C: service::CacheDatabase>(
     cache: Rc<C>,
 ) -> impl GraphDiagnostics + use<C> {
@@ -161,17 +167,16 @@ where
 {
     let git = open_repository_with_cleanup(directory, Arc::new(GitWriteCleanup::new()))?;
     let root = git.worktree_root_get().to_path_buf();
-    let filesystem = LocalFileSystem::new(git.worktree_root_get())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
+    let filesystem =
+        LocalFileSystem::new(git.worktree_root_get()).map_err(map_error_to_service_status_error)?;
     let service_directory = filesystem
         .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
+        .map_err(map_error_to_service_status_error)?;
     let cache = open_status_cache(&root.join(SERVICE_DIRECTORY), service_directory.as_ref())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
-    let provenance = wire_source_provenance_with_repository(git)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
-    let provider = build_embedding_provider()
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
+        .map_err(map_error_to_service_status_error)?;
+    let provenance =
+        wire_source_provenance_with_repository(git).map_err(map_error_to_service_status_error)?;
+    let provider = build_embedding_provider().map_err(map_error_to_service_status_error)?;
     let cache = Rc::new(cache);
     let graph = GraphDiagnosticsService::new(Rc::clone(&cache));
     let mut service = StatusService {
@@ -197,9 +202,8 @@ where
 {
     let git = open_repository_with_cleanup(directory, Arc::new(GitWriteCleanup::new()))?;
     let filesystem = LocalFileSystem::new(git.worktree_root_get())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
-    let provider = build_embedding_provider()
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
+        .map_err(map_error_to_service_configuration_error)?;
+    let provider = build_embedding_provider().map_err(map_error_to_service_configuration_error)?;
     let service = ConfigurationService {
         file_reader: &filesystem,
         provider: &provider,
@@ -219,7 +223,7 @@ fn open_repository_with_cleanup(
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<GitRepository> {
     GitRepository::open_with_cleanup(directory, cleanup, &[SERVICE_DIRECTORY])
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Repository, cause).into())
+        .map_err(map_snapshot_error_to_repository_command_error)
 }
 
 /// Builds a repository initializer that uses an existing Git work tree and its
@@ -229,17 +233,19 @@ fn open_repository_with_cleanup(
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired initializer.
+///
 /// # Errors
 /// Returns `invalid_request` outside a non-bare Git work tree and an internal
 /// error for repository, filesystem or provider setup failures.
 pub fn wire_initializer(start_path: &Path) -> ServiceResult<impl Initializer + use<>> {
-    let git =
-        GitRepository::open(start_path, &[SERVICE_DIRECTORY]).map_err(map_repository_open_error)?;
+    let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
+        .map_err(map_snapshot_error_to_service_error)?;
     let root = git.worktree_root_get().to_path_buf();
-    let filesystem = LocalFileSystem::new(&root)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
-    let provider = build_embedding_provider()
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
+    let filesystem =
+        LocalFileSystem::new(&root).map_err(map_error_to_service_initialization_error)?;
+    let provider = build_embedding_provider().map_err(map_error_to_service_initialization_error)?;
     Ok(InitService::new(
         Box::new(filesystem),
         Box::new(initialize_storage as StorageInitializer),
@@ -255,12 +261,15 @@ pub fn wire_initializer(start_path: &Path) -> ServiceResult<impl Initializer + u
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired traverser.
+///
 /// # Errors
 /// Returns an error for unsupported repositories, unsafe paths or storage and
 /// provider setup failures.
 pub fn wire_traverser(start_path: &Path) -> ServiceResult<impl Traverser + use<>> {
     let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+        .map_err(map_error_to_service_traversal_error)?;
     wire_traverser_with_repository(git)
 }
 
@@ -271,26 +280,26 @@ pub fn wire_traverser(start_path: &Path) -> ServiceResult<impl Traverser + use<>
 /// * `git` — opened repository shared by the traversal collaborators.
 fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Traverser + use<>> {
     let filesystem = LocalFileSystem::new(git.worktree_root_get())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+        .map_err(map_error_to_service_traversal_error)?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+        .map_err(map_error_to_service_traversal_error)?;
     let (vector_database, cache) = crate::open_confined_databases(
         &git.worktree_root_get().join(SERVICE_DIRECTORY),
         &directory,
     )
-    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+    .map_err(map_error_to_service_traversal_error)?;
     let cache = Rc::new(cache);
     let vector_database = Rc::new(vector_database);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
         LocalFileSystem::new(git.worktree_root_get())
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?,
+            .map_err(map_error_to_service_traversal_error)?,
         Rc::clone(&cache),
     )
-    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+    .map_err(map_error_to_service_traversal_error)?;
     let embeddings = wire_embedder(git.worktree_root_get(), Rc::clone(&cache), vector_database)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+        .map_err(map_error_to_service_embedding_error)?;
     Ok(TraversalService {
         cache: Rc::clone(&cache),
         filesystem,
@@ -298,14 +307,12 @@ fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Trav
         embeddings: Box::new(embeddings),
         markdown: Box::new(MarkdownParser::new()),
         sources: Box::new(
-            wire_source_reader(git.worktree_root_get(), Rc::clone(&cache)).map_err(|cause| {
-                ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
-            })?,
+            wire_source_reader(git.worktree_root_get(), Rc::clone(&cache))
+                .map_err(map_error_to_service_traversal_error)?,
         ),
         provenance: Box::new(
-            wire_source_provenance_with_repository(git).map_err(|cause| {
-                ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
-            })?,
+            wire_source_provenance_with_repository(git)
+                .map_err(map_error_to_service_traversal_error)?,
         ),
         graph: Box::new(GraphService::new(cache)),
     })
@@ -322,6 +329,9 @@ fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Trav
 /// * `root` — already selected Git worktree root observed by the source reader.
 /// * `cache` — shared cache database used by each source observation.
 ///
+/// # Returns
+/// The wired source reader.
+///
 /// # Errors
 /// Returns an error when the root is inaccessible, a symlink or not a directory.
 pub fn wire_source_reader<C: service::CacheDatabase>(
@@ -330,13 +340,7 @@ pub fn wire_source_reader<C: service::CacheDatabase>(
 ) -> DocumentResult<impl SourceReader + use<C>> {
     Ok(SourceService::new(
         cache,
-        LocalFileSystem::new(root).map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "document path changed during observation",
-                cause,
-            )
-        })?,
+        LocalFileSystem::new(root).map_err(map_error_to_document_path_changed_error)?,
     ))
 }
 
@@ -347,16 +351,14 @@ pub fn wire_source_reader<C: service::CacheDatabase>(
 ///
 /// * `root` — path inside the repository whose provenance is observed.
 ///
+/// # Returns
+/// The wired source provenance reader.
+///
 /// # Errors
 /// Returns an error for unsupported repositories or unsafe filesystem roots.
 pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenance + use<>> {
-    let git = GitRepository::open(root, &[SERVICE_DIRECTORY]).map_err(|cause| {
-        DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            "cannot open provenance repository",
-            cause,
-        )
-    })?;
+    let git = GitRepository::open(root, &[SERVICE_DIRECTORY])
+        .map_err(map_error_to_provenance_repository_error)?;
     wire_source_provenance_with_repository(git)
 }
 
@@ -366,12 +368,15 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired checker.
+///
 /// # Errors
 /// Returns an error for unsupported repositories, unsafe service paths or storage
 /// setup failures.
 pub fn wire_checker(start_path: &Path) -> ServiceResult<impl Checker + use<>> {
     let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+        .map_err(map_error_to_service_check_error)?;
     wire_checker_with_repository(git)
 }
 
@@ -381,30 +386,28 @@ pub fn wire_checker(start_path: &Path) -> ServiceResult<impl Checker + use<>> {
 ///
 /// * `git` — opened repository shared by the check collaborators.
 fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checker + use<>> {
-    let filesystem = LocalFileSystem::new(git.worktree_root_get())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    let filesystem =
+        LocalFileSystem::new(git.worktree_root_get()).map_err(map_error_to_service_check_error)?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+        .map_err(map_error_to_service_check_error)?;
     let (_, cache) = crate::open_confined_databases(
         &git.worktree_root_get().join(SERVICE_DIRECTORY),
         &directory,
     )
-    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    .map_err(map_error_to_service_check_error)?;
     let cache = Rc::new(cache);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::new(git.worktree_root_get())
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
+        LocalFileSystem::new(git.worktree_root_get()).map_err(map_error_to_service_check_error)?,
         Rc::clone(&cache),
     )
-    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    .map_err(map_error_to_service_check_error)?;
     Ok(CheckService::new(
         refresher,
         Rc::clone(&cache),
         Box::new(GraphDiagnosticsService::new(cache)),
-        wire_source_provenance_with_repository(git)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
+        wire_source_provenance_with_repository(git).map_err(map_error_to_service_check_error)?,
     ))
 }
 
@@ -414,12 +417,15 @@ fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checke
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired searcher.
+///
 /// # Errors
 /// Returns an error for unsupported repositories, unsafe paths or storage and
 /// provider setup failures.
 pub fn wire_searcher(start_path: &Path) -> ServiceResult<impl Searcher + use<>> {
     let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+        .map_err(map_error_to_service_search_error)?;
     wire_searcher_with_repository(git)
 }
 
@@ -429,27 +435,26 @@ pub fn wire_searcher(start_path: &Path) -> ServiceResult<impl Searcher + use<>> 
 ///
 /// * `git` — opened repository shared by the search collaborators.
 fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searcher + use<>> {
-    let filesystem = LocalFileSystem::new(git.worktree_root_get())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    let filesystem =
+        LocalFileSystem::new(git.worktree_root_get()).map_err(map_error_to_service_search_error)?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+        .map_err(map_error_to_service_search_error)?;
     let (vector_database, cache) = crate::open_confined_databases(
         &git.worktree_root_get().join(SERVICE_DIRECTORY),
         &directory,
     )
-    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    .map_err(map_error_to_service_search_error)?;
     let cache = Rc::new(cache);
     let vector_database = Rc::new(vector_database);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::new(git.worktree_root_get())
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
+        LocalFileSystem::new(git.worktree_root_get()).map_err(map_error_to_service_search_error)?,
         Rc::clone(&cache),
     )
-    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    .map_err(map_error_to_service_search_error)?;
     let embeddings = wire_embedder(git.worktree_root_get(), Rc::clone(&cache), vector_database)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+        .map_err(map_error_to_service_embedding_error)?;
     Ok(SearchService {
         refresher,
         cache,
@@ -457,7 +462,7 @@ fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searc
         filesystem,
         markdown: MarkdownParser::new(),
         provenance: wire_source_provenance_with_repository(git)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
+            .map_err(map_error_to_service_search_error)?,
     })
 }
 
@@ -468,12 +473,15 @@ fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searc
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired inspector.
+///
 /// # Errors
 /// Returns an error for unsupported repositories, unsafe service paths or setup
 /// failures.
 pub fn wire_inspector(start_path: &Path) -> ServiceResult<impl Inspector + use<>> {
     let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
+        .map_err(map_error_to_service_inspection_error)?;
     wire_inspector_with_repository(git)
 }
 
@@ -484,9 +492,9 @@ pub fn wire_inspector(start_path: &Path) -> ServiceResult<impl Inspector + use<>
 /// * `git` — opened repository shared by the inspection collaborators.
 fn wire_inspector_with_repository(git: GitRepository) -> ServiceResult<impl Inspector + use<>> {
     let refresher = wire_document_refresher_with_repository(git.clone())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
+        .map_err(map_error_to_service_inspection_error)?;
     let filesystem = LocalFileSystem::new(git.worktree_root_get())
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
+        .map_err(map_error_to_service_inspection_error)?;
     Ok(InspectionService::new(
         refresher,
         git,
@@ -501,17 +509,15 @@ fn wire_inspector_with_repository(git: GitRepository) -> ServiceResult<impl Insp
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired document refresher.
+///
 /// # Errors
 /// Returns an error for unsupported repositories, unsafe service paths or storage
 /// and I/O failures.
 pub fn wire_document_refresher(start_path: &Path) -> DocumentResult<impl Refresher + use<>> {
-    let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY]).map_err(|cause| {
-        DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            "cannot open document repository",
-            cause,
-        )
-    })?;
+    let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
+        .map_err(map_error_to_document_repository_error)?;
     wire_document_refresher_with_repository(git)
 }
 
@@ -523,33 +529,16 @@ pub fn wire_document_refresher(start_path: &Path) -> DocumentResult<impl Refresh
 fn wire_document_refresher_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl Refresher + use<>> {
-    let filesystem = LocalFileSystem::new(git.worktree_root_get()).map_err(|cause| {
-        DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            "document path changed during observation",
-            cause,
-        )
-    })?;
+    let filesystem = LocalFileSystem::new(git.worktree_root_get())
+        .map_err(map_error_to_document_path_changed_error)?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "document path changed during observation",
-                cause,
-            )
-        })?;
+        .map_err(map_error_to_document_path_changed_error)?;
     let (_, cache) = crate::open_confined_databases(
         &git.worktree_root_get().join(SERVICE_DIRECTORY),
         &directory,
     )
-    .map_err(|cause| {
-        DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            "cannot open document storage",
-            cause,
-        )
-    })?;
+    .map_err(map_error_to_document_storage_error)?;
     wire_document_refresher_with_storage(git, filesystem, Rc::new(cache))
 }
 
@@ -560,22 +549,11 @@ fn wire_document_refresher_with_storage(
 ) -> DocumentResult<impl Refresher + use<>> {
     filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "document path changed during observation",
-                cause,
-            )
-        })?;
+        .map_err(map_error_to_document_path_changed_error)?;
     let provenance = ProvenanceService::new(
         Box::new(git.clone()),
-        LocalFileSystem::new(git.worktree_root_get()).map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "document path changed during observation",
-                cause,
-            )
-        })?,
+        LocalFileSystem::new(git.worktree_root_get())
+            .map_err(map_error_to_document_path_changed_error)?,
     );
     Ok(DocumentRefreshService {
         git,
@@ -595,13 +573,8 @@ fn wire_document_refresher_with_storage(
 fn wire_source_provenance_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl SourceProvenance + use<>> {
-    let filesystem = LocalFileSystem::new(git.worktree_root_get()).map_err(|cause| {
-        DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            "document path changed during observation",
-            cause,
-        )
-    })?;
+    let filesystem = LocalFileSystem::new(git.worktree_root_get())
+        .map_err(map_error_to_document_path_changed_error)?;
     Ok(ProvenanceService::new(Box::new(git), filesystem))
 }
 
@@ -614,6 +587,9 @@ fn wire_source_provenance_with_repository(
 ///
 /// * `start_path` — path where the command was invoked; discovery walks to its work tree.
 ///
+/// # Returns
+/// The wired embedding executor.
+///
 /// # Errors
 /// Returns an error for unsupported repositories, unsafe service or database paths,
 /// or setup failures.
@@ -621,7 +597,7 @@ pub fn wire_embedding_executor(
     start_path: &Path,
 ) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
     let git = GitRepository::open(start_path, &[SERVICE_DIRECTORY])
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+        .map_err(map_error_to_service_embedding_error)?;
     wire_embedding_executor_at_root(git.worktree_root_get())
 }
 
@@ -633,22 +609,20 @@ pub fn wire_embedding_executor(
 fn wire_embedding_executor_at_root(
     root: &Path,
 ) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
-    let filesystem = LocalFileSystem::new(root)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+    let filesystem = LocalFileSystem::new(root).map_err(map_error_to_service_embedding_error)?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+        .map_err(map_error_to_service_embedding_error)?;
     let (vector_database, cache) =
         crate::open_confined_databases(&root.join(SERVICE_DIRECTORY), &directory)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+            .map_err(map_error_to_service_embedding_error)?;
     Ok(EmbeddingService::new(
         Rc::new(cache),
         Rc::new(vector_database),
         filesystem,
         Box::new(SystemClock::new()),
         MarkdownParser::new(),
-        build_embedding_provider()
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?,
+        build_embedding_provider().map_err(map_error_to_service_embedding_error)?,
     ))
 }
 
@@ -660,6 +634,9 @@ fn wire_embedding_executor_at_root(
 /// * `executable` — current executable used to launch the detached embedding drain.
 /// * `tasks` — optional foreground embedding executor reused by the detached drain.
 ///
+/// # Returns
+/// The wired background runner.
+///
 /// # Errors
 /// Returns an error for an inaccessible or unsafe root directory.
 pub fn wire_background_runner<'a>(
@@ -667,8 +644,7 @@ pub fn wire_background_runner<'a>(
     executable: &Path,
     tasks: Option<&'a mut dyn EmbeddingExecutor>,
 ) -> ServiceResult<impl BackgroundRunner + use<'a>> {
-    let filesystem = LocalFileSystem::new(root)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Background, cause))?;
+    let filesystem = LocalFileSystem::new(root).map_err(map_error_to_service_background_error)?;
     Ok(BackgroundRunnerService::new(
         tasks,
         filesystem,
@@ -688,6 +664,9 @@ pub fn wire_background_runner<'a>(
 /// * `cache` — caller-owned cache database shared by the embedder.
 /// * `vector_database` — caller-owned vector database shared by the embedder.
 ///
+/// # Returns
+/// The wired embedder.
+///
 /// # Errors
 /// Returns an error for filesystem or provider setup failures.
 pub fn wire_embedder<C: service::CacheDatabase, V: service::VectorDatabase>(
@@ -695,14 +674,10 @@ pub fn wire_embedder<C: service::CacheDatabase, V: service::VectorDatabase>(
     cache: Rc<C>,
     vector_database: Rc<V>,
 ) -> EmbeddingResult<impl Embedder + EmbeddingExecutor + use<C, V>> {
-    let filesystem = LocalFileSystem::new(root).map_err(|error| {
-        EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-    })?;
+    let filesystem = LocalFileSystem::new(root).map_err(map_error_to_embedding_internal_error)?;
     filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-        .map_err(|error| {
-            EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-        })?;
+        .map_err(map_error_to_embedding_internal_error)?;
     Ok(EmbeddingService::new(
         cache,
         vector_database,
@@ -715,6 +690,9 @@ pub fn wire_embedder<C: service::CacheDatabase, V: service::VectorDatabase>(
 
 /// Builds the embedding provider and reads the `OpenAI` key once.
 /// Does not perform inference or require a key for native Ollama.
+///
+/// # Returns
+/// The configured embedding provider.
 ///
 /// # Errors
 /// Reserved for provider construction failures.
@@ -735,6 +713,9 @@ pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + us
 /// `.letopis` as the first path component before writing any object; addressed
 /// historical reads and retention do not apply that creation policy.
 ///
+/// # Returns
+/// Git snapshots with read-only root verification.
+///
 /// # Errors
 /// Returns a snapshot error when the repository is unsupported, the checkout root
 /// cannot be decoded, an alternates path exists, or Git I/O fails.
@@ -752,6 +733,9 @@ pub fn open_git_snapshots(
 /// * `directory` — already pinned service directory containing the published databases.
 /// * `pinned` — pinned directory descriptor compared against the observed storage paths.
 ///
+/// # Returns
+/// Cache storage over the published databases.
+///
 /// # Errors
 /// Returns an error for unsafe paths, incompatible schemas or database read
 /// failures.
@@ -768,6 +752,9 @@ pub fn open_status_storage<F: AsFd>(
 ///
 /// * `cache_path` — path of the cache database file.
 /// * `vectors_path` — path of the vector database file.
+///
+/// # Returns
+/// The vector storage and cache database together.
 ///
 /// # Errors
 /// Returns an invalid request for invalid or aliased paths, or an internal error
@@ -789,6 +776,9 @@ pub fn open_storage(
 /// * `cache_path` — path of the cache database file.
 /// * `vectors_path` — path of the vector database file.
 ///
+/// # Returns
+/// Cache storage with the vector database attached for reads.
+///
 /// # Errors
 /// Returns an error for unsafe or aliased paths, unsupported schemas, native
 /// capabilities or I/O.
@@ -804,6 +794,9 @@ pub fn open_cache_storage(
 /// # Arguments
 ///
 /// * `root` — directory that confines all file and lock operations.
+///
+/// # Returns
+/// Confined file operations and persistent locks.
 ///
 /// # Errors
 /// Returns an error for an inaccessible or non-directory root, including a symlink
@@ -828,13 +821,7 @@ fn open_sqlite_databases(
     storage::attach_read_only_vectors(&cache_writer, &vectors_path)?;
     vector_writer
         .busy_timeout(VECTOR_WRITE_WAIT)
-        .map_err(|error| {
-            service::StorageError::new_with_cause(
-                service::StorageErrorKind::InternalError,
-                storage::STORAGE_FAILURE,
-                error,
-            )
-        })?;
+        .map_err(map_error_to_storage_internal_error)?;
     storage::attach_cache(&vector_writer, &cache_path)?;
     let read = storage::open_database(&cache_path)?;
     storage::attach_vectors(&read, &vectors_path)?;
@@ -860,13 +847,7 @@ fn open_confined_databases(
     }
     vector_writer
         .busy_timeout(VECTOR_WRITE_WAIT)
-        .map_err(|error| {
-            service::StorageError::new_with_cause(
-                service::StorageErrorKind::InternalError,
-                storage::STORAGE_FAILURE,
-                error,
-            )
-        })?;
+        .map_err(map_error_to_storage_internal_error)?;
     attach_confined_cache(directory, pinned, &vector_writer)?;
     let read = open_confined_database(directory, pinned, "cache.db")?;
     attach_confined_vectors(directory, pinned, &read)?;
@@ -978,21 +959,16 @@ fn with_verified_database_paths<T, F>(
 where
     F: FnOnce(Option<FileIdentity>, Option<FileIdentity>) -> StorageResult<T>,
 {
-    let filesystem = LocalFileSystem::new(directory).map_err(|cause| {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "cannot validate document storage path",
-            cause,
-        )
-    })?;
+    let filesystem = LocalFileSystem::new(directory)
+        .map_err(map_error_to_document_storage_path_storage_error)?;
     let (cache_identity, vectors_identity) = wait_for_stable_storage_paths(|| {
         verify_storage_directory(&filesystem, pinned)?;
         let cache_identity = filesystem
             .file_get_identity_by_path(Path::new("cache.db"))
-            .map_err(map_storage_path_error)?;
+            .map_err(map_file_error_to_storage_error)?;
         let vectors_identity = filesystem
             .file_get_identity_by_path(Path::new("vectors.db"))
-            .map_err(map_storage_path_error)?;
+            .map_err(map_file_error_to_storage_error)?;
         verify_storage_files(&filesystem, cache_identity, vectors_identity)?;
         Ok((cache_identity, vectors_identity))
     })?;
@@ -1056,20 +1032,10 @@ fn verify_storage_directory(file_reader: &dyn FileReader, pinned: &impl AsFd) ->
                 "document storage directory changed",
             )
         })?;
-    let current = rustix::fs::fstat(&current).map_err(|cause| {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "cannot validate document storage path",
-            cause,
-        )
-    })?;
-    let pinned = rustix::fs::fstat(pinned).map_err(|cause| {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "cannot validate document storage path",
-            cause,
-        )
-    })?;
+    let current =
+        rustix::fs::fstat(&current).map_err(map_error_to_document_storage_path_storage_error)?;
+    let pinned =
+        rustix::fs::fstat(pinned).map_err(map_error_to_document_storage_path_storage_error)?;
     if !is_same_identity(&current, &pinned) {
         return Err(StorageError::new(
             StorageErrorKind::InvalidRequest,
@@ -1096,16 +1062,16 @@ fn verify_storage_files(
 ) -> StorageResult<()> {
     file_reader
         .file_verify_identity_by_path(Path::new("cache.db"), cache_identity)
-        .map_err(map_storage_path_error)?;
+        .map_err(map_file_error_to_storage_error)?;
     file_reader
         .file_verify_identity_by_path(Path::new("vectors.db"), vectors_identity)
-        .map_err(map_storage_path_error)?;
+        .map_err(map_file_error_to_storage_error)?;
     file_reader
         .file_verify_distinct_by_paths(Path::new("cache.db"), Path::new("vectors.db"))
-        .map_err(map_storage_path_error)
+        .map_err(map_file_error_to_storage_error)
 }
 
-fn map_storage_path_error(cause: FileError) -> StorageError {
+fn map_file_error_to_storage_error(cause: FileError) -> StorageError {
     let message = match cause.get_kind() {
         FileErrorKind::Changed => "document storage database changed",
         FileErrorKind::Aliased => "storage databases must be distinct files",
@@ -1191,7 +1157,7 @@ where
         ));
         let mut output = io::stdout();
         let _ = writer.response_write(&mut output, response);
-        let _ = cleanup.writes_cancel_and_cleanup();
+        let _ = cleanup.shutdown();
     });
     install(on_interrupt).map(Some)
 }
@@ -1204,7 +1170,7 @@ fn execute_request(
     request_parse(args, input).and_then(|request| run_request(request, cleanup))
 }
 
-fn map_repository_open_error(cause: SnapshotError) -> ServiceError {
+fn map_snapshot_error_to_service_error(cause: SnapshotError) -> ServiceError {
     let kind = match cause.get_kind() {
         SnapshotErrorKind::InvalidRequest => ServiceErrorKind::RepositoryRequired,
         SnapshotErrorKind::NotFound | SnapshotErrorKind::InternalError => {
@@ -1212,4 +1178,130 @@ fn map_repository_open_error(cause: SnapshotError) -> ServiceError {
         }
     };
     ServiceError::new_with_cause(kind, cause)
+}
+
+fn map_error_to_service_status_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Status, cause)
+}
+
+fn map_error_to_service_configuration_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause)
+}
+
+fn map_error_to_service_initialization_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause)
+}
+
+fn map_error_to_service_traversal_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
+}
+
+fn map_error_to_service_embedding_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause)
+}
+
+fn map_error_to_service_check_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Check, cause)
+}
+
+fn map_error_to_service_search_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Search, cause)
+}
+
+fn map_error_to_service_inspection_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause)
+}
+
+fn map_error_to_service_background_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> ServiceError {
+    ServiceError::new_with_cause(ServiceErrorKind::Background, cause)
+}
+
+fn map_snapshot_error_to_repository_command_error(cause: SnapshotError) -> CommandError {
+    ServiceError::new_with_cause(ServiceErrorKind::Repository, cause).into()
+}
+
+fn map_error_to_document_path_changed_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "document path changed during observation",
+        cause,
+    )
+}
+
+fn map_error_to_provenance_repository_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "cannot open provenance repository",
+        cause,
+    )
+}
+
+fn map_error_to_document_repository_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "cannot open document repository",
+        cause,
+    )
+}
+
+fn map_error_to_document_storage_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "cannot open document storage",
+        cause,
+    )
+}
+
+fn map_error_to_embedding_internal_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
+}
+
+fn map_error_to_storage_internal_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> StorageError {
+    StorageError::new_with_cause(
+        StorageErrorKind::InternalError,
+        storage::STORAGE_FAILURE,
+        cause,
+    )
+}
+
+fn map_error_to_document_storage_path_storage_error<
+    E: std::error::Error + Send + Sync + 'static,
+>(
+    cause: E,
+) -> StorageError {
+    StorageError::new_with_cause(
+        StorageErrorKind::InvalidRequest,
+        "cannot validate document storage path",
+        cause,
+    )
 }

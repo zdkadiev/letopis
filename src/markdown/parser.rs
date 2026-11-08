@@ -98,6 +98,9 @@ impl Diagnostic {
 /// * `path` — the root-relative path used to form element identifiers.
 /// * `bytes` — the file contents; they must be valid UTF-8 for a marked file.
 ///
+/// # Returns
+/// The parsed file, or `None` when it declares no marked element.
+///
 /// # Errors
 /// Returns local diagnostics for invalid UTF-8 or invalid knowledge metadata,
 /// anchors, element layout or declared graph links.

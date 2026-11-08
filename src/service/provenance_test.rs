@@ -320,9 +320,9 @@ use super::ProvenanceService;
 use crate::{
     domain::{BlobOid, RepoPath, SourceUri, TreeOid},
     service::{
-        BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind, FileStat, GitSnapshots,
-        ProvenanceRequest, RetainedTree, SnapshotEntry, SnapshotError, SnapshotErrorKind,
-        SnapshotFile, SnapshotState, SnapshotVerifier, SourceProvenance, SourceRevisionComparison,
+        CapturedFile, DocumentError, DocumentErrorKind, FileStat, GitSnapshots, ProvenanceRequest,
+        SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile, SnapshotRefsUpdater,
+        SnapshotState, SnapshotVerifier, SourceProvenance, SourceRevisionComparison,
         SourceRevisionRequest,
     },
 };
@@ -342,7 +342,7 @@ fn full_audit_still_pins_available_roots() {
     let tree = create_oid('a');
     // When: exhaustive verification is explicitly requested.
     service
-        .verify_snapshots(&BTreeSet::from([tree.clone()]))
+        .snapshot_sync_by_oids(&BTreeSet::from([tree.clone()]))
         .unwrap();
     // Then: strong pin is used instead of lightweight retention.
     assert_eq!(*service.git.strong_pins.borrow(), [tree]);
@@ -437,7 +437,7 @@ fn retain_each_unique_available_root_and_skip_missing_or_invalid() {
         invalid.clone(),
     ]);
     // When: the unique roots are retained.
-    service.retain_snapshots(&roots).unwrap();
+    service.snapshot_refs_update_by_oids(&roots).unwrap();
     // Then: all unique roots are verified and only the available root is retained.
     assert_eq!(
         *service.git.verified.borrow(),
@@ -454,7 +454,7 @@ fn propagate_retention_and_verification_failures_with_private_causes() {
         let service = create_service(fault);
         let roots = BTreeSet::from([create_oid('a')]);
         // When: the author roots are retained.
-        let error = service.retain_snapshots(&roots).unwrap_err();
+        let error = service.snapshot_refs_update_by_oids(&roots).unwrap_err();
         // Then: the public error preserves its private cause without exposing it.
         assert_private_document_error(&error);
     }
@@ -579,7 +579,7 @@ impl SnapshotVerifier for Rc<RecordedGit> {
 }
 
 impl GitSnapshots for Rc<RecordedGit> {
-    fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
+    fn ref_update_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
         self.pins.borrow_mut().push(tree.clone());
         if matches!(self.fault.get(), GitFault::Pin) {
             return Err(create_git_failure());
@@ -620,12 +620,12 @@ impl GitSnapshots for Rc<RecordedGit> {
         }
     }
 
-    fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+    fn tree_sync_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
         self.strong_pins.borrow_mut().push(tree.clone());
         if matches!(self.fault.get(), GitFault::Pin) {
             return Err(create_git_failure());
         }
-        Ok(RetainedTree::new(tree.clone()))
+        Ok(())
     }
 }
 

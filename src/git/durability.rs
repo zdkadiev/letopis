@@ -93,9 +93,8 @@ impl StagedObject {
         object_verify_identity(oid, kind, bytes)?;
         let staged = store.object_path(&oid);
         let permissions = repository_get_shared_permissions(repo)?;
-        gix::fs::set_shared_repository_permissions(&staged, permissions).map_err(|error| {
-            SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-        })?;
+        gix::fs::set_shared_repository_permissions(&staged, permissions)
+            .map_err(map_io_error_to_snapshot_write_error)?;
         object_sync(&staged)?;
         let live = gix::odb::loose::Store::at(&object_root, repo.object_hash());
         Ok(Self {
@@ -168,19 +167,23 @@ impl StagedObject {
     }
 }
 
-/// Verify and sync an existing loose object without staging another compressed copy.
-/// Packed or absent objects use the ordinary publication path instead.
+/// Returns the identity of a loose object stored for exactly these bytes.
+///
+/// Verifies the object kind and content identity before returning it.
 ///
 /// # Arguments
 ///
-/// * `repo` — repository whose object store is verified.
+/// * `repo` — repository whose loose object store is searched.
 /// * `kind` — Git object kind the bytes must form.
-/// * `bytes` — exact object payload to verify and sync.
+/// * `bytes` — exact object payload whose identity is computed.
 /// * `cleanup` — active write guard that must stay cancellation-safe.
 ///
+/// # Returns
+/// The verified loose object identity, or `None` when no loose object has that content.
+///
 /// # Errors
-/// Fails closed on cancellation, corrupt existing bytes, invalid configuration or sync failure.
-pub(super) fn object_reuse_existing(
+/// Fails closed on cancellation, corrupt existing bytes or invalid configuration.
+pub(super) fn loose_object_get_by_content(
     repo: &Repository,
     kind: Kind,
     bytes: &[u8],
@@ -207,7 +210,31 @@ pub(super) fn object_reuse_existing(
         ));
     }
     object_verify_identity(oid, object.kind, object.data)?;
+    Ok(Some(oid))
+}
+
+/// Synchronizes an existing loose object file and its parent directories to disk.
+///
+/// Applies shared repository permissions, flushes the object file and parent chain and rechecks
+/// write activity before and after.
+///
+/// # Arguments
+///
+/// * `repo` — repository whose loose object file is synchronized.
+/// * `oid` — verified identity of the loose object to synchronize.
+/// * `cleanup` — active write guard that must stay cancellation-safe.
+///
+/// # Errors
+/// Fails closed on cancellation, invalid configuration or sync failure.
+pub(super) fn loose_object_sync_by_oid(
+    repo: &Repository,
+    oid: ObjectId,
+    cleanup: &GitWriteCleanup,
+) -> Result<(), SnapshotError> {
+    cleanup.writes_verify_active()?;
     repository_get_shared_permissions(repo)?;
+    let object_root = repo.objects.store_ref().path();
+    let store = gix::odb::loose::Store::at(object_root, repo.object_hash());
     let destination = store.object_path(&oid);
     object_sync(&destination)?;
     let parent = destination.parent().ok_or_else(|| {
@@ -218,7 +245,7 @@ pub(super) fn object_reuse_existing(
     })?;
     directory_sync_parent_chain(parent, object_root)?;
     cleanup.writes_verify_active()?;
-    Ok(Some(oid))
+    Ok(())
 }
 
 /// Returns whether the error is contention a command may retry through the full durable protocol.
@@ -244,7 +271,7 @@ pub(super) fn ref_lock_is_busy(error: &SnapshotError) -> bool {
 /// Returns an internal error for invalid/conflicting refs or lock/write/sync failures.
 /// Contention has a safe typed cause recognized by `ref_lock_is_busy`; retries must
 /// reenter this protocol. No success path bypasses owned-lock durability confirmation.
-pub(super) fn ref_retain_by_oid(
+pub(super) fn ref_update_by_oid(
     repo: &Repository,
     oid: ObjectId,
     cleanup: &Arc<GitWriteCleanup>,
@@ -258,26 +285,24 @@ pub(super) fn ref_retain_by_oid(
         repo.common_dir(),
         repository_get_shared_permissions(repo)?,
     )?;
-    if ref_confirm_durable(repo, &name, oid, cleanup)? {
+    if ref_sync_existing_by_name_and_oid(repo, &name, oid, cleanup)? {
         return Ok(());
     }
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefSync)?;
     writeln!(file, "{oid}")
         .and_then(|()| file.sync_all())
-        .map_err(|error| {
-            SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-        })?;
+        .map_err(map_io_error_to_snapshot_write_error)?;
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefPublish)?;
     lock.ref_commit()?;
-    ref_confirm_published(repo, &name, oid, cleanup)
+    ref_verify_published_by_name_and_oid(repo, &name, oid, cleanup)
 }
 
 // Publication releases the write lock. Reacquire ownership before selecting the
 // current backing: pack-refs may have moved this value into packed-refs meanwhile.
 
-fn ref_confirm_published(
+fn ref_verify_published_by_name_and_oid(
     repo: &Repository,
     name: &str,
     oid: ObjectId,
@@ -288,7 +313,7 @@ fn ref_confirm_published(
         repo.common_dir(),
         repository_get_shared_permissions(repo)?,
     )?;
-    if !ref_confirm_durable(repo, name, oid, cleanup)? {
+    if !ref_sync_existing_by_name_and_oid(repo, name, oid, cleanup)? {
         return Err(SnapshotError::new(
             SnapshotErrorKind::InternalError,
             DURABILITY_INTEGRITY_MESSAGE,
@@ -300,7 +325,7 @@ fn ref_confirm_published(
 // The caller holds the exact ref lock. Packed-only confirmation additionally
 // holds packed-refs.lock so neither Git update-ref nor pack-refs can replace the backing file.
 
-fn ref_confirm_durable(
+fn ref_sync_existing_by_name_and_oid(
     repo: &Repository,
     name: &str,
     oid: ObjectId,
@@ -364,9 +389,7 @@ fn ref_sync_existing(
         .custom_flags(libc::O_NOFOLLOW)
         .open(backing)
         .and_then(|file| file.sync_all())
-        .map_err(|error| {
-            SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-        })?;
+        .map_err(map_io_error_to_snapshot_write_error)?;
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefDirectorySync)?;
     directory_sync_parent_chain(
@@ -480,7 +503,7 @@ fn object_sync(path: &Path) -> Result<(), SnapshotError> {
     tests::inject_failure(tests::FailurePoint::ObjectSync)?;
     File::open(path)
         .and_then(|file| file.sync_all())
-        .map_err(|error| SnapshotError::new_with_cause("Git durable write failed", SafeIo(error)))
+        .map_err(map_io_error_to_snapshot_write_error)
 }
 
 fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> {
@@ -489,9 +512,7 @@ fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), Snaps
     for directory in path.ancestors() {
         File::open(directory)
             .and_then(|file| file.sync_all())
-            .map_err(|error| {
-                SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
-            })?;
+            .map_err(map_io_error_to_snapshot_write_error)?;
         if directory == boundary {
             return Ok(());
         }
@@ -507,7 +528,11 @@ fn directory_sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), Snaps
 /// # Arguments
 ///
 /// * `error` — lock failure classified as typed contention or a safe I/O kind.
-pub(super) fn lock_map_error(error: &gix::Error) -> SnapshotError {
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "map_err passes the error by value to the mapper"
+)]
+pub(super) fn lock_map_error(error: gix::Error) -> SnapshotError {
     if error.is_retryable() {
         return SnapshotError::new_with_cause(
             "Git ref durability confirmation is contended",
@@ -518,6 +543,15 @@ pub(super) fn lock_map_error(error: &gix::Error) -> SnapshotError {
         .downcast_any_ref::<io::Error>()
         .map_or(io::ErrorKind::Other, io::Error::kind);
     SnapshotError::new_with_cause("Git durable write failed", SafeIo(io::Error::from(kind)))
+}
+
+/// Maps an I/O failure into a snapshot write error.
+///
+/// # Arguments
+///
+/// * `error` — I/O failure from a write or synchronization step.
+fn map_io_error_to_snapshot_write_error(error: io::Error) -> SnapshotError {
+    SnapshotError::new_with_cause("Git durable write failed", SafeIo(error))
 }
 
 #[cfg(test)]

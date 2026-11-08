@@ -1,12 +1,13 @@
 use super::utils::{
     CandidateObservation, CandidateSelection, DOCUMENTS_CHANGED_MESSAGE, DiscoveryObservation,
-    is_selected_path, map_document_file,
+    is_selected_path, map_document_transaction_error_to_document_error,
+    map_file_result_to_document_result,
 };
 use super::{
-    BasisRetainer, CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult,
-    FileError, FileErrorKind, FileReader, FileRow, FileStat, GitWorktreeListing, KnowledgeMetadata,
+    CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileError,
+    FileErrorKind, FileReader, FileRow, FileStat, GitWorktreeListing, KnowledgeMetadata,
     MarkdownCodec, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest,
-    RefreshOutcome, Refresher, SourceMetadata, SourceProvenance, StorageRead,
+    RefreshOutcome, Refresher, SnapshotRefsUpdater, SourceMetadata, SourceProvenance, StorageRead,
 };
 use super::{Clock, FileLocker};
 use crate::domain::{
@@ -115,7 +116,7 @@ enum PublicationMode {
 }
 
 impl PublicationMode {
-    fn get_previous(self, previous: Option<&FileRow>) -> Option<&FileRow> {
+    fn get_previous_row(self, previous: Option<&FileRow>) -> Option<&FileRow> {
         previous.filter(|_| self == Self::Incremental)
     }
 }
@@ -162,7 +163,7 @@ impl<
     G: GitWorktreeListing,
     F: FileReader + FileLocker,
     M: MarkdownCodec,
-    P: SourceProvenance + BasisRetainer,
+    P: SourceProvenance + SnapshotRefsUpdater,
     C: CacheDatabase,
 > Refresher for DocumentRefreshService<G, F, M, P, C>
 {
@@ -173,7 +174,7 @@ impl<
             if delta.is_empty() && preliminary.source_snapshots.is_empty() {
                 #[cfg(test)]
                 reach_checkpoint("noop_policy");
-                self.verify_discovery(&delta.discovery)?;
+                self.verify_discovery_unchanged(&delta.discovery)?;
                 return Ok(build_outcome(
                     preliminary.revision,
                     PublicationState::Unchanged,
@@ -186,7 +187,7 @@ impl<
         let _lock = self
             .filesystem
             .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
-            .map_err(map_document_lock_error)?;
+            .map_err(map_file_error_to_document_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(
@@ -200,7 +201,7 @@ impl<
         let _lock = self
             .filesystem
             .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
-            .map_err(map_document_lock_error)?;
+            .map_err(map_file_error_to_document_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(
@@ -214,7 +215,7 @@ impl<
         let _lock = self
             .filesystem
             .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
-            .map_err(map_document_lock_error)?;
+            .map_err(map_file_error_to_document_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Full, SnapshotVerification::Closure, paths)
@@ -225,7 +226,7 @@ impl<
     G: GitWorktreeListing,
     F: FileReader + FileLocker,
     M: MarkdownCodec,
-    P: SourceProvenance + BasisRetainer,
+    P: SourceProvenance + SnapshotRefsUpdater,
     C: CacheDatabase,
 > DocumentRefreshService<G, F, M, P, C>
 {
@@ -251,10 +252,10 @@ impl<
                 markdown: &self.markdown,
                 provenance: &self.provenance,
             }
-            .verify_snapshots(verification, &state.source_snapshots)?;
+            .snapshot_sync_by_oids(verification, &state.source_snapshots)?;
             #[cfg(test)]
             reach_checkpoint("locked_noop_policy");
-            self.verify_discovery(&delta.discovery)?;
+            self.verify_discovery_unchanged(&delta.discovery)?;
             return Ok(build_outcome(state.revision, PublicationState::Unchanged));
         }
         self.publish_changes(&state, delta, mode, verification, paths)
@@ -274,10 +275,7 @@ impl<
                         .collect(),
                 })
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => DocumentError::from(error),
-            })
+            .map_err(map_document_transaction_error_to_document_error)
     }
 
     fn detect_changes(
@@ -286,7 +284,7 @@ impl<
         mode: PublicationMode,
         paths: &[RepoPath],
     ) -> DocumentResult<Delta> {
-        let observation = self.get_candidates(paths)?;
+        let observation = self.get_candidate_observation_by_paths(paths)?;
         let candidates: BTreeSet<_> = observation.paths.into_iter().collect();
         let mut delta = Delta {
             discovery: observation.discovery,
@@ -300,7 +298,7 @@ impl<
         }
         for path in candidates {
             let previous = state.files.get(&path);
-            let Some(stat) = map_document_file(
+            let Some(stat) = map_file_result_to_document_result(
                 self.filesystem
                     .file_get_stat_by_path(Path::new(path.as_str())),
             )?
@@ -310,7 +308,9 @@ impl<
                 }
                 continue;
             };
-            if let Some(observation) = self.detect_file(&path, stat, mode.get_previous(previous))? {
+            if let Some(observation) =
+                self.detect_file(&path, stat, mode.get_previous_row(previous))?
+            {
                 delta.updated.insert(path, observation);
             }
         }
@@ -329,11 +329,10 @@ impl<
         {
             return Ok(None);
         }
-        let captured =
-            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
-                .ok_or_else(|| {
-                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-                })?;
+        let captured = map_file_result_to_document_result(
+            self.filesystem.file_get_by_path(Path::new(path.as_str())),
+        )?
+        .ok_or_else(build_documents_changed_error)?;
         if captured.stat != stat {
             return Err(DocumentError::new(
                 DocumentErrorKind::InternalError,
@@ -387,7 +386,7 @@ impl<
                         base_revision: state.revision,
                         path: &path,
                         observed: &observation,
-                        previous: mode.get_previous(state.files.get(&path)),
+                        previous: mode.get_previous_row(state.files.get(&path)),
                         graph: &graph,
                     })?;
                     graph.apply(&prepared);
@@ -398,23 +397,20 @@ impl<
                 self.verify_excluded_candidates(&excluded, paths)?;
                 #[cfg(test)]
                 reach_checkpoint("before_commit");
-                self.verify_discovery(&delta.discovery)?;
+                self.verify_discovery_unchanged(&delta.discovery)?;
                 #[cfg(test)]
                 tests::process::fail_late(self.cache.as_ref())?;
                 outcome.revision = self.cache.project_get_revision()?;
                 Ok(outcome)
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => DocumentError::from(error),
-            })?;
+            .map_err(map_document_transaction_error_to_document_error)?;
         #[cfg(test)]
         reach_checkpoint("after_commit");
         Ok(outcome)
     }
 
     fn verify_removed_candidate(&self, path: &RepoPath) -> DocumentResult<()> {
-        let stat = map_document_file(
+        let stat = map_file_result_to_document_result(
             self.filesystem
                 .file_get_stat_by_path(Path::new(path.as_str())),
         )?;
@@ -447,10 +443,7 @@ impl<
                 }
                 EffectiveGraph::from_storage(self.cache.as_ref())
             })
-            .map_err(|error| match error {
-                super::TransactionError::Operation(error) => error,
-                super::TransactionError::Storage(error) => DocumentError::from(error),
-            })?;
+            .map_err(map_document_transaction_error_to_document_error)?;
         if mode == PublicationMode::Full {
             graph.mark_sources_by_paths(paths);
         }
@@ -484,7 +477,7 @@ impl<
     ) -> DocumentResult<()> {
         if !excluded.is_empty()
             && self
-                .get_candidates(paths)?
+                .get_candidate_observation_by_paths(paths)?
                 .paths
                 .iter()
                 .any(|path| excluded.contains(path))
@@ -499,12 +492,15 @@ impl<
 }
 
 impl<G: GitWorktreeListing, F: FileReader, M, P, C> DocumentRefreshService<G, F, M, P, C> {
-    fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<CandidateObservation> {
+    fn get_candidate_observation_by_paths(
+        &self,
+        paths: &[RepoPath],
+    ) -> DocumentResult<CandidateObservation> {
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .get_candidates(paths)
+        .get_candidate_observation_by_paths(paths)
     }
 
     /// Rejects a discovery policy edit made after the refresh observed its inputs.
@@ -515,16 +511,16 @@ impl<G: GitWorktreeListing, F: FileReader, M, P, C> DocumentRefreshService<G, F,
     ///
     /// # Errors
     /// Reports unreadable policy files or an observation that no longer matches.
-    fn verify_discovery(&self, observation: &DiscoveryObservation) -> DocumentResult<()> {
+    fn verify_discovery_unchanged(&self, observation: &DiscoveryObservation) -> DocumentResult<()> {
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .verify_discovery(observation)
+        .verify_discovery_unchanged(observation)
     }
 }
 
-impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
+impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + SnapshotRefsUpdater, C>
     DocumentPublication<'_, F, M, P, C>
 {
     /// Prepares metadata for changed files only.
@@ -555,19 +551,15 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRe
         for (path, observed) in updated {
             // Hash-equal files reuse their last valid projection already represented by graph.
             if mode
-                .get_previous(previous.get(path))
+                .get_previous_row(previous.get(path))
                 .is_some_and(|previous| previous.hash == observed.hash)
             {
                 continue;
             }
-            let captured =
-                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
-                    .ok_or_else(|| {
-                        DocumentError::new(
-                            DocumentErrorKind::InternalError,
-                            DOCUMENTS_CHANGED_MESSAGE,
-                        )
-                    })?;
+            let captured = map_file_result_to_document_result(
+                self.filesystem.file_get_by_path(Path::new(path.as_str())),
+            )?
+            .ok_or_else(build_documents_changed_error)?;
             if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
                 return Err(DocumentError::new(
                     DocumentErrorKind::InternalError,
@@ -585,7 +577,7 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRe
         }
         preflight
             .snapshots
-            .extend(graph.get_source_snapshots(&replaced));
+            .extend(graph.get_source_snapshots_by_excluded_paths(&replaced));
         Ok(preflight)
     }
 
@@ -615,7 +607,7 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRe
                 .collect();
             self.provenance.observe_sources_batch(&requests)?;
         }
-        self.verify_snapshots(verification, &preflight.snapshots)
+        self.snapshot_sync_by_oids(verification, &preflight.snapshots)
     }
 
     /// Retains or verifies snapshot roots according to the publication mode.
@@ -627,14 +619,14 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRe
     ///
     /// # Errors
     /// Reports missing or corrupt snapshot objects and failures to retain them.
-    fn verify_snapshots(
+    fn snapshot_sync_by_oids(
         &self,
         verification: SnapshotVerification,
         snapshots: &BTreeSet<TreeOid>,
     ) -> DocumentResult<()> {
         match verification {
-            SnapshotVerification::Root => self.provenance.retain_snapshots(snapshots),
-            SnapshotVerification::Closure => self.provenance.verify_snapshots(snapshots),
+            SnapshotVerification::Root => self.provenance.snapshot_refs_update_by_oids(snapshots),
+            SnapshotVerification::Closure => self.provenance.snapshot_sync_by_oids(snapshots),
         }
     }
 }
@@ -683,11 +675,10 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
             previous,
             graph,
         } = *request;
-        let captured =
-            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
-                .ok_or_else(|| {
-                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-                })?;
+        let captured = map_file_result_to_document_result(
+            self.filesystem.file_get_by_path(Path::new(path.as_str())),
+        )?
+        .ok_or_else(build_documents_changed_error)?;
         if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
             return Err(DocumentError::new(
                 DocumentErrorKind::InternalError,
@@ -709,7 +700,7 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
         } else {
             match self.markdown.file_parse(path, &captured.bytes) {
                 Ok(parsed) => {
-                    prepared = prepare_valid(prepared, parsed, graph.get_file_ids(path));
+                    prepared = prepare_valid(prepared, parsed, graph.get_file_ids_by_path(path));
                 }
                 Err(errors) => {
                     file.valid = false;
@@ -776,12 +767,11 @@ impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
         sources: Vec<(SourceUri, u64)>,
     ) -> DocumentResult<()> {
         // One capture serves every affected address of this path and then is released.
-        let captured =
-            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?;
+        let captured = map_file_result_to_document_result(
+            self.filesystem.file_get_by_path(Path::new(path.as_str())),
+        )?;
         for (uri, created_at) in sources {
-            let local = uri.get_local().ok_or_else(|| {
-                DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-            })?;
+            let local = uri.get_local().ok_or_else(build_documents_changed_error)?;
             let lines = local.get_lines();
             let hash = captured
                 .as_ref()
@@ -942,7 +932,10 @@ impl EffectiveGraph {
     /// # Arguments
     ///
     /// * `excluded` — Paths whose knowledge must not contribute snapshot roots.
-    fn get_source_snapshots(&self, excluded: &BTreeSet<RepoPath>) -> BTreeSet<TreeOid> {
+    fn get_source_snapshots_by_excluded_paths(
+        &self,
+        excluded: &BTreeSet<RepoPath>,
+    ) -> BTreeSet<TreeOid> {
         let paths: BTreeSet<_> = excluded.iter().map(RepoPath::as_str).collect();
         self.knowledge
             .values()
@@ -979,7 +972,7 @@ impl EffectiveGraph {
         }
     }
 
-    fn get_file_ids(&self, path: &RepoPath) -> Vec<KnowledgeId> {
+    fn get_file_ids_by_path(&self, path: &RepoPath) -> Vec<KnowledgeId> {
         self.knowledge
             .keys()
             .filter(|id| id.as_str().split('#').next() == Some(path.as_str()))
@@ -999,9 +992,10 @@ impl EffectiveGraph {
                     "source address conflicts with a knowledge element",
                 ));
             }
-            let knowledge = self.knowledge.get(edge.get_source()).ok_or_else(|| {
-                DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-            })?;
+            let knowledge = self
+                .knowledge
+                .get(edge.get_source())
+                .ok_or_else(build_documents_changed_error)?;
             references
                 .entry(uri.clone())
                 .and_modify(|created: &mut u64| {
@@ -1045,7 +1039,7 @@ fn prepare_removal(
     path: RepoPath,
     graph: &EffectiveGraph,
 ) -> PreparedProjection {
-    let ids = graph.get_file_ids(&path);
+    let ids = graph.get_file_ids_by_path(&path);
     PreparedProjection {
         base_revision,
         cleared: ids.clone(),
@@ -1106,7 +1100,7 @@ fn prepare_valid(
 #[cfg(test)]
 pub(super) use tests::process::reach_checkpoint;
 
-fn map_document_lock_error(cause: FileError) -> DocumentError {
+fn map_file_error_to_document_error(cause: FileError) -> DocumentError {
     let (kind, message) = match cause.get_kind() {
         FileErrorKind::Aliased => (
             DocumentErrorKind::InvalidRequest,
@@ -1122,6 +1116,11 @@ fn map_document_lock_error(cause: FileError) -> DocumentError {
         ),
     };
     DocumentError::new_with_cause(kind, message, cause)
+}
+
+/// Builds the error reported when observed documents changed during refresh.
+fn build_documents_changed_error() -> DocumentError {
+    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
 }
 
 #[cfg(test)]

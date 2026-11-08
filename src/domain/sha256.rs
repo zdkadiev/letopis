@@ -12,6 +12,9 @@ impl Sha256 {
     ///
     /// * `raw` — the lowercase hexadecimal hash text to decode.
     ///
+    /// # Returns
+    /// The parsed SHA-256 digest.
+    ///
     /// # Errors
     /// Returns [`ValueError::InvalidHash`] for a malformed hash.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
@@ -35,6 +38,9 @@ impl Sha256 {
     /// # Arguments
     ///
     /// * `bytes` — the exact input bytes to hash without normalization.
+    ///
+    /// # Returns
+    /// The SHA-256 digest of the bytes.
     pub fn digest(bytes: &[u8]) -> Self {
         Self(sha2::Sha256::digest(bytes).into())
     }

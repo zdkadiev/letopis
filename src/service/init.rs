@@ -1,7 +1,8 @@
+use super::utils::map_error_to_config_read_command_error;
 use super::{
     CommandError, CommandErrorKind, CommandResult, Configuration, EmbeddingProvider,
     EmbeddingResult, FileWriter, GENERATED_CONFIG, InitStorage, Initializer,
-    map_invalid_configuration,
+    map_configuration_error_to_command_error,
 };
 use crate::service::FileResult;
 use crate::utils::{CONFIG_PATH, SERVICE_DIRECTORY};
@@ -67,28 +68,19 @@ impl Initializer for InitService {
             self.file_writer
                 .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         })
-        .map_err(|cause| {
-            CommandError::new_with_cause(CommandErrorKind::InternalError, INIT_FAILURE, cause)
-        })?;
+        .map_err(map_error_to_init_command_error)?;
         self.init_storage
             .initialize(&self.directory, &pinned)
-            .map_err(|cause| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    STORAGE_FAILURE,
-                    cause,
-                )
-            })?;
+            .map_err(map_error_to_init_storage_command_error)?;
         super::utils::retry_changed_file_observation(|| {
             self.file_writer
                 .file_create_if_absent_by_path(Path::new(CONFIG_PATH), GENERATED_CONFIG)
         })
-        .map_err(|cause| {
-            CommandError::new_with_cause(CommandErrorKind::InternalError, INIT_FAILURE, cause)
-        })?;
+        .map_err(map_error_to_init_command_error)?;
         let bytes = self
-            .get_config_bytes_by_path()?
-            .ok_or_else(|| CommandError::new(CommandErrorKind::InternalError, INIT_FAILURE))?;
+            .get_config_bytes()
+            .map_err(map_error_to_config_read_command_error)?
+            .ok_or_else(build_init_error)?;
         self.verify_configuration_bytes(&bytes)?;
         self.sync_service_directories()
     }
@@ -100,24 +92,13 @@ impl InitService {
     /// # Errors
     /// Reports unreadable or invalid configuration before any state is written.
     fn verify_existing_configuration(&self) -> CommandResult<()> {
-        let Some(bytes) = self.get_config_bytes_by_path()? else {
+        let Some(bytes) = self
+            .get_config_bytes()
+            .map_err(map_error_to_config_read_command_error)?
+        else {
             return Ok(());
         };
         self.verify_configuration_bytes(&bytes)
-    }
-
-    /// Reads the configuration file.
-    ///
-    /// # Errors
-    /// Reports file read failures with the configuration read message.
-    fn get_config_bytes_by_path(&self) -> CommandResult<Option<Vec<u8>>> {
-        self.get_config_bytes().map_err(|error| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                super::utils::CONFIG_READ_FAILURE,
-                error,
-            )
-        })
     }
 
     /// Verifies the stored configuration bytes.
@@ -129,9 +110,10 @@ impl InitService {
     /// # Errors
     /// Reports invalid or unsupported configuration as a command failure.
     fn verify_configuration_bytes(&self, bytes: &[u8]) -> CommandResult<()> {
-        let configuration = Configuration::parse(bytes).map_err(map_invalid_configuration)?;
+        let configuration =
+            Configuration::parse(bytes).map_err(map_configuration_error_to_command_error)?;
         self.validate_configuration(&configuration)
-            .map_err(map_invalid_configuration)
+            .map_err(map_configuration_error_to_command_error)
     }
 
     /// Syncs the service directory and repository root after publication.
@@ -143,23 +125,17 @@ impl InitService {
             self.file_writer
                 .directory_sync_by_path(Path::new(SERVICE_DIRECTORY))
         })
-        .map_err(|cause| {
-            CommandError::new_with_cause(CommandErrorKind::InternalError, INIT_FAILURE, cause)
-        })?;
+        .map_err(map_error_to_init_command_error)?;
         super::utils::retry_changed_file_observation(|| {
             self.file_writer.directory_sync_by_path(Path::new("."))
         })
-        .map_err(|cause| {
-            CommandError::new_with_cause(CommandErrorKind::InternalError, INIT_FAILURE, cause)
-        })?;
+        .map_err(map_error_to_init_command_error)?;
         super::utils::retry_changed_file_observation(|| {
             self.file_writer
                 .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
         })
-        .map_err(|cause| {
-            CommandError::new_with_cause(CommandErrorKind::InternalError, INIT_FAILURE, cause)
-        })?
-        .ok_or_else(|| CommandError::new(CommandErrorKind::InternalError, INIT_FAILURE))
+        .map_err(map_error_to_init_command_error)?
+        .ok_or_else(build_init_error)
         .map(|_| ())
     }
 
@@ -169,6 +145,33 @@ impl InitService {
         };
         self.provider.config_validate(config)
     }
+}
+
+/// Converts an error to an initialization command error.
+///
+/// # Arguments
+///
+/// * `cause` — Failure from an initialization step.
+fn map_error_to_init_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(CommandErrorKind::InternalError, INIT_FAILURE, cause)
+}
+
+/// Converts a storage failure to an initialization storage command error.
+///
+/// # Arguments
+///
+/// * `cause` — Storage failure from initialization.
+fn map_error_to_init_storage_command_error<E: std::error::Error + Send + Sync + 'static>(
+    cause: E,
+) -> CommandError {
+    CommandError::new_with_cause(CommandErrorKind::InternalError, STORAGE_FAILURE, cause)
+}
+
+/// Builds the error reported when initialization cannot complete.
+fn build_init_error() -> CommandError {
+    CommandError::new(CommandErrorKind::InternalError, INIT_FAILURE)
 }
 
 #[cfg(test)]

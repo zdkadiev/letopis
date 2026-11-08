@@ -75,9 +75,7 @@ impl ObjectReader {
                 ..Options::default()
             },
         )
-        .map_err(|error| {
-            SnapshotError::new_with_cause("Git object store open failed", SafeIo(error))
-        })?;
+        .map_err(map_io_error_to_snapshot_object_store_error)?;
         Ok(Self {
             objects: Rc::new(store).to_handle(),
             oid_len,
@@ -219,7 +217,7 @@ impl ObjectReader {
         let (object, _) = self
             .objects
             .try_find_cached(&id, &mut self.buffer, &mut Never)
-            .map_err(|error| make_decode_error(&error))?
+            .map_err(make_decode_error)?
             .ok_or_else(|| SnapshotError::new(missing, "Git object is missing"))?;
         let kind = std::str::from_utf8(object.kind.as_bytes()).map_err(|_| {
             SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
@@ -247,11 +245,24 @@ impl ObjectReader {
     }
 }
 
-fn make_decode_error(error: &gix::Error) -> SnapshotError {
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "map_err passes the error by value to the mapper"
+)]
+fn make_decode_error(error: gix::Error) -> SnapshotError {
     let kind = error
         .downcast_any_ref::<io::Error>()
         .map_or(io::ErrorKind::InvalidData, io::Error::kind);
     SnapshotError::new_with_cause("Git object decode failed", SafeIo(io::Error::from(kind)))
+}
+
+/// Maps an I/O failure into an object-store snapshot error.
+///
+/// # Arguments
+///
+/// * `error` — I/O failure from opening the object store.
+fn map_io_error_to_snapshot_object_store_error(error: io::Error) -> SnapshotError {
+    SnapshotError::new_with_cause("Git object store open failed", SafeIo(error))
 }
 
 #[cfg(test)]

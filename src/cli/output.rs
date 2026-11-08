@@ -261,7 +261,9 @@ fn configuration_build(configuration: &Configuration) -> ConfigurationOutput<'_>
             max_retries: configuration.get_max_retries(),
         },
         discovery: DiscoveryOutput {
-            respect_gitignore: configuration.get_discovery().is_gitignore_respected(),
+            respect_gitignore: configuration
+                .get_discovery_config()
+                .is_gitignore_respected(),
         },
     }
 }

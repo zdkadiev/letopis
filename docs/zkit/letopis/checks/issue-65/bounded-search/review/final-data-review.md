@@ -49,7 +49,7 @@ Independently traversed raw profile stack/frame tables and the symbol sidecar, d
 
 | Owner | Inclusive observed CPU, microseconds | Share of observed thread CPU |
 | --- | --- | --- |
-| Search eligibility (`get_eligible_links`) | 117,272 | 7.6260087528% |
+| Search eligibility (`get_eligible_links_by_metadata_and_filters`) | 117,272 | 7.6260087528% |
 | Document refresh (`Refresher::refresh`) | 689,639 | 44.8461103272% |
 | Vector retrieval (`get_nearest_vectors`) | 573,023 | 37.2627601948% |
 

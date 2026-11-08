@@ -1576,7 +1576,7 @@ mod storage_status {
             provenance: &super::Provenance { is_failing: false },
             provider: &provider,
         };
-        service.get_embedding_status(policy)
+        service.get_embedding_status_by_policy(policy)
     }
     fn build_knowledge(id: &str, text: &str) -> crate::service::NodeMetadata {
         use crate::{
