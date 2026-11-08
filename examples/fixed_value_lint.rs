@@ -11,6 +11,8 @@ const SOURCE_ROOTS: [&str; 3] = ["src", "tests", "examples"];
 
 struct FixedValueVisitor {
     violations: Vec<String>,
+    ok_or_else_helpers: Vec<String>,
+    is_inspecting_impl: bool,
 }
 
 impl<'ast> Visit<'ast> for FixedValueVisitor {
@@ -20,17 +22,30 @@ impl<'ast> Visit<'ast> for FixedValueVisitor {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        if item.trait_.is_none() && item.generics.params.is_empty() {
-            visit::visit_item_impl(self, item);
-        }
+        let is_inspecting_impl = self.is_inspecting_impl;
+        self.is_inspecting_impl = item.trait_.is_none() && item.generics.params.is_empty();
+        visit::visit_item_impl(self, item);
+        self.is_inspecting_impl = is_inspecting_impl;
     }
 
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
-        self.inspect(&item.sig, &item.block);
+        if self.is_inspecting_impl {
+            self.inspect(&item.sig, &item.block);
+        }
         visit::visit_impl_item_fn(self, item);
     }
 
     fn visit_item_trait(&mut self, _item: &'ast ItemTrait) {}
+
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if call.method == "ok_or_else"
+            && let Some(Expr::Path(path)) = call.args.first()
+            && let Some(segment) = path.path.segments.last()
+        {
+            self.ok_or_else_helpers.push(segment.ident.to_string());
+        }
+        visit::visit_expr_method_call(self, call);
+    }
 }
 
 impl FixedValueVisitor {
@@ -60,9 +75,14 @@ fn get_violations(source: &str) -> Result<Vec<String>, syn::Error> {
     let syntax = syn::parse_file(source)?;
     let mut visitor = FixedValueVisitor {
         violations: Vec::new(),
+        ok_or_else_helpers: Vec::new(),
+        is_inspecting_impl: true,
     };
     visitor.visit_file(&syntax);
-    Ok(visitor.violations)
+    let helpers = visitor.ok_or_else_helpers;
+    let mut violations = visitor.violations;
+    violations.retain(|name| !helpers.contains(name));
+    Ok(violations)
 }
 
 fn is_fixed_construction(expression: &Expr) -> bool {
@@ -271,6 +291,26 @@ mod tests {
         let violations = get_violations(source).unwrap();
         // Then: none of these meaningful or exempt functions is flagged.
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn permits_error_builders_passed_to_ok_or_else() {
+        // Given: builders used from a free function and from a trait implementation.
+        let source = r#"
+            fn build_missing_error() -> Error { Error::new(Kind::Missing) }
+            fn build_drain_error() -> Error { Error::new(Kind::Missing) }
+            fn build_unused_error() -> Error { Error::new(Kind::Bad) }
+            fn caller(value: Option<u8>) -> Result<u8, Error> { value.ok_or_else(build_missing_error) }
+            trait Drainer { fn drain(&self) -> Result<(), Error>; }
+            struct Drain;
+            impl Drainer for Drain {
+                fn drain(&self) -> Result<(), Error> { None.ok_or_else(build_drain_error)?; Ok(()) }
+            }
+        "#;
+        // When: the checker inspects the source.
+        let violations = get_violations(source).unwrap();
+        // Then: only the builder that is not passed to ok_or_else is reported.
+        assert_eq!(violations, ["build_unused_error"]);
     }
 
     #[test]
