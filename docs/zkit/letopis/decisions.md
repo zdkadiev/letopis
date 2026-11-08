@@ -2313,15 +2313,16 @@ flat/cos в закреплённом vec1 — инженерное решени�
 приблизительный ANN, top-K cap и ослабление полного eligible-channel ranking
 не согласовывались и не вводятся. D-79/D-96 описывают прежний no-index baseline.
 
-Новые базы и config reset создают flat/cos. Старые распознанные none/cos базы
-однократно перестраиваются при writable bootstrap с повторной проверкой после
-получения writer. Opaque model сравнивается с factory output того же native
-module, native model-version проверяется до increment, исходные finite bytes и
-размерность проверяются до rebuild. Неизвестные/повреждённые модели не заменяются
-молча. Rebuild сохраняет исходные векторы, rowids, identity и attempts/errors;
-логическая schema version остаётся 1. Already-flat не требует writer, query-only
-legacy и observational status сохраняют read-only путь. Consumer read views
-создаются после подготовки; отдельный pinned reader должен переживать переход.
+Новые базы и config reset создают flat/cos. Любая не-flat база однократно
+перестраивается в flat/cos при writable bootstrap с повторной проверкой модели
+после получения writer. Opaque model сравнивается только с factory output того же
+native module. Legacy-совместимость и проверка старого model-version/исходных
+байтов не нужны: индекс — это кеш, и несовместимая база пересоздаётся из
+существующих knowledge-файлов. Rebuild сохраняет исходные векторы, rowids,
+identity и attempts/errors; логическая schema version остаётся 1. Already-flat не
+требует writer, query-only и observational status сохраняют read-only путь.
+Consumer read views создаются после подготовки; отдельный pinned reader должен
+переживать переход.
 
 Flat хранит полный f32 payload в packed blocks, без quantization/training/bucket
 pruning. Это авторитетное хранение векторов, а не disposable secondary index.

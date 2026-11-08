@@ -38,6 +38,10 @@ Keep the DDD boundary explicit: entities and value objects own domain data, loca
 - A component's interfaces, types, errors and policies use its own concepts. Git owns repositories, worktrees, indexes, ignore rules, objects and references; services/composition own Markdown-candidate selection and application-specific private-path inclusion. Markdown owns the project's X-4 Markdown syntax and its parsed values; it does not orchestrate Git, filesystem, storage or providers. Embedding owns provider/model/vector/HTTP protocol behavior. Process owns generic processes, signals and I/O; consumers choose application commands. CLI owns request, command and output representation and calls injected services.
 - A trait method may delegate to a same-named private free function outside `impl` when that keeps the implementation clear. Pass `self` or the required resource handles directly, keep the struct and its trait implementations together in their owning file, and place helper functions according to the code-reading and utility rules. This does not add a proxy component, move application orchestration into an infrastructure component, or change the receiver rule for services' injected collaborators.
 
+### Cache storage
+
+- The `.letopis/` databases are a rebuildable cache, not user data. Do not add schema migrations, legacy-format conversion or other backward-compatibility paths for changes to the storage schema or behavior: after such a change the user recreates the cache from the existing knowledge files. Keep only the validation and failure behavior the current task explicitly requires for invalid or incompatible state.
+
 ### Filesystem boundary
 
 - The filesystem component and its interfaces speak only in file/filesystem terms: files, directories, paths, bytes, metadata, permissions, identities, symlinks and locks. Database, cache, vector, embedding, configuration, knowledge and command roles do not belong in filesystem interface names, methods, parameters, return types or errors. A database file is an ordinary file at this boundary.
