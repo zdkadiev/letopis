@@ -802,6 +802,42 @@ mod search_tests {
         println!("CLI_RESPONSE {}", json!({"exit":exit,"response":value}));
     }
 
+    #[test]
+    fn search_defaults_and_caps_positive_limits() {
+        // Given: omitted, small, boundary and oversized valid limits.
+        for (input, expected) in [
+            (r#"{"query":"sqlite"}"#, 100),
+            (r#"{"query":"sqlite","limit":1}"#, 1),
+            (r#"{"query":"sqlite","limit":5}"#, 5),
+            (r#"{"query":"sqlite","limit":100}"#, 100),
+            (r#"{"query":"sqlite","limit":101}"#, 100),
+            (r#"{"query":"sqlite","limit":18446744073709551615}"#, 100),
+        ] {
+            // When: the search request is decoded.
+            let Ok(Request::Search(request)) = parse(input) else {
+                panic!("search request")
+            };
+            // Then: each request has its independently specified effective bound.
+            assert_eq!(request.limit.get(), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn search_rejects_invalid_limits_without_defaulting_them() {
+        // Given: supplied limits that are not positive unsigned integers.
+        for limit in ["0", "null", "-1", "1.0", "1e0", "18446744073709551616"] {
+            let input = format!(r#"{{"query":"sqlite","limit":{limit}}}"#);
+            // When: the search request is decoded.
+            let error = parse(&input).unwrap_err();
+            // Then: an explicit invalid value is rejected rather than replaced by a default.
+            assert_eq!(
+                error.get_kind(),
+                CommandErrorKind::InvalidRequest,
+                "{limit}"
+            );
+        }
+    }
+
     fn parse(body: &str) -> CommandResult<Request> {
         request_parse(&[OsString::from("search")], &mut body.as_bytes())
     }
