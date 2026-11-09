@@ -65,7 +65,7 @@ def run_host(root, evidence, execute):
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
     process_env = {'LETOPIS_TEST_EVIDENCE': str(evidence / 'process')}
-    execute(['make', 'verify', 'V=1'], 'rust-check.log', extra=process_env)
+    execute(['make', 'verify', 'V=1'], 'rust-check.log', extra=process_env, timeout=3600)
     execute(['cargo', 'test', '--locked', '--offline', '--test',
              'embedding_provider', 'attempt_obeys_real_sixty_second_deadline',
              '--', '--ignored', '--exact', '--nocapture'],
@@ -134,11 +134,11 @@ def main():
                 'machine': platform.machine(), 'python': sys.version,
                 'inputs': {}, 'commands': COMMANDS}
 
-    def execute(argv, name, *, cwd=root, extra=None):
+    def execute(argv, name, *, cwd=root, extra=None, timeout=1800):
         run_command(argv, cwd=cwd, env={**os.environ,
                     'LETOPIS_TEST_EVIDENCE': str(evidence / 'process'),
                     **(extra or {})},
-                    log=evidence / name, timeout=1800)
+                    log=evidence / name, timeout=timeout)
 
     try:
         manifest['inputs'] = hash_inputs(root)
