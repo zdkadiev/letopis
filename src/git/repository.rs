@@ -20,10 +20,17 @@ use gix::{
     bstr::ByteSlice,
     glob::pattern::Case,
     hash::ObjectId,
-    ignore::Search as IgnoreSearch,
+    ignore::{Search as IgnoreSearch, search::Ignore as IgnoreParse},
     index::{
         State,
         entry::{Flags, Mode},
+    },
+    worktree::{
+        Stack,
+        stack::{
+            State as StackState,
+            state::{Ignore as IgnoreState, ignore::Source as IgnoreSource},
+        },
     },
 };
 use gix_dir::{
@@ -225,12 +232,17 @@ impl SnapshotVerifier for GitRepository {
 }
 
 impl GitWorktreeListing for GitRepository {
-    fn worktree_paths_get_by_ignore_mode_and_patterns(
+    fn worktree_paths_get_by_ignore_mode_and_ignore_bytes(
         &self,
         ignore_mode: GitIgnoreMode,
-        patterns: &[u8],
+        ignore_bytes: &[u8],
     ) -> GitResult<Vec<u8>> {
-        worktree_paths_get_by_ignore_mode_and_patterns(self, &self.root, ignore_mode, patterns)
+        worktree_paths_get_by_ignore_mode_and_ignore_bytes(
+            self,
+            &self.root,
+            ignore_mode,
+            ignore_bytes,
+        )
     }
 }
 
@@ -739,16 +751,19 @@ fn paths_validate(excluded_roots: &[&str], paths: &[&RepoPath]) -> Result<(), Sn
     Ok(())
 }
 
-/// Returns index and untracked paths after Git ignore filtering.
+/// Returns index and untracked paths after Git ignore filtering and pattern pruning.
 ///
 /// Steps:
-/// 1. Expand sparse-index metadata in a private copy, so excludes and the walk observe one
-///    tracked view without touching the user's index.
+/// 1. Expand sparse-index metadata in a private copy, so the exclude-file stack and the walk
+///    observe one tracked view without touching the user's index.
 /// 2. Collect every index entry path, retaining deleted tracked paths and duplicate stages.
-/// 3. Load the repository exclude sources only when `ignore_mode` requests standard Git rules.
+/// 3. Build the walk exclusions: standard Git sources only when `ignore_mode` requests them,
+///    always with the ignore bytes as highest-priority overrides so excluded directories are
+///    pruned before their contents are read.
 /// 4. Walk the worktree under `root`, skipping ignored entries and Git metadata, and append each
 ///    untracked regular file and symlink as a NUL-terminated path.
-/// 5. Apply `patterns` to the complete union, using the repository's case mode.
+/// 5. Apply the ignore bytes to the complete union as a safety net, using the repository's case
+///    mode.
 ///
 /// The result holds nonempty NUL-terminated paths in walk/index order; duplicates are preserved.
 ///
@@ -757,31 +772,34 @@ fn paths_validate(excluded_roots: &[&str], paths: &[&RepoPath]) -> Result<(), Sn
 /// * `git` — opened repository whose index, objects and configuration are read.
 /// * `root` — canonical worktree root used as the walk boundary.
 /// * `ignore_mode` — selects standard Git exclusion sources or their absence.
-/// * `patterns` — root-relative Gitignore bytes applied to the complete path union.
+/// * `ignore_bytes` — root-relative Gitignore bytes applied to the complete path union.
 ///
 /// # Errors
 /// Reports index, ignore, sparse-object, worktree traversal or repository-policy failures.
-fn worktree_paths_get_by_ignore_mode_and_patterns(
+fn worktree_paths_get_by_ignore_mode_and_ignore_bytes(
     git: &GitRepository,
     root: &Path,
     ignore_mode: GitIgnoreMode,
-    patterns: &[u8],
+    ignore_bytes: &[u8],
 ) -> GitResult<Vec<u8>> {
     let repo = &git.repo;
     let index = repo.index_or_empty().map_err(GitError::new)?;
     let index = index_expand_sparse(git, &index)?;
     let mut raw = index_paths_get(&index);
-    let mut excludes = if ignore_mode == GitIgnoreMode::Standard {
-        Some(
-            repo.excludes(&index, None, Default::default())
-                .map_err(GitError::new)?
-                .detach(),
-        )
-    } else {
-        None
-    };
-    let mut pathspec = Search::from_specs(std::iter::empty(), None, root).map_err(GitError::new)?;
     let caps = repo.filesystem_options().map_err(GitError::new)?;
+    let case = if caps.ignore_case {
+        Case::Fold
+    } else {
+        Case::Sensitive
+    };
+    let mut exclude_stack = exclude_stack_get_by_ignore_mode_and_ignore_bytes(
+        git,
+        &index,
+        ignore_mode,
+        ignore_bytes,
+        case,
+    )?;
+    let mut pathspec = Search::from_specs(std::iter::empty(), None, root).map_err(GitError::new)?;
     let lookup = caps.ignore_case.then(|| index.prepare_icase_backing());
     let git_dir = repo.git_dir().canonicalize().map_err(GitError::new)?;
     let mut found = Collect::default();
@@ -795,7 +813,7 @@ fn worktree_paths_get_by_ignore_mode_and_patterns(
             ignore_case_index_lookup: lookup.as_ref(),
             pathspec: &mut pathspec,
             pathspec_attributes: &mut |_, _, _, _| false,
-            excludes: excludes.as_mut(),
+            excludes: exclude_stack.as_mut(),
             objects: &repo.objects,
             explicit_traversal_root: Some(root),
         },
@@ -815,18 +833,63 @@ fn worktree_paths_get_by_ignore_mode_and_patterns(
             raw.push(0);
         }
     }
-    paths_filter_by_patterns(
-        &raw,
-        patterns,
-        if caps.ignore_case {
-            Case::Fold
-        } else {
-            Case::Sensitive
-        },
-    )
+    paths_filter_by_ignore_bytes(&raw, ignore_bytes, case)
 }
 
-/// Expands only metadata in a private copy so excludes and the walk use the same tracked view.
+/// Returns the exclude stack used by the worktree walk for one ignore mode and ignore bytes.
+///
+/// Standard mode also loads the repository's Git exclusion sources. Disabled mode uses only
+/// `ignore_bytes`, so excluded directories are pruned without re-enabling `.gitignore` handling.
+///
+/// # Arguments
+///
+/// * `git` — opened repository supplying exclusion sources and the worktree root.
+/// * `index` — index state used to locate tracked ignore files.
+/// * `ignore_mode` — selects standard Git exclusion sources or their absence.
+/// * `ignore_bytes` — root-relative Gitignore bytes added as highest-priority overrides.
+/// * `case` — repository case policy applied to exclusion matching.
+///
+/// # Errors
+/// Reports unreadable standard exclusion sources or a buffer that cannot be parsed.
+fn exclude_stack_get_by_ignore_mode_and_ignore_bytes(
+    git: &GitRepository,
+    index: &State,
+    ignore_mode: GitIgnoreMode,
+    ignore_bytes: &[u8],
+    case: Case,
+) -> GitResult<Option<Stack>> {
+    let repo = &git.repo;
+    if ignore_mode == GitIgnoreMode::Disabled && ignore_bytes.is_empty() {
+        return Ok(None);
+    }
+    let ignore_search = search_get_by_ignore_bytes(ignore_bytes)?;
+    if ignore_mode == GitIgnoreMode::Standard {
+        let stack = repo
+            .excludes(index, Some(ignore_search), Default::default())
+            .map_err(GitError::new)?
+            .detach();
+        return Ok(Some(stack));
+    }
+    let empty_index = State::new(repo.object_hash());
+    let ignore = IgnoreState::new(
+        ignore_search,
+        IgnoreSearch::default(),
+        None,
+        IgnoreSource::IdMapping,
+        IgnoreParse::default(),
+    );
+    let state = StackState::IgnoreStack(ignore);
+    let id_mappings = state.id_mappings_from_index(&empty_index, empty_index.path_backing(), case);
+    Ok(Some(Stack::new(
+        repo.workdir().unwrap_or(repo.git_dir()),
+        state,
+        case,
+        Vec::with_capacity(512),
+        id_mappings,
+    )))
+}
+
+/// Expands only metadata in a private copy so the exclude-file stack and the walk use the same tracked view.
 ///
 /// # Arguments
 ///
@@ -908,21 +971,18 @@ fn index_paths_get(index: &State) -> Vec<u8> {
     raw
 }
 
-/// Filters NUL-framed paths by root-relative patterns without interpreting document roles.
+/// Filters NUL-framed paths by root-relative ignore bytes without interpreting document roles.
 ///
 /// # Arguments
 ///
 /// * `raw` — NUL-terminated repository paths, including tracked and deleted entries.
-/// * `patterns` — root-relative Gitignore bytes; the parser skips invalid lines.
+/// * `ignore_bytes` — root-relative Gitignore bytes; the parser skips invalid lines.
 /// * `case` — repository case policy applied to pattern matching.
 ///
 /// # Errors
 /// Reports a pattern buffer that cannot be attached to the fresh in-memory search.
-fn paths_filter_by_patterns(raw: &[u8], patterns: &[u8], case: Case) -> GitResult<Vec<u8>> {
-    let mut search = IgnoreSearch::default();
-    search
-        .add_patterns_buffer(patterns, "ignore", None, Default::default())
-        .map_err(GitError::new)?;
+fn paths_filter_by_ignore_bytes(raw: &[u8], ignore_bytes: &[u8], case: Case) -> GitResult<Vec<u8>> {
+    let search = search_get_by_ignore_bytes(ignore_bytes)?;
     let mut filtered = Vec::new();
     for path in raw.split(|byte| *byte == 0).filter(|path| !path.is_empty()) {
         if !path_is_excluded(&search, path, case) {
@@ -931,6 +991,22 @@ fn paths_filter_by_patterns(raw: &[u8], patterns: &[u8], case: Case) -> GitResul
         }
     }
     Ok(filtered)
+}
+
+/// Returns an in-memory exclusion search holding the root-relative ignore bytes.
+///
+/// # Arguments
+///
+/// * `ignore_bytes` — root-relative Gitignore bytes; the parser skips invalid lines.
+///
+/// # Errors
+/// Reports a buffer that cannot be attached to the fresh in-memory search.
+fn search_get_by_ignore_bytes(ignore_bytes: &[u8]) -> GitResult<IgnoreSearch> {
+    let mut search = IgnoreSearch::default();
+    search
+        .add_patterns_buffer(ignore_bytes, "ignore", None, Default::default())
+        .map_err(GitError::new)?;
+    Ok(search)
 }
 
 /// Returns whether a lexical ancestor or the leaf itself matches an excluding pattern.

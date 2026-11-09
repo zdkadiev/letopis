@@ -50,7 +50,7 @@ fn inspection_filters_raw_symlinks_before_decoding_and_normalizes_safe_results()
     use crate::service::{MockFileReader, MockGitWorktreeListing};
     // Given: raw irrelevant/private names, a symlink and a normalized duplicate.
     let mut git = MockGitWorktreeListing::new();
-    git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+    git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
         .returning(|_, _| {
             Ok(b"bad\xff.txt\0.letopis/bad\xff.md\0link\xff.md\0./note.md\0note.md\0".to_vec())
         });
@@ -81,7 +81,7 @@ fn inspection_preserves_listing_error_context_and_cause() {
     use crate::service::{GitError, MockFileReader, MockGitWorktreeListing};
     // Given: an independent Git enumeration failure and no permitted filesystem calls.
     let mut git = MockGitWorktreeListing::new();
-    git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+    git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
         .returning(|_, _| Err(GitError::new(std::io::Error::other("private cause"))));
     let mut files = MockFileReader::new();
     files.expect_directory_get_by_path().returning(|_| Ok(None));
@@ -370,7 +370,7 @@ impl Refresher for RecordingDocuments {
 }
 
 impl GitWorktreeListing for RecordingGit {
-    fn worktree_paths_get_by_ignore_mode_and_patterns(
+    fn worktree_paths_get_by_ignore_mode_and_ignore_bytes(
         &self,
         _: crate::service::GitIgnoreMode,
         _: &[u8],

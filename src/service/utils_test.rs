@@ -23,7 +23,7 @@ fn discovery_permission_failure_is_not_treated_as_absence() {
             ))
         });
     let mut git = MockGitWorktreeListing::new();
-    git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+    git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
         .times(0);
     // When: discovery observes both policy inputs.
     let result = CandidateSelection {

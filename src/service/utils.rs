@@ -168,7 +168,7 @@ impl CandidateSelection<'_> {
             GitIgnoreMode::Disabled
         };
         self.git
-            .worktree_paths_get_by_ignore_mode_and_patterns(
+            .worktree_paths_get_by_ignore_mode_and_ignore_bytes(
                 mode,
                 discovery.ignore_bytes.as_deref().unwrap_or_default(),
             )
