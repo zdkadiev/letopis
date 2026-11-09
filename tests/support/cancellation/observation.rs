@@ -173,10 +173,11 @@ pub fn observe_git_read(pid: u32, path: &Path) -> String {
 fn is_git_read_observed(trace: &str) -> bool {
     let main = get_main_thread_trace(trace).unwrap_or("");
     let corpus = main.lines().any(|line| {
-        line.contains("letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes")
-            || (line.contains("letopis..git..repository..GitRepository")
-                && line.contains("..document_traits..CorpusLister")
-                && line.contains("::get_candidates"))
+        line.contains(
+            "letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes",
+        ) || (line.contains("letopis..git..repository..GitRepository")
+            && line.contains("..document_traits..CorpusLister")
+            && line.contains("::get_candidates"))
             || (line.contains("letopis..git..repository..GitRepository")
                 && line.contains("..GitWorktreeListing")
                 && line.contains("::worktree_paths_get_by_ignore_mode_and_ignore_bytes"))
