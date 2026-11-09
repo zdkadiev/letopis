@@ -225,3 +225,51 @@ pre-change binary: two warmups and ten checks, without inventing an after build.
 Direct child wait4 CPU/RSS retain their existing descendant-accounting scope;
 concurrent whole-stack peak, exact lock waits and real-provider performance remain
 unassessed. [Issue-67 evidence index](../../docs/zkit/letopis/checks/issue-67/evidence-index.md).
+
+## Historical provenance campaigns (#108)
+
+`historical.py` specializes frozen comparisons for 10k/100k knowledge elements.
+It creates standalone repositories with seed 65, 30 elements per Markdown file,
+2,000 bytes per fragment and disabled embeddings. Every element has the same
+search marker and one external link. `shared` uses one 100-line source, whole-file
+selectors for every sixteenth element and otherwise line `1 + index % 64`;
+`distinct` gives each element its own whole-file source with identical content.
+Each shape owns a complete source tree and exact fixture hashes/counts. Their
+different source cardinalities mean absolute times do not isolate one variable.
+
+```sh
+/opt/homebrew/bin/python3.12 -B tests/performance/compare.py --freeze-build \
+  --source "$PWD" --evidence "$PWD/.artifacts/issue-108/before-build"
+/opt/homebrew/bin/python3.12 -B tests/performance/historical.py \
+  --before "$PWD/.artifacts/issue-108/before-build/build.json" \
+  --nodes 10000 --variant shared --stage timings \
+  --evidence "$PWD/.artifacts/issue-108/before-shared-10k-timings"
+# Repeat with distinct and 100000; each evidence directory must be new.
+# Add --after /absolute/path/to/candidate/build.json for a matched comparison.
+# Use --stage profiles under another evidence path for separate Samply captures.
+```
+
+Evidence paths must be absent, absolute and normalized, without symlink parents.
+The baseline-only mode records no candidate statistics or speedup. By default,
+both `check` and `status` run: first publication once per side (up to 600 seconds),
+then two conditioning calls and three alternating ordinary pairs per scenario
+(120 seconds per call). Each side reuses its own stable repository; generation
+and publication precede ordinary samples. The 1,200-second stage watchdog includes
+setup. Shorter explicit budgets and `--scenarios check status` are supported.
+
+Attempts are flushed and synced before the next call. The first timeout, process
+error or invalid output stops that side's current series without retry; an invalid
+publication prevents that side's initialized series. Interruption stops all new
+series. Incomplete campaigns exit nonzero and retain receipts, partial manifest
+and summary. A censored attempt never becomes a successful latency.
+
+Profiles use three alternating ordinary/Samply controls per side and scenario;
+profile durations never enter ordinary medians. Missing sampling capabilities
+remain failed/unavailable evidence. This runner uses no PATH Git wrapper.
+Frozen source/build receipts, archived harness bytes, input hashes, requests,
+independent count/output oracles, host load and measurement resource scopes remain
+in the evidence directory. CPU/RSS inherit `measure_process`'s per-child wait4
+scope; OS page cache and shared-host load are uncontrolled. These synthetic
+disabled-provider runs do not establish production or real-provider performance.
+
+Harness checks: `cd tests/performance && /opt/homebrew/bin/python3.12 -B -m unittest test_historical`.
