@@ -1,4 +1,6 @@
 use super::{LineRange, RepoPath, ValueError};
+use std::collections::BTreeMap;
+use std::ops::Range;
 
 /// A canonical local source address or an opaque absolute HTTP/HTTPS address.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -111,6 +113,38 @@ impl LocalSource {
         None
     }
 
+    /// Gets exact byte ranges for selectors using at most one scan of the bytes.
+    ///
+    /// A `None` selector addresses the whole file, including an empty file.
+    /// Line selection follows [`Self::select_bytes`]: LF remains in each line,
+    /// CR and binary bytes are preserved, and a trailing LF adds no empty line.
+    /// Only requested line boundaries are retained; no per-line index is built.
+    /// This operation performs no I/O.
+    ///
+    /// # Returns
+    /// One byte range per selector in the original order, including duplicates,
+    /// or `None` when the complete selected line range is unavailable.
+    pub fn get_byte_ranges(
+        bytes: &[u8],
+        selectors: &[Option<LineRange>],
+    ) -> Vec<Option<Range<usize>>> {
+        let line_byte_ranges = get_line_byte_ranges(bytes, selectors);
+        let mut byte_ranges = Vec::with_capacity(selectors.len());
+        for selector in selectors {
+            let Some(lines) = selector else {
+                byte_ranges.push(Some(0..bytes.len()));
+                continue;
+            };
+            let start = line_byte_ranges.get(&lines.get_start());
+            let end = line_byte_ranges.get(&lines.get_end());
+            byte_ranges.push(match (start, end) {
+                (Some(start), Some(end)) => Some(start.start..end.end),
+                _ => None,
+            });
+        }
+        byte_ranges
+    }
+
     fn parse(raw: &str) -> Result<Self, ValueError> {
         let (path, fragment) = raw
             .split_once('#')
@@ -120,6 +154,37 @@ impl LocalSource {
             lines: fragment.map(parse_line_range).transpose()?,
         })
     }
+}
+
+fn get_line_byte_ranges(
+    bytes: &[u8],
+    selectors: &[Option<LineRange>],
+) -> BTreeMap<u64, Range<usize>> {
+    let mut line_numbers = Vec::new();
+    for lines in selectors.iter().flatten() {
+        line_numbers.push(lines.get_start());
+        line_numbers.push(lines.get_end());
+    }
+    line_numbers.sort_unstable();
+    line_numbers.dedup();
+    let mut requested_line_numbers = line_numbers.into_iter().peekable();
+    let mut line_byte_ranges = BTreeMap::new();
+    if requested_line_numbers.peek().is_none() {
+        return line_byte_ranges;
+    }
+    let mut offset = 0;
+    for (line, number) in bytes.split_inclusive(|byte| *byte == b'\n').zip(1_u64..) {
+        let start = offset;
+        offset += line.len();
+        if requested_line_numbers.peek() == Some(&number) {
+            line_byte_ranges.insert(number, start..offset);
+            requested_line_numbers.next();
+        }
+        if requested_line_numbers.peek().is_none() {
+            break;
+        }
+    }
+    line_byte_ranges
 }
 
 fn is_remote_scheme(raw: &str) -> bool {
@@ -160,3 +225,7 @@ fn parse_line_range(fragment: &str) -> Result<LineRange, ValueError> {
         end.parse().map_err(|_| ValueError::InvalidRange)?,
     )
 }
+
+#[cfg(test)]
+#[path = "source_test.rs"]
+mod tests;
