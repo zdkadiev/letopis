@@ -81,7 +81,8 @@ rustix = { version = "=1.1.5", default-features = false, features = ["process", 
 # Distribution build: `make release`. Kept separate from `release` so `make verify` stays fast.
 [profile.dist]
 inherits = "release"
-lto = "fat"
+lto = true
+opt-level = 3
 codegen-units = 1
 panic = "abort"
 strip = true
