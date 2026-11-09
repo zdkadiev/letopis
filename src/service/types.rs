@@ -41,6 +41,23 @@ const LEGACY_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retrie
 /// Complete generated configuration written by initialization.
 pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  },\n  \"discovery\": {\n    \"respect_gitignore\": true\n  }\n}\n";
 
+/// Complete generated ignore file written by initialization.
+pub(crate) const GENERATED_IGNORE: &[u8] =
+    br"# Letopis discovery ignores paths listed in this file.
+#
+# Patterns use Gitignore syntax and are relative to the repository root.
+# A matching directory is pruned during traversal, so its contents are never
+# read. Negation with ! re-includes an otherwise ignored path.
+#
+# Examples:
+#   /build/
+#   *.log
+#   !/build/keep.md
+#
+# This file affects discovery only, never Git. Set discovery.respect_gitignore
+# in .letopis/config.json to apply .gitignore patterns as well.
+";
+
 /// Transaction contexts in which a use case may begin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransactionRequirement {

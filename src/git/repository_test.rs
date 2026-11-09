@@ -1,4 +1,4 @@
-use super::{GitIgnoreMode, GitRepository, paths_filter_by_patterns};
+use super::{GitIgnoreMode, GitRepository, paths_filter_by_ignore_bytes};
 use crate::git::durability::SNAPSHOT_REF_PREFIX;
 use crate::process_test_support as fixture;
 use crate::{
@@ -12,7 +12,7 @@ use std::{
     collections::BTreeSet,
     ffi::OsStr,
     fs,
-    os::unix::ffi::OsStrExt,
+    os::unix::{ffi::OsStrExt, fs::PermissionsExt},
     path::{Path, PathBuf},
     rc::Rc,
     sync::Arc,
@@ -45,7 +45,7 @@ fn exclusion_modes_match_git_membership_without_user_state_changes() {
         ] {
             // When: the Git library and independent Git CLI enumerate the same repository.
             let actual = git
-                .worktree_paths_get_by_ignore_mode_and_patterns(mode, &[])
+                .worktree_paths_get_by_ignore_mode_and_ignore_bytes(mode, &[])
                 .unwrap();
             let oracle = repo.run_git_successfully(&arguments, None);
             // Then: all raw paths agree, including deleted tracked membership.
@@ -54,7 +54,7 @@ fn exclusion_modes_match_git_membership_without_user_state_changes() {
         }
         // When: an additional rule targets tracked membership while standard exclusions are off.
         let filtered = git
-            .worktree_paths_get_by_ignore_mode_and_patterns(
+            .worktree_paths_get_by_ignore_mode_and_ignore_bytes(
                 GitIgnoreMode::Disabled,
                 b"tracked.md\n",
             )
@@ -82,7 +82,8 @@ fn worktree_paths_preserve_raw_names_and_non_document_entries() {
     fs::write(repo.get_root().join("plain.txt"), b"text").unwrap();
     let git = GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
     // When: the infrastructure boundary enumerates repository paths.
-    let paths = git.worktree_paths_get_by_ignore_mode_and_patterns(GitIgnoreMode::Standard, &[]);
+    let paths =
+        git.worktree_paths_get_by_ignore_mode_and_ignore_bytes(GitIgnoreMode::Standard, &[]);
     // Then: document encoding and extension policies do not reject Git paths.
     let paths = paths.unwrap();
     assert!(
@@ -196,7 +197,7 @@ fn snapshots_work_without_git_executable() {
         b"raw\r\n\0bytes"
     );
     assert!(
-        git.worktree_paths_get_by_ignore_mode_and_patterns(GitIgnoreMode::Standard, &[])
+        git.worktree_paths_get_by_ignore_mode_and_ignore_bytes(GitIgnoreMode::Standard, &[])
             .unwrap()
             .split(|byte| *byte == 0)
             .any(|path| path == b"live.md")
@@ -512,7 +513,7 @@ fn get_path_set(raw: &[u8]) -> std::collections::BTreeSet<Vec<u8>> {
 #[test]
 fn matches_anchors_basenames_and_directory_boundaries_like_git() {
     // Given: root anchoring, basename and directory-only patterns.
-    for (patterns, included, excluded) in [
+    for (ignore_bytes, included, excluded) in [
         (
             b"/root.md\n".as_slice(),
             &[b"sub/root.md".as_slice()][..],
@@ -530,14 +531,14 @@ fn matches_anchors_basenames_and_directory_boundaries_like_git() {
         ),
     ] {
         // When / Then: literal membership and an independent Git oracle agree.
-        assert_matches_git(patterns, included, excluded, Case::Sensitive);
+        assert_matches_git(ignore_bytes, included, excluded, Case::Sensitive);
     }
 }
 
 #[test]
 fn excluded_ancestors_override_child_negations_like_git() {
     // Given: child negation cannot bypass an excluded parent, but eligible parents permit it.
-    for (patterns, included, excluded) in [
+    for (ignore_bytes, included, excluded) in [
         (
             b"notes/\n!notes/keep.md\n".as_slice(),
             &[b"other/keep.md".as_slice()][..],
@@ -565,14 +566,84 @@ fn excluded_ancestors_override_child_negations_like_git() {
         ),
     ] {
         // When / Then: the matcher obeys directory precedence and last-match ordering.
-        assert_matches_git(patterns, included, excluded, Case::Sensitive);
+        assert_matches_git(ignore_bytes, included, excluded, Case::Sensitive);
     }
+}
+
+#[test]
+fn patterns_prune_ignored_directories_without_reenabling_git_excludes() {
+    use crate::service::GitWorktreeListing;
+    // Given: an unreadable directory excluded by patterns and a Git-ignored visible file.
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    fs::create_dir_all(repo.get_root().join("excluded/deep")).unwrap();
+    fs::write(repo.get_root().join("excluded/deep/file.md"), b"bytes").unwrap();
+    fs::write(repo.get_root().join("visible.md"), b"bytes").unwrap();
+    fs::write(repo.get_root().join(".gitignore"), b"visible.md\n").unwrap();
+    let git = GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+    let directory = repo.get_root().join("excluded");
+    let permissions = fs::metadata(&directory).unwrap().permissions().mode();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o000)).unwrap();
+    // When: disabled-mode discovery excludes that directory through patterns.
+    let paths = git.worktree_paths_get_by_ignore_mode_and_ignore_bytes(
+        GitIgnoreMode::Disabled,
+        b"excluded/\n",
+    );
+    // Then: the unreadable directory is never entered and Git ignores stay disabled.
+    fs::set_permissions(&directory, fs::Permissions::from_mode(permissions)).unwrap();
+    let paths = get_path_set(&paths.unwrap());
+    assert!(!paths.contains(b"excluded/deep/file.md".as_slice()));
+    assert!(paths.contains(b"visible.md".as_slice()));
+}
+
+#[test]
+fn pattern_pruning_preserves_git_negation_semantics() {
+    use crate::service::GitWorktreeListing;
+    // Given: excluded children and a negated child in the same untracked directory.
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    fs::create_dir_all(repo.get_root().join("notes")).unwrap();
+    fs::write(repo.get_root().join("notes/keep.md"), b"bytes").unwrap();
+    fs::write(repo.get_root().join("notes/drop.md"), b"bytes").unwrap();
+    let git = GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+    // When: only children are excluded, so the directory stays walkable for its negated child.
+    let children = git
+        .worktree_paths_get_by_ignore_mode_and_ignore_bytes(
+            GitIgnoreMode::Disabled,
+            b"notes/*\n!notes/keep.md\n",
+        )
+        .unwrap();
+    // Then: pruning enters the directory and keeps exactly the negated child.
+    let children = get_path_set(&children);
+    assert!(children.contains(b"notes/keep.md".as_slice()));
+    assert!(!children.contains(b"notes/drop.md".as_slice()));
+    // When: the directory itself is excluded, so a child negation cannot re-include it.
+    let parent = git
+        .worktree_paths_get_by_ignore_mode_and_ignore_bytes(
+            GitIgnoreMode::Disabled,
+            b"notes/\n!notes/keep.md\n",
+        )
+        .unwrap();
+    // Then: Git's excluded-parent rule still wins over the child negation.
+    assert!(!get_path_set(&parent).contains(b"notes/keep.md".as_slice()));
+    // When: a wildcard excludes everything below a directory but re-includes a deep branch.
+    fs::create_dir_all(repo.get_root().join("notes/deep")).unwrap();
+    fs::write(repo.get_root().join("notes/deep/keep.md"), b"bytes").unwrap();
+    fs::write(repo.get_root().join("notes/deep/drop.md"), b"bytes").unwrap();
+    let deep = git
+        .worktree_paths_get_by_ignore_mode_and_ignore_bytes(
+            GitIgnoreMode::Disabled,
+            b"notes/**\n!notes/deep/\n!notes/deep/keep.md\n",
+        )
+        .unwrap();
+    // Then: the walk descends through the re-included branch and keeps only its negated file.
+    let deep = get_path_set(&deep);
+    assert!(deep.contains(b"notes/deep/keep.md".as_slice()));
+    assert!(!deep.contains(b"notes/deep/drop.md".as_slice()));
 }
 
 #[test]
 fn matches_globs_escapes_comments_and_raw_bytes_like_git() {
     // Given: Git syntax includes slash-aware wildcards, escaping, CRLF and byte names.
-    for (patterns, included, excluded) in [
+    for (ignore_bytes, included, excluded) in [
         (
             b"**/generated?.[mM][dD]\n".as_slice(),
             &[b"a/generated11.md".as_slice()][..],
@@ -617,7 +688,7 @@ fn matches_globs_escapes_comments_and_raw_bytes_like_git() {
         ),
     ] {
         // When / Then: supplied bytes and native Git produce the literal excluded set.
-        assert_matches_git(patterns, included, excluded, Case::Sensitive);
+        assert_matches_git(ignore_bytes, included, excluded, Case::Sensitive);
     }
 }
 
@@ -629,11 +700,11 @@ fn matching_uses_the_repository_case_mode() {
     assert_matches_git(b"NOTE.md\n", &[], &[b"note.md"], Case::Fold);
 }
 
-fn assert_matches_git(patterns: &[u8], included: &[&[u8]], excluded: &[&[u8]], case: Case) {
+fn assert_matches_git(ignore_bytes: &[u8], included: &[&[u8]], excluded: &[&[u8]], case: Case) {
     let names: Vec<_> = included.iter().chain(excluded).copied().collect();
     let mut raw = names.join(&b"\0"[..]);
     raw.push(0);
-    let actual = paths_filter_by_patterns(&raw, patterns, case).unwrap();
+    let actual = paths_filter_by_ignore_bytes(&raw, ignore_bytes, case).unwrap();
     let actual: BTreeSet<_> = actual
         .split(|byte| *byte == 0)
         .filter(|path| !path.is_empty())
@@ -641,10 +712,10 @@ fn assert_matches_git(patterns: &[u8], included: &[&[u8]], excluded: &[&[u8]], c
     assert_eq!(
         actual,
         included.iter().copied().collect(),
-        "patterns={patterns:?}"
+        "ignore bytes={ignore_bytes:?}"
     );
     let repo = TempRepo::new(ObjectFormat::Sha1);
-    fs::write(repo.get_root().join(".gitignore"), patterns).unwrap();
+    fs::write(repo.get_root().join(".gitignore"), ignore_bytes).unwrap();
     for name in &names {
         let path = Path::new(OsStr::from_bytes(name));
         if let Some(parent) = path.parent() {
@@ -669,7 +740,7 @@ fn assert_matches_git(patterns: &[u8], included: &[&[u8]], excluded: &[&[u8]], c
     assert_eq!(
         ignored,
         excluded.iter().copied().collect(),
-        "Git patterns={patterns:?}"
+        "Git ignore bytes={ignore_bytes:?}"
     );
 }
 

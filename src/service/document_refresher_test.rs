@@ -656,7 +656,7 @@ fn reject_candidate_reappearing_before_publication() {
     let observed = std::sync::Arc::clone(&calls);
     let mut candidates = Candidates::new();
     candidates
-        .expect_worktree_paths_get_by_ignore_mode_and_patterns()
+        .expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
         .returning(move |_, _| {
             let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
             if count < 3 {
@@ -2757,7 +2757,7 @@ mod reindex {
 fn build_candidates() -> Candidates {
     let mut candidates = Candidates::new();
     candidates
-        .expect_worktree_paths_get_by_ignore_mode_and_patterns()
+        .expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
         .returning(|_, _| Ok(b"note.md\0".to_vec()));
     candidates
 }
@@ -3293,7 +3293,7 @@ mod corpus {
         use crate::service::MockGitWorktreeListing;
         // Given: relevant raw paths whose structural form is unsafe to probe.
         let mut git = MockGitWorktreeListing::new();
-        git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+        git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
             .returning(|_, _| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
         let service = DocumentRefreshService {
             git,
@@ -3323,7 +3323,7 @@ mod corpus {
         use crate::service::MockGitWorktreeListing;
         // Given: a raw name escaping the selected directory and another dot path resolving into it.
         let mut git = MockGitWorktreeListing::new();
-        git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+        git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
             .returning(|_, _| Ok(b"notes/../outside.md\0notes/./a.md\0notes/ab.md\0".to_vec()));
         let mut filesystem = build_root_only_files();
         filesystem
@@ -3367,7 +3367,7 @@ mod corpus {
         use crate::service::MockGitWorktreeListing;
         // Given: an escaping path and a filesystem mock that permits only the root observation.
         let mut git = MockGitWorktreeListing::new();
-        git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+        git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
             .returning(|_, _| Ok(b"../note.md\0".to_vec()));
         let service = DocumentRefreshService {
             git,
@@ -3396,7 +3396,7 @@ mod corpus {
         fs::rename(&root, parent.path().join("detached")).unwrap();
         fs::create_dir(&root).unwrap();
         let mut git = MockGitWorktreeListing::new();
-        git.expect_worktree_paths_get_by_ignore_mode_and_patterns()
+        git.expect_worktree_paths_get_by_ignore_mode_and_ignore_bytes()
             .returning(|_, _| Ok(b"irrelevant.txt\0".to_vec()));
         let service = DocumentRefreshService {
             git,

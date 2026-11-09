@@ -620,7 +620,8 @@ pub use types::{
     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
 };
 pub(crate) use types::{
-    GENERATED_CONFIG, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM,
+    GENERATED_CONFIG, GENERATED_IGNORE, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS,
+    NEIGHBOR_PAGE_QUANTUM,
 };
 mod background_runner;
 mod check;
@@ -1132,28 +1133,28 @@ pub trait Refresher {
 
 /// Raw Git index and policy-selected untracked worktree path observations.
 ///
-/// Return nonempty NUL-terminated paths after the supplied root-relative Gitignore
-/// patterns apply to tracked and untracked paths, without document-role filtering.
+/// Return nonempty NUL-terminated paths after the supplied root-relative ignore
+/// bytes apply to tracked and untracked paths, without document-role filtering.
 /// Include deleted tracked paths and expand sparse index membership; duplicate stages
 /// are permitted. Read only Git index, ignore and sparse-tree metadata; never
 /// modify the index or repository.
 #[cfg_attr(test, mockall::automock)]
 pub trait GitWorktreeListing {
-    /// Returns raw root-relative paths selected by ignore mode and patterns.
+    /// Returns raw root-relative paths selected by ignore mode and ignore bytes.
     ///
-    /// Additional patterns apply to the complete union, including tracked paths.
+    /// Additional ignore bytes apply to the complete union, including tracked paths.
     ///
     /// # Arguments
     ///
     /// * `ignore_mode` — Selects standard Git exclusion sources or their absence.
-    /// * `patterns` — Root-relative Gitignore bytes applied to tracked and untracked paths.
+    /// * `ignore_bytes` — Root-relative Gitignore bytes applied to tracked and untracked paths.
     ///
     /// # Errors
     /// Reports index, ignore, sparse-object, worktree traversal or repository-policy failures.
-    fn worktree_paths_get_by_ignore_mode_and_patterns(
+    fn worktree_paths_get_by_ignore_mode_and_ignore_bytes(
         &self,
         ignore_mode: GitIgnoreMode,
-        patterns: &[u8],
+        ignore_bytes: &[u8],
     ) -> GitResult<Vec<u8>>;
 }
 
@@ -1436,7 +1437,7 @@ pub trait InitStorage {
 
 /// One repository initialization operation.
 pub trait Initializer {
-    /// Initializes the service directory, storage and configuration.
+    /// Initializes the service directory, storage, configuration and ignore file.
     ///
     /// Existing valid state is not replaced.
     ///
