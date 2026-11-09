@@ -173,13 +173,13 @@ pub fn observe_git_read(pid: u32, path: &Path) -> String {
 fn is_git_read_observed(trace: &str) -> bool {
     let main = get_main_thread_trace(trace).unwrap_or("");
     let corpus = main.lines().any(|line| {
-        line.contains("letopis::git::repository::worktree_paths_get_by_ignore_mode_and_patterns")
+        line.contains("letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes")
             || (line.contains("letopis..git..repository..GitRepository")
                 && line.contains("..document_traits..CorpusLister")
                 && line.contains("::get_candidates"))
             || (line.contains("letopis..git..repository..GitRepository")
                 && line.contains("..GitWorktreeListing")
-                && line.contains("::worktree_paths_get_by_ignore_mode_and_patterns"))
+                && line.contains("::worktree_paths_get_by_ignore_mode_and_ignore_bytes"))
     });
     // Optimized builds may inline the free function into its trait caller.
     corpus
@@ -323,8 +323,8 @@ mod tests {
     fn git_read_observer_recognizes_debug_and_inlined_release_frames() {
         // Given: independent corpus frames before and after interface consolidation.
         for caller in [
-            "letopis::git::repository::worktree_paths_get_by_ignore_mode_and_patterns::h123",
-            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..GitWorktreeListing$GT$::worktree_paths_get_by_ignore_mode_and_patterns::h123",
+            "letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes::h123",
+            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..GitWorktreeListing$GT$::worktree_paths_get_by_ignore_mode_and_ignore_bytes::h123",
             "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::get_candidates::h123",
         ] {
             let trace = format!(
@@ -340,10 +340,10 @@ mod tests {
     #[test]
     fn git_read_observer_rejects_incomplete_or_wrong_thread_evidence() {
         // Given: counted native reads alone, another thread's Git stack, or no native read.
-        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::repository::worktree_paths_get_by_ignore_mode_and_patterns (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
-        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::repository::worktree_paths_get_by_ignore_mode_and_patterns (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
+        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
         let no_corpus = "900 Thread_1 com.apple.main-thread\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
-        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::repository::worktree_paths_get_by_ignore_mode_and_patterns (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::repository::worktree_paths_get_by_ignore_mode_and_ignore_bytes (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
         let other_owner = "900 Thread_1 com.apple.main-thread\n+ 900 _$LT$unrelated..Repository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::get_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
         // When / Then: none authorizes signalling at the required product boundary.
         for trace in [

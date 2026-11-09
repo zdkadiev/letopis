@@ -59,7 +59,7 @@ Manuals подтверждают форматы и назначение кома
 
 ## Worktree exclusion policy — issue #97, 2026-11-06
 
-`GitWorktreeListing::worktree_paths_get_by_ignore_mode_and_patterns` consumes a standard-exclusion mode and a
+`GitWorktreeListing::worktree_paths_get_by_ignore_mode_and_ignore_bytes` consumes a standard-exclusion mode and a
 root-relative Gitignore-pattern byte buffer. Standard mode matches the existing
 `ls-files -z --cached --others --exclude-standard` oracle; Disabled mode omits
 standard sources. Supplied patterns apply to the tracked/untracked union,
