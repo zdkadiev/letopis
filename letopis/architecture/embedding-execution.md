@@ -1,5 +1,5 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
-# Embedding execution
+## Service and query behavior {#service}
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
 `EmbeddingService` connects configuration, Markdown-derived search text, storage
 and an embedding provider through application interfaces. A missing, invalid,
@@ -20,25 +20,23 @@ Document-vector work is handled by drain. Successful foreground operations can
 request a detached drain; query inference is part of the search request and is
 distinct from this background work.
 
-[Embedding drain](embedding-drain.md "letopis:type=related_to;path=letopis/architecture/embedding-drain.md")
-
-One `HttpProviders` owns two independent HTTP pools and the captured compatible
-credential. It dispatches to private protocol functions in `ollama.rs` and
-`openai.rs`, rather than separate provider structs. Ollama uses the `embed` endpoint
-and disables truncation; OpenAI uses `embeddings` and bearer authorization. Native
-requests receive no compatible credential. Both validate returned vectors against
-the expected item count and dimensions through shared HTTP decoding.
-
 [Embedding service](../../src/service/embedding.rs "letopis:type=external;path=src/service/embedding.rs")
 
 [Search vector channel](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
 
-[Provider dispatch](../../src/embedding/provider.rs "letopis:type=external;path=src/embedding/provider.rs")
-
-[Ollama protocol](../../src/embedding/ollama.rs "letopis:type=external;path=src/embedding/ollama.rs")
-
-[OpenAI protocol](../../src/embedding/openai.rs "letopis:type=external;path=src/embedding/openai.rs")
-
-[Shared HTTP transport and vector validation](../../src/embedding/http.rs "letopis:type=external;path=src/embedding/http.rs")
+[Embedding drain](embedding-drain.md#drain-execution "letopis:type=related_to;path=letopis/architecture/embedding-drain.md#drain-execution")
 
 [Background execution](process-execution.md "letopis:type=related_to;path=letopis/architecture/process-execution.md")
+
+## Provider dispatch and HTTP {#providers}
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
+One `HttpProviders` owns two independent HTTP pools and the captured compatible
+credential. It dispatches to private protocol functions in `provider.rs` rather
+than separate provider structs: `ollama_vectors_compute` uses the `embed` endpoint
+and disables truncation, while `openai_vectors_compute` uses `embeddings` and
+bearer authorization. Native requests receive no compatible credential. Both
+validate returned vectors against the expected item count and dimensions through
+shared HTTP decoding.
+
+[Provider dispatch, protocols and HTTP transport](../../src/embedding/provider.rs "letopis:type=external;path=src/embedding/provider.rs")

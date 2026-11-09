@@ -45,7 +45,7 @@ Earlier 10k embeddings-disabled pre-optimization medians: traverse 0.106s, check
 [10k bounded hybrid](../../docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md")
 
 ## Optimization mechanisms {#optimizations}
-<!-- letopis: {"created_at":1794155240,"source_snapshot":"662f576b823ad39c52163622c18e696d88787e4a"} -->
+<!-- letopis: {"created_at":1794155240,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
 Five changes produced the measurements above; their campaigns are separate and
 must not be pooled.
@@ -55,7 +55,7 @@ object, verifies its kind and identity, syncs the object file and parent chain
 and rechecks write activity before reuse. Packed or absent objects and any
 integrity or I/O failure keep the ordinary staging path.
 [reuse](../../src/git/durability.rs#L183-L222 "letopis:type=external;path=src/git/durability.rs#L183-L222")
-[call site](../../src/git/objects.rs#L264-L269 "letopis:type=external;path=src/git/objects.rs#L264-L269")
+[call site](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
 
 **Tree validation.** After a fresh read verifies an object's type and identity,
 `tree_bytes_get_by_oid` skips structural validation for an OID already retained
@@ -71,11 +71,14 @@ and SHA-256; missing, invalid, unmarked or oversized observations clear it.
 [layout](../../src/markdown/parser.rs#L204-L237 "letopis:type=external;path=src/markdown/parser.rs#L204-L237")
 [parse reuse](../../src/service/search.rs#L325-L361 "letopis:type=external;path=src/service/search.rs#L325-L361")
 
+## Retrieval optimizations {#retrieval-optimizations}
+<!-- letopis: {"created_at":1794155240,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
 **Vector index.** New databases build a packed exact flat/cos index. Preparation
 rebuilds any non-flat model in one immediate transaction, rechecks after taking
 the writer and leaves read-only or query-only handles unchanged.
 [schema](../../src/storage/vectors.sql#L24-L25 "letopis:type=external;path=src/storage/vectors.sql#L24-L25")
-[preparation](../../src/storage/vector_index.rs#L18-L43 "letopis:type=external;path=src/storage/vector_index.rs#L18-L43")
+[preparation](../../src/storage/schema.rs "letopis:type=external;path=src/storage/schema.rs")
 
 **Bounded search.** The per-channel and final limit defaults to 100 and is capped
 at 100. Both FTS and vector SQL apply the bound after joins and deterministic
@@ -87,3 +90,21 @@ no refill.
 [vector SQL](../../src/storage/vector.rs#L673-L712 "letopis:type=external;path=src/storage/vector.rs#L673-L712")
 
 [measurements](#measurements "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#measurements")
+
+## Ignore-directory pruning {#ignore-pruning}
+<!-- letopis: {"created_at":1794251269,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
+Discovery passes the `.letopis/ignore` bytes to the `gix_dir::walk` exclude stack,
+so a matching directory is pruned before its entries are read; the post-walk
+filter still removes excluded paths as a safety net. With the default
+`respect_gitignore=true` the stack also carries the repository's Git exclusion
+sources; `respect_gitignore=false` uses only the Letopis bytes.
+
+A single-host 10k-element measurement with `respect_gitignore=false` and an
+ignore file keeping only `/letopis/` and `/src/` changed discovery from 13.2 s to
+0.43–0.49 s and search from 26.6–32.5 s to 0.26–0.31 s. These are local wall-time
+samples, not the controlled campaigns above, and are not pooled with them.
+
+[Worktree walk and exclusion stack](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
+
+[Discovery measurements and search](performance-bottlenecks.md#search "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#search")

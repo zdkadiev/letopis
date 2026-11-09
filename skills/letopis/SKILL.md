@@ -26,7 +26,8 @@ false also admits untracked files hidden by `.gitignore`, `info/exclude` and
 Git's global excludes. `.letopis/ignore` applies root-relative Gitignore patterns
 to both tracked and untracked candidates, including `!` negation. Excluded parents
 still block child negation; `.git` and `.letopis` components always stay excluded.
-The ignore file is optional and `init` does not create it.
+The ignore file is optional; `init` writes a commented default when it is
+absent and never replaces an existing file.
 
 Only Letopis markup outside code blocks declares knowledge; ordinary Markdown
 alone creates no elements. A clean `check` does not prove a filtered file was
@@ -252,6 +253,17 @@ the next refreshing command. The mandatory-path binary upgrade requires an
 [explicit reindex](references/operations.md#mandatory-path-upgrade-issue-69), even
 for unchanged files; status alone cannot perform it. Before cancelling a command,
 read [foreground cancellation](references/operations.md#cancel-your-own-foreground-call).
+
+Run the skill's `scripts/audit_knowledge.py` from the repository root to check
+knowledge organization without editing files. It prints JSON and exits 1 when an
+element exceeds the recommended 40 lines, a file exceeds 800 lines, or a file
+mixes a whole-file element with marked sections. It reads Markdown only; run
+`check` for markup, link and provenance validation.
+
+Run the skill's `scripts/check_links.py` to invoke `letopis check` and print its
+findings grouped by reason: broken knowledge links (`dangling_target`), missing
+sources (`source_not_found`), navigation path mismatches and unusable source
+snapshots. It exits 1 when findings exist and 2 when the command fails.
 
 The public CLI has `init`, `check`, `config`, `search`, `status`, `traverse`,
 `inspect`, and `index`. Use Git to read captured bytes and edit Markdown to

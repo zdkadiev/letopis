@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"662f576b823ad39c52163622c18e696d88787e4a"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 # Git snapshot storage
 
 `GitRepository` discovers a non-bare worktree in process through the pinned gix
@@ -21,16 +21,19 @@ A snapshot write computes the object ID and reuses an existing loose object afte
 verifying its kind and identity and syncing its file and parent directories;
 packed or absent objects take the ordinary staging path.
 [Loose-object reuse](../../src/git/durability.rs#L183-L222 "letopis:type=external;path=src/git/durability.rs#L183-L222")
-[Write entry](../../src/git/objects.rs#L264-L269 "letopis:type=external;path=src/git/objects.rs#L264-L269")
+[Write entry](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
 
-`tree_retain_by_oid` validates a tree root and durably retains its exact ref without
-walking all descendants. `tree_pin_by_oid` additionally validates the reachable closure on each call
-before retaining the root. Gitlinks are not traversed by that closure walk. This
-distinction lets routine work retain roots while full audits use stronger checks.
+`ref_update_by_oid` validates one exact root and updates its direct ref without
+auditing descendants; a later GC therefore protects healthy reachable objects but
+not against hidden corruption. `tree_sync_by_oid` verifies the root's complete
+local closure before updating the same ref, and that closure ignores gitlinks.
+Routine work retains roots with the direct ref; full audits use the
+closure-verifying path. `SnapshotVerifier::tree_verify_by_oid` only reports the
+state of one exact root and never creates, writes or retains objects.
 
 [Git repository](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
 
-[Retention and closure](../../src/git/refs.rs "letopis:type=external;path=src/git/refs.rs")
+[Snapshot interface](../../src/service/mod.rs "letopis:type=external;path=src/service/mod.rs")
 
 [Inspection capture](../../src/service/inspection.rs "letopis:type=external;path=src/service/inspection.rs")
 

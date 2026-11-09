@@ -1,10 +1,11 @@
+## Initialization and configuration {#initialization}
 <!-- letopis: {"created_at":1793727646,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
-# Initialization, configuration and status
 
 `init` discovers the repository and validates an existing configuration before
 opening service storage. It initializes storage, installs generated configuration
-only if absent, reads and validates the resulting configuration, then syncs service
-state. Existing configuration is not silently overwritten.
+and a commented default `.letopis/ignore` only when absent, reads and validates
+the resulting configuration, then syncs service state. Existing configuration
+and ignore bytes are not silently overwritten.
 
 `config` observes the current configuration through non-creating filesystem access.
 It parses the document and validates provider settings when an embedding model is
@@ -12,6 +13,17 @@ configured; it does not run background embedding work. The full configuration
 also contains discovery policy with effective defaults. Discovery does not enter
 the embedding identity, and invalid embedding settings do not prevent discovery
 when the JSON root and discovery section remain valid.
+
+[Initialization](../../src/service/init.rs "letopis:type=external;path=src/service/init.rs")
+
+[Configuration values](../../src/service/types.rs "letopis:type=external;path=src/service/types.rs")
+
+[Configuration reader](../../src/service/configuration.rs "letopis:type=external;path=src/service/configuration.rs")
+
+[Command dispatch](../../src/commands.rs "letopis:type=external;path=src/commands.rs")
+
+## Status observation {#status}
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
 
 `status` observes the last published revision, diagnostics, embedding backlog and
 failures, configuration validity and lock state. It reads a status view if one is
@@ -30,18 +42,10 @@ Embedding configuration and durable vector identity are separate: embedding
 execution observes the config file and reconciles vector state through storage.
 The status/config read paths report observations and do not perform this reset.
 
-[Initialization](../../src/service/init.rs "letopis:type=external;path=src/service/init.rs")
-
-[Configuration values](../../src/service/types.rs "letopis:type=external;path=src/service/types.rs")
-
-[Configuration reader](../../src/service/configuration.rs "letopis:type=external;path=src/service/configuration.rs")
-
 [Status service](../../src/service/status.rs "letopis:type=external;path=src/service/status.rs")
 
 [Status SQL observations](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
 
 [Attempt validation](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
 
-[Command dispatch](../../src/commands.rs "letopis:type=external;path=src/commands.rs")
-
-[Embedding execution](embedding-execution.md "letopis:type=related_to;path=letopis/architecture/embedding-execution.md")
+[Embedding execution](embedding-execution.md#service "letopis:type=related_to;path=letopis/architecture/embedding-execution.md#service")

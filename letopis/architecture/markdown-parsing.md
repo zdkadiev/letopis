@@ -1,5 +1,5 @@
-<!-- letopis: {"created_at":1793728313,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
-# Parsing Markdown documents
+## Parsing pipeline {#pipeline}
+<!-- letopis: {"created_at":1793728313,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
 `MarkdownParser` implements `MarkdownCodec::file_parse` as a pure codec: it receives a repository-relative path and
 file bytes, and returns parsed data or diagnostics. It does not read the filesystem,
@@ -30,21 +30,16 @@ The result contains elements, their search text and hashes, and a set of edges.
 The exact element hash and search hash serve different purposes: a markup change
 can alter the former without changing the latter.
 
+[Parser, element layout, metadata, links and search text](../../src/markdown/parser.rs "letopis:type=external;path=src/markdown/parser.rs")
+
+[Markdown contract](../../docs/zkit/letopis/contracts/X-4-markdown.md "letopis:type=external;path=docs/zkit/letopis/contracts/X-4-markdown.md")
+
+## Diagnostics and publication boundary {#diagnostics}
+<!-- letopis: {"created_at":1793728313,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
 Invalid UTF-8, metadata, layout or declared links produce diagnostics, not a
 partial parsed projection. The refresh service records an invalid file while
 retaining its last valid published projection; it owns publication and transactions,
 not the parser.
 
-[Parser entry](../../src/markdown/parser.rs "letopis:type=external;path=src/markdown/parser.rs")
-
-[Element layout](../../src/markdown/scan.rs "letopis:type=external;path=src/markdown/scan.rs")
-
-[Metadata parsing](../../src/markdown/metadata.rs "letopis:type=external;path=src/markdown/metadata.rs")
-
-[Link collection](../../src/markdown/links.rs "letopis:type=external;path=src/markdown/links.rs")
-
-[Search text rendering](../../src/markdown/search.rs "letopis:type=external;path=src/markdown/search.rs")
-
-[Markdown contract](../../docs/zkit/letopis/contracts/X-4-markdown.md "letopis:type=external;path=docs/zkit/letopis/contracts/X-4-markdown.md")
-
-[Projection and publication](markdown-projection.md "letopis:type=related_to;path=letopis/architecture/markdown-projection.md")
+[Projection and publication](markdown-projection.md#publication "letopis:type=related_to;path=letopis/architecture/markdown-projection.md#publication")
