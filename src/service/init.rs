@@ -1,11 +1,11 @@
 use super::utils::map_error_to_config_read_command_error;
 use super::{
     CommandError, CommandErrorKind, CommandResult, Configuration, EmbeddingProvider,
-    EmbeddingResult, FileWriter, GENERATED_CONFIG, InitStorage, Initializer,
+    EmbeddingResult, FileWriter, GENERATED_CONFIG, GENERATED_IGNORE, InitStorage, Initializer,
     map_configuration_error_to_command_error,
 };
 use crate::service::FileResult;
-use crate::utils::{CONFIG_PATH, SERVICE_DIRECTORY};
+use crate::utils::{CONFIG_PATH, IGNORE_PATH, SERVICE_DIRECTORY};
 use std::path::Path;
 use std::{fmt, path::PathBuf};
 
@@ -75,6 +75,11 @@ impl Initializer for InitService {
         super::utils::retry_changed_file_observation(|| {
             self.file_writer
                 .file_create_if_absent_by_path(Path::new(CONFIG_PATH), GENERATED_CONFIG)
+        })
+        .map_err(map_error_to_init_command_error)?;
+        super::utils::retry_changed_file_observation(|| {
+            self.file_writer
+                .file_create_if_absent_by_path(Path::new(IGNORE_PATH), GENERATED_IGNORE)
         })
         .map_err(map_error_to_init_command_error)?;
         let bytes = self

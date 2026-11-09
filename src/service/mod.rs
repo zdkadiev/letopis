@@ -620,7 +620,8 @@ pub use types::{
     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
 };
 pub(crate) use types::{
-    GENERATED_CONFIG, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM,
+    GENERATED_CONFIG, GENERATED_IGNORE, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS,
+    NEIGHBOR_PAGE_QUANTUM,
 };
 mod background_runner;
 mod check;
@@ -1436,7 +1437,7 @@ pub trait InitStorage {
 
 /// One repository initialization operation.
 pub trait Initializer {
-    /// Initializes the service directory, storage and configuration.
+    /// Initializes the service directory, storage, configuration and ignore file.
     ///
     /// Existing valid state is not replaced.
     ///

@@ -176,6 +176,7 @@ fn fresh_initialization_installs_then_rereads_and_syncs_in_order() {
             "open",
             "storage",
             "install",
+            "install-ignore",
             "observe-directory",
             "config",
             "validate",
@@ -184,6 +185,37 @@ fn fresh_initialization_installs_then_rereads_and_syncs_in_order() {
             "observe-directory",
         ]
     );
+}
+
+#[test]
+fn initialization_installs_default_ignore_and_preserves_existing_bytes() {
+    // Given: a fresh repository and one whose ignore file already has content.
+    let cases: [(Option<&[u8]>, &[u8]); 2] = [
+        (None, super::GENERATED_IGNORE),
+        (Some(b"PRIVATE\n".as_slice()), b"PRIVATE\n".as_slice()),
+    ];
+    for (existing, expected) in cases {
+        let root = tempfile::tempdir().unwrap();
+        let root_path = root.path().canonicalize().unwrap();
+        fs::create_dir(root_path.join(".letopis")).unwrap();
+        let ignore_path = root_path.join(".letopis/ignore");
+        if let Some(bytes) = existing {
+            fs::write(&ignore_path, bytes).unwrap();
+        }
+        let files = LocalFileSystem::new(&root_path).unwrap();
+        let mut service = InitService::new(
+            Box::new(files),
+            Box::new(initialize_storage as StorageInitializer),
+            Box::new(Provider::new(Trace::new(), false)),
+            root_path.join(".letopis"),
+        );
+
+        // When: initialization runs.
+        service.initialize().unwrap();
+
+        // Then: the default file appears without replacing existing bytes.
+        assert_eq!(fs::read(&ignore_path).unwrap(), expected);
+    }
 }
 
 #[test]
@@ -384,9 +416,17 @@ impl FileReader for Files {
 
 impl FileWriter for Files {
     fn file_create_if_absent_by_path(&self, path: &Path, bytes: &[u8]) -> FileResult<()> {
-        assert_eq!(path, Path::new(".letopis/config.json"));
-        self.trace.push("install");
-        assert_eq!(bytes, super::GENERATED_CONFIG);
+        match path.to_str() {
+            Some(".letopis/config.json") => {
+                self.trace.push("install");
+                assert_eq!(bytes, super::GENERATED_CONFIG);
+            }
+            Some(".letopis/ignore") => {
+                self.trace.push("install-ignore");
+                assert_eq!(bytes, super::GENERATED_IGNORE);
+            }
+            _ => panic!("unexpected file_create_if_absent_by_path"),
+        }
         Ok(())
     }
 
