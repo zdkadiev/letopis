@@ -17,6 +17,20 @@ use support::{
 };
 
 const GENERATED: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  },\n  \"discovery\": {\n    \"respect_gitignore\": true\n  }\n}\n";
+const GENERATED_IGNORE: &[u8] = br"# Letopis discovery ignores paths listed in this file.
+#
+# Patterns use Gitignore syntax and are relative to the repository root.
+# A matching directory is pruned during traversal, so its contents are never
+# read. Negation with ! re-includes an otherwise ignored path.
+#
+# Examples:
+#   /build/
+#   *.log
+#   !/build/keep.md
+#
+# This file affects discovery only, never Git. Set discovery.respect_gitignore
+# in .letopis/config.json to apply .gitignore patterns as well.
+";
 const SUCCESS: &[u8] = b"{\"ok\":true,\"result\":{}}\n";
 const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9/api"},"max_retries":2}}"#;
 
@@ -49,7 +63,15 @@ fn init_creates_exact_private_configuration_and_usable_schemas() {
     );
     assert!(service.join("cache.db").is_file());
     assert!(service.join("vectors.db").is_file());
-    assert!(!service.join("ignore").exists());
+    assert_eq!(fs::read(service.join("ignore")).unwrap(), GENERATED_IGNORE);
+    assert_eq!(
+        fs::metadata(service.join("ignore"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
     let status = repo.invoke(&["status"], b"{}");
     let status: Value = serde_json::from_slice(&status.stdout).unwrap();
     assert_eq!(status["result"]["revision"], Value::Null);
