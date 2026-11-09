@@ -1,18 +1,29 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
-# Markdown projection and publication
+## Discovery and candidate selection {#discovery}
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
 Marked Markdown in the Git worktree is the authored knowledge; SQLite is its
-searchable projection. `GitWorktreePaths::worktree_paths_get` returns raw indexed
-and policy-selected untracked paths without running the Git executable; deleted
-tracked paths remain candidates unless additional patterns exclude them. The Git
-interface receives standard-exclusion mode and root-relative Gitignore bytes;
-ancestor exclusions block child negation. Application code safely reads the config
-and optional `.letopis/ignore`; tracked owners can be filtered too. Application `CandidateSelection` filters Markdown extensions
+searchable projection. `GitWorktreeListing::worktree_paths_get_by_ignore_mode_and_ignore_bytes`
+returns raw indexed and policy-selected untracked paths without running the Git executable;
+deleted tracked paths remain candidates unless the ignore bytes exclude them. The Git
+interface receives the standard-exclusion mode and root-relative ignore bytes, and passes
+them to the worktree walk as an exclude stack: a matching directory is pruned before its
+entries are read, while the final path filter remains as a safety net. Ancestor exclusions
+block child negation. Application code safely reads the config and optional
+`.letopis/ignore`; `letopis init` writes a commented default when the file is absent and
+never replaces an existing one. Tracked owners can be filtered too. Application
+`CandidateSelection` filters Markdown extensions
 and `.git`/`.letopis` components as bytes. For structurally safe paths it asks the
 filesystem to observe final symlinks without following components and skips them
 before UTF-8 decoding and `RepoPath` validation. Unsafe parents, replacement and
 I/O failures remain errors; only stable nonregular document leaves are excluded.
 Only marked Markdown produces nodes.
+
+[Raw Git worktree listing](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
+
+[Application candidate selection](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
+
+## Refresh and publication {#publication}
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
 `DocumentRefreshService` compares candidate file state with cached observations.
 A routine refresh can return early when nothing requires publication and the
@@ -34,14 +45,10 @@ method to reparse the selected projection rather than apply an incremental one. 
 
 [Refresh implementation](../../src/service/document_refresher.rs "letopis:type=external;path=src/service/document_refresher.rs")
 
-[Raw Git worktree paths](../../src/git/worktree.rs "letopis:type=external;path=src/git/worktree.rs")
-
-[Application candidate selection](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
-
 [Markdown parser](../../src/markdown/parser.rs "letopis:type=external;path=src/markdown/parser.rs")
 
-[Parsing Markdown documents](markdown-parsing.md "letopis:type=related_to;path=letopis/architecture/markdown-parsing.md")
+[Parsing Markdown documents](markdown-parsing.md#pipeline "letopis:type=related_to;path=letopis/architecture/markdown-parsing.md#pipeline")
 
 [Cache transaction](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
 
-[Storage model](storage.md "letopis:type=related_to;path=letopis/architecture/storage.md")
+[Storage model](storage.md#schemas "letopis:type=related_to;path=letopis/architecture/storage.md#schemas")

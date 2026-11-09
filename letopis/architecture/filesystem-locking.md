@@ -1,5 +1,5 @@
-<!-- letopis: {"created_at":1793816837,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
-# Filesystem locking and observation
+## Lock operations and identity checks {#operations}
+<!-- letopis: {"created_at":1793816837,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
 `LocalFileSystem` implements `FileReader`, `FileWriter` and `FileLocker`. The
 component keeps no cross-thread lock: single-owner state uses `RefCell` for the
@@ -30,18 +30,17 @@ requires a regular lock file with unchanged identity, and reports the PID only
 while another process still holds the lock. If this process can take the lock
 itself, observation reports no owner.
 
+[Local filesystem locks, paths and observations](../../src/filesystem/local.rs "letopis:type=external;path=src/filesystem/local.rs")
+
+[Lock interface](../../src/service/mod.rs "letopis:type=external;path=src/service/mod.rs")
+
+## Error mapping and boundaries {#errors}
+<!-- letopis: {"created_at":1793816837,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
 Aliased or non-regular coordination entries produce typed `FileError` values.
 The document lock consumer maps those kinds to invalid requests; other consumers
 choose their own public diagnostics. Identity, link and root verification failures
 also surface as file errors.
-
-[Lock operations](../../src/filesystem/lock.rs "letopis:type=external;path=src/filesystem/lock.rs")
-
-[Local filesystem](../../src/filesystem/local.rs "letopis:type=external;path=src/filesystem/local.rs")
-
-[Lock interface](../../src/service/mod.rs "letopis:type=external;path=src/service/mod.rs")
-
-[Path, identity and entry checks](../../src/filesystem/path.rs "letopis:type=external;path=src/filesystem/path.rs")
 
 [Document coordination](../../src/service/document_refresher.rs "letopis:type=external;path=src/service/document_refresher.rs")
 
@@ -49,4 +48,4 @@ also surface as file errors.
 
 [Document lock error mapping](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
 
-[Storage model](storage.md "letopis:type=related_to;path=letopis/architecture/storage.md")
+[Storage model](storage.md#schemas "letopis:type=related_to;path=letopis/architecture/storage.md#schemas")

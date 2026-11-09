@@ -22,8 +22,10 @@ ignore sources, including `info/exclude` and global Git excludes. `config` retur
 the effective section, and `init` includes it in newly generated config while
 preserving existing valid file bytes.
 
-Create `.letopis/ignore` only when needed. Its Gitignore patterns use the repository
-root as their base and filter tracked paths too. For example:
+Create `.letopis/ignore` when you need additional rules; `init` writes a
+commented default when the file is absent and never replaces an existing file.
+Its Gitignore patterns use the repository root as their base and filter tracked
+paths too. For example:
 
 ```gitignore
 /vendor/
@@ -32,9 +34,10 @@ notes/*
 ```
 
 The parent must remain eligible for a child negation to work. `notes/` plus
-`!notes/keep.md` still excludes the child. No pattern can admit `.git`/`.letopis`
-components or a path missing from the Git candidate union. A missing ignore file
-means no additional rules; `init` and indexing do not create it.
+`!notes/keep.md` still excludes the child. Matching directories are pruned during
+the worktree walk, so their contents are not read. No pattern can admit
+`.git`/`.letopis` components or a path missing from the Git candidate union. A
+missing ignore file means no additional rules; indexing does not create it.
 
 Refreshing commands use the same policy, including all index modes. An exclusion
 removes cached owner rows/projections at the next relevant refresh. Scoped index

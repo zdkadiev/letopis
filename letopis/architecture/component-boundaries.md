@@ -32,7 +32,7 @@ interpretation; storage retains SQL aggregation and persisted-value validation.
 
 [Agent conventions](../../AGENTS.md "letopis:type=external;path=AGENTS.md")
 
-[Repository conventions](../development/repository-conventions.md "letopis:type=related_to;path=letopis/development/repository-conventions.md")
+[Repository conventions](../development/repository-conventions.md#naming "letopis:type=related_to;path=letopis/development/repository-conventions.md#naming")
 
 ## Command wiring {#command-wiring}
 <!-- letopis: {"created_at":1793278392,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
