@@ -127,10 +127,8 @@ fn verify_batch_selection(bytes: &[u8], selectors: &[Option<LineRange>]) {
             path: RepoPath::parse("source.bin").unwrap(),
             lines: *lines,
         };
-        let actual = match range {
-            Some(range) => Some(&bytes[range]),
-            None => None,
-        };
+        let map_byte_range_to_bytes = |range| &bytes[range];
+        let actual = range.map(map_byte_range_to_bytes);
         assert_eq!(
             actual,
             local_source.select_bytes(bytes),
