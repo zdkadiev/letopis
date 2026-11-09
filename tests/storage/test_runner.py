@@ -152,8 +152,17 @@ class SchemaParityTests(unittest.TestCase):
             # Then
             self.assertEqual(good.returncode, 0, good.stderr)
             path = root / 'src/storage/cache.sql'
-            path.write_text(path.read_text().replace('revision integer', 'revision text'))
+            original = path.read_text()
+            # When: the product DDL is only reformatted.
+            path.write_text(original.replace('revision integer', 'revision\ninteger'))
+            reformatted = subprocess.run([sys.executable, str(script), str(root)],
+                                         capture_output=True)
+            # Then: whitespace alone is not drift.
+            self.assertEqual(reformatted.returncode, 0, reformatted.stderr)
+            # When: one DDL token changes.
+            path.write_text(original.replace('revision integer', 'revision text'))
             bad = subprocess.run([sys.executable, str(script), str(root)], capture_output=True)
+            # Then: the changed type fails parity.
             self.assertNotEqual(bad.returncode, 0)
             self.assertIn(b'canonical DDL differs', bad.stderr)
 
