@@ -1,7 +1,7 @@
 use crate::service::{FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult};
 
 mod batches {
-    use super::{create_oid, create_service, GitFault};
+    use super::{GitFault, create_oid, create_service};
     use crate::{
         domain::{SourceUri, TreeOid},
         service::{
@@ -228,6 +228,42 @@ mod batches {
         assert!(results[3].flags.is_empty());
         assert_eq!(service.git.verified.borrow().len(), 2);
         assert_eq!(service.git.reads.get(), 2);
+    }
+
+    #[test]
+    fn batch_single_request_reuses_history_across_distinct_ranges() {
+        // Given: one request binds two distinct ranges of one unchanged file.
+        let service = create_service(GitFault::None);
+        let tree = create_oid('a');
+        service
+            .git
+            .bytes
+            .borrow_mut()
+            .insert(tree.clone(), b"basis\nold\n".to_vec());
+        *service.filesystem.changes.borrow_mut() = vec![Some(b"basis\nold\n".to_vec()); 4];
+        let sources = BTreeSet::from([
+            SourceUri::parse("a#L1-L1").unwrap(),
+            SourceUri::parse("a#L2-L2").unwrap(),
+        ]);
+        let request = ProvenanceRequest {
+            source_snapshot: Some(&tree),
+            sources: &sources,
+        };
+        // When: the single-request batch observes both selectors.
+        let results = service.observe_sources_batch(&[request]).unwrap();
+        // Then: one historical file read supplies both ranges, with separate live captures.
+        assert_eq!(results.len(), 1);
+        assert!(results[0].flags.is_empty());
+        assert!(results[0].issues.is_empty());
+        assert_eq!(service.git.reads.get(), 1);
+        assert_eq!(service.filesystem.reads.get(), 2);
+        // When: the singleton API independently observes the same selectors.
+        let result = service.observe_sources(request).unwrap();
+        // Then: its unchanged sequential contract reads both historical addresses afresh.
+        assert!(result.flags.is_empty());
+        assert!(result.issues.is_empty());
+        assert_eq!(service.git.reads.get(), 3);
+        assert_eq!(service.filesystem.reads.get(), 4);
     }
 
     #[test]

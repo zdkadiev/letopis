@@ -76,11 +76,7 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
         &self,
         requests: &[ProvenanceRequest<'_>],
     ) -> DocumentResult<Vec<ProvenanceObservation>> {
-        let plan = if requests.len() > 1 {
-            HistoricalPlan::build_plan(requests)
-        } else {
-            None
-        };
+        let plan = HistoricalPlan::build_plan(requests);
         let mut observations = HistoricalObservations::new(self, plan);
         requests
             .iter()
