@@ -279,7 +279,7 @@ Harness checks: `cd tests/performance && /opt/homebrew/bin/python3.12 -B -m unit
 `--variant distinct-sharded` keeps one distinct whole-file source per knowledge
 element and the same source bytes as `distinct`, but puts 100 files in each
 `sources/shard-NNNN/` directory (1,000 leaf directories at 100k). This separately
-labelled control tests unique-path/fallback behavior without one huge flat Git
+labelled control tests unique-path planning behavior without one huge flat Git
 tree. The deterministic path is `sources/shard-{index // 100:04d}/source-{index}.txt`.
 Before and after must use the same variant and equivalent hashes/requests.
 
