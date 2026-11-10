@@ -12,8 +12,8 @@ mod batches {
     use std::collections::BTreeSet;
 
     #[test]
-    fn batch_reuses_exact_history_but_reads_each_live_binding() {
-        // Given: two bindings of exactly the same historical address.
+    fn batch_reuses_exact_snapshot_but_reads_each_live_binding() {
+        // Given: two bindings of exactly the same snapshot address.
         let service = create_service(GitFault::None);
         let tree = create_oid('a');
         let sources = BTreeSet::from([SourceUri::parse("a#L1-L1").unwrap()]);
@@ -23,7 +23,7 @@ mod batches {
         };
         // When: both bindings are observed together.
         let results = service.observe_sources_batch(&[request, request]).unwrap();
-        // Then: equal clean observations share history but capture live bytes twice.
+        // Then: equal clean observations share snapshot but capture live bytes twice.
         assert_eq!(results.len(), 2);
         assert_eq!(results[0], results[1]);
         assert!(results[0].flags.is_empty());
@@ -47,7 +47,7 @@ mod batches {
         };
         // When: the two bindings are observed in order.
         let results = service.observe_sources_batch(&[request, request]).unwrap();
-        // Then: only the second binding is changed; the historical read is shared.
+        // Then: only the second binding is changed; the snapshot read is shared.
         assert!(results[0].flags.is_empty());
         assert_eq!(
             results[1].flags,
@@ -145,7 +145,7 @@ mod batches {
         service.observe_sources_batch(&[request, request]).unwrap();
         service.observe_sources_batch(&[request, request]).unwrap();
         service.observe_sources(request).unwrap();
-        // Then: each operation reads history anew and every binding captures live bytes.
+        // Then: each operation reads snapshot anew and every binding captures live bytes.
         assert_eq!(service.git.verified.borrow().len(), 3);
         assert_eq!(service.git.reads.get(), 3);
         assert_eq!(service.filesystem.reads.get(), 5);
@@ -177,8 +177,8 @@ mod batches {
     }
 
     #[test]
-    fn batch_keys_history_by_exact_tree_and_range() {
-        // Given: distinct historical trees and line ranges have different bytes.
+    fn batch_keys_snapshot_by_exact_tree_and_range() {
+        // Given: distinct snapshot trees and line ranges have different bytes.
         let service = create_service(GitFault::None);
         let first = create_oid('a');
         let second = create_oid('b');
@@ -227,11 +227,363 @@ mod batches {
         );
         assert!(results[3].flags.is_empty());
         assert_eq!(service.git.verified.borrow().len(), 2);
-        assert_eq!(service.git.reads.get(), 4);
+        assert_eq!(service.git.reads.get(), 2);
     }
 
     #[test]
-    fn historical_cache_overflow_recomputes_without_rejecting() {
+    fn batch_single_request_reuses_snapshot_across_distinct_ranges() {
+        // Given: one request binds two distinct ranges of one unchanged file.
+        let service = create_service(GitFault::None);
+        let tree = create_oid('a');
+        service
+            .git
+            .bytes
+            .borrow_mut()
+            .insert(tree.clone(), b"basis\nold\n".to_vec());
+        *service.filesystem.changes.borrow_mut() = vec![Some(b"basis\nold\n".to_vec()); 4];
+        let sources = BTreeSet::from([
+            SourceUri::parse("a#L1-L1").unwrap(),
+            SourceUri::parse("a#L2-L2").unwrap(),
+        ]);
+        let request = ProvenanceRequest {
+            source_snapshot: Some(&tree),
+            sources: &sources,
+        };
+        // When: the single-request batch observes both line ranges.
+        let results = service.observe_sources_batch(&[request]).unwrap();
+        // Then: one snapshot file read supplies both ranges, with separate live captures.
+        assert_eq!(results.len(), 1);
+        assert!(results[0].flags.is_empty());
+        assert!(results[0].issues.is_empty());
+        assert_eq!(service.git.reads.get(), 1);
+        assert_eq!(service.filesystem.reads.get(), 2);
+        // When: the single-source observation call independently observes the same line ranges.
+        let result = service.observe_sources(request).unwrap();
+        // Then: its unchanged sequential contract reads both snapshot addresses afresh.
+        assert!(result.flags.is_empty());
+        assert!(result.issues.is_empty());
+        assert_eq!(service.git.reads.get(), 3);
+        assert_eq!(service.filesystem.reads.get(), 4);
+    }
+
+    #[test]
+    fn batch_reuses_snapshot_across_distinct_ranges() {
+        // Given: repeated and distinct line ranges share one file with a changed second line.
+        let service = create_service(GitFault::None);
+        let singleton = create_service(GitFault::None);
+        let tree = create_oid('a');
+        for recorder in [&service, &singleton] {
+            recorder
+                .git
+                .bytes
+                .borrow_mut()
+                .insert(tree.clone(), b"basis\nold\n".to_vec());
+            *recorder.filesystem.changes.borrow_mut() = vec![Some(b"basis\nnew\n".to_vec()); 4];
+        }
+        let sources = ["a#L1-L1", "a#L2-L2", "a#L1-L1", "a"]
+            .map(|source| BTreeSet::from([SourceUri::parse(source).unwrap()]));
+        let requests: Vec<_> = sources
+            .iter()
+            .map(|sources| ProvenanceRequest {
+                source_snapshot: Some(&tree),
+                sources,
+            })
+            .collect();
+        // When: batch and sequential singleton calls observe the same stable inputs.
+        let results = service.observe_sources_batch(&requests).unwrap();
+        let sequential: Vec<_> = requests
+            .iter()
+            .map(|request| singleton.observe_sources(*request).unwrap())
+            .collect();
+        // Then: both paths agree with literal flags and live capture remains per binding.
+        assert_eq!(results, sequential);
+        assert!(results[0].flags.is_empty());
+        assert_eq!(
+            results[1].flags,
+            BTreeSet::from([SearchFlag::SourceChanged])
+        );
+        assert!(results[2].flags.is_empty());
+        assert_eq!(
+            results[3].flags,
+            BTreeSet::from([SearchFlag::SourceChanged])
+        );
+        assert_eq!(service.git.reads.get(), 1);
+        assert_eq!(service.filesystem.reads.get(), 4);
+    }
+
+    #[test]
+    fn batch_defers_snapshot_damage_until_next_read() {
+        for fault in [
+            GitFault::Read,
+            GitFault::ReadInvalid,
+            GitFault::ReadMissing,
+            GitFault::Verify,
+        ] {
+            // Given: the first live capture damages snapshot after a successful grouped read.
+            let service = create_service(GitFault::None);
+            service.filesystem.next_git_fault.set(Some(fault));
+            let tree = create_oid('a');
+            let sources =
+                ["a#L1-L1", "a"].map(|source| BTreeSet::from([SourceUri::parse(source).unwrap()]));
+            let requests: Vec<_> = sources
+                .iter()
+                .map(|sources| ProvenanceRequest {
+                    source_snapshot: Some(&tree),
+                    sources,
+                })
+                .collect();
+            // When: the second source address uses the first successful contents.
+            let results = service.observe_sources_batch(&requests).unwrap();
+            // Then: both remain clean; a new call observes the injected damage.
+            assert!(results.iter().all(|result| result.flags.is_empty()));
+            assert_eq!(service.git.reads.get(), 1);
+            if matches!(fault, GitFault::ReadMissing) {
+                let later = service.observe_sources_batch(&requests).unwrap();
+                assert_eq!(later[0].flags, BTreeSet::from([SearchFlag::SourceNotFound]));
+            } else {
+                assert_eq!(
+                    service
+                        .observe_sources_batch(&requests)
+                        .unwrap_err()
+                        .get_kind(),
+                    DocumentErrorKind::InternalError
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn batch_preserves_exact_missing_result_after_group_recovers() {
+        // Given: the first address is missing, then the same snapshot file recovers.
+        let service = create_service(GitFault::ReadMissing);
+        service.filesystem.next_git_fault.set(Some(GitFault::None));
+        let tree = create_oid('a');
+        service
+            .git
+            .bytes
+            .borrow_mut()
+            .insert(tree.clone(), b"basis\nsecond\n".to_vec());
+        *service.filesystem.changes.borrow_mut() = vec![Some(b"basis\nsecond\n".to_vec()); 3];
+        let sources = ["a#L1-L1", "a#L2-L2", "a#L1-L1"]
+            .map(|source| BTreeSet::from([SourceUri::parse(source).unwrap()]));
+        let requests: Vec<_> = sources
+            .iter()
+            .map(|sources| ProvenanceRequest {
+                source_snapshot: Some(&tree),
+                sources,
+            })
+            .collect();
+        // When: another source address retries the file before the exact missing address repeats.
+        let results = service.observe_sources_batch(&requests).unwrap();
+        // Then: group success never overwrites the earlier exact absence.
+        assert_eq!(
+            results[0].flags,
+            BTreeSet::from([SearchFlag::SourceNotFound])
+        );
+        assert!(results[1].flags.is_empty());
+        assert_eq!(
+            results[2].flags,
+            BTreeSet::from([SearchFlag::SourceNotFound])
+        );
+        assert_eq!(service.git.reads.get(), 2);
+        assert_eq!(service.filesystem.reads.get(), 3);
+    }
+
+    #[test]
+    fn batch_live_failure_precedes_future_group_failure() {
+        for (next_tree, next_path) in [('a', "b"), ('b', "a")] {
+            // Given: the first live read fails while the next group's snapshot read would fail.
+            let mut service = create_service(GitFault::None);
+            service.filesystem.is_failing = true;
+            service.filesystem.next_git_fault.set(Some(GitFault::Read));
+            let first = create_oid('a');
+            let second = create_oid(next_tree);
+            let first_sources = BTreeSet::from([SourceUri::parse("a").unwrap()]);
+            let second_sources = BTreeSet::from([SourceUri::parse(next_path).unwrap()]);
+            let requests = [
+                ProvenanceRequest {
+                    source_snapshot: Some(&first),
+                    sources: &first_sources,
+                },
+                ProvenanceRequest {
+                    source_snapshot: Some(&second),
+                    sources: &second_sources,
+                },
+            ];
+            // When: the ordered batch stops at its first live capture failure.
+            let error = service.observe_sources_batch(&requests).unwrap_err();
+            // Then: no later tree/path is demanded and the filesystem cause is preserved.
+            assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+            assert_eq!(service.git.verified.borrow().as_slice(), &[first]);
+            assert_eq!(service.git.paths.borrow().as_slice(), &["a".to_owned()]);
+            assert_eq!(service.git.reads.get(), 1);
+            assert_eq!(service.filesystem.reads.get(), 1);
+        }
+    }
+
+    #[test]
+    fn batch_missing_range_does_not_hide_valid_neighbor() {
+        // Given: an incomplete line range and a valid line range address one nonempty file.
+        let service = create_service(GitFault::None);
+        let tree = create_oid('a');
+        let sources = ["a#L1-L2", "a#L1-L1"]
+            .map(|source| BTreeSet::from([SourceUri::parse(source).unwrap()]));
+        let requests: Vec<_> = sources
+            .iter()
+            .map(|sources| ProvenanceRequest {
+                source_snapshot: Some(&tree),
+                sources,
+            })
+            .collect();
+        // When: the unavailable range triggers preparation before its valid neighbor.
+        let results = service.observe_sources_batch(&requests).unwrap();
+        // Then: the invalid range is missing and its neighbor is clean from one read.
+        assert_eq!(
+            results[0].flags,
+            BTreeSet::from([SearchFlag::SourceNotFound])
+        );
+        assert!(results[1].flags.is_empty());
+        assert_eq!(service.git.reads.get(), 1);
+    }
+
+    #[test]
+    fn batch_does_not_group_distinct_paths_or_read_unbound_and_remote_sources() {
+        // Given: two paths share a root alongside an unbound local and a remote source.
+        let service = create_service(GitFault::None);
+        let tree = create_oid('a');
+        let sources = ["a", "b", "a", "https://example.test/a"]
+            .map(|source| BTreeSet::from([SourceUri::parse(source).unwrap()]));
+        let requests: Vec<_> = sources
+            .iter()
+            .enumerate()
+            .map(|(index, sources)| ProvenanceRequest {
+                source_snapshot: if index == 2 { None } else { Some(&tree) },
+                sources,
+            })
+            .collect();
+        // When: all bindings are observed together.
+        let results = service.observe_sources_batch(&requests).unwrap();
+        // Then: snapshot reads both local paths only; live captures include the unbound local.
+        assert!(results[0].flags.is_empty());
+        assert!(results[1].flags.is_empty());
+        assert_eq!(
+            results[2].flags,
+            BTreeSet::from([SearchFlag::SourceChanged])
+        );
+        assert!(results[3].flags.is_empty());
+        assert_eq!(
+            service.git.paths.borrow().as_slice(),
+            &["a".to_owned(), "b".to_owned()]
+        );
+        assert_eq!(service.git.reads.get(), 2);
+        assert_eq!(service.filesystem.reads.get(), 3);
+    }
+
+    #[test]
+    fn plan_entry_limit_counts_unique_roots_and_exact_source_addresses() {
+        // Given: one declared root and 4095 distinct local source addresses exactly fill the budget.
+        let tree = create_oid('a');
+        let sources: Vec<_> = (1..=4096)
+            .map(|line| BTreeSet::from([SourceUri::parse(&format!("a#L{line}-L{line}")).unwrap()]))
+            .collect();
+        let requests: Vec<_> = sources
+            .iter()
+            .map(|sources| ProvenanceRequest {
+                source_snapshot: Some(&tree),
+                sources,
+            })
+            .collect();
+        // When / Then: exact capacity is accepted and the next source address rejects the whole plan.
+        assert!(super::super::SnapshotReadPlan::build_plan(&requests[..4095]).is_some());
+        assert!(super::super::SnapshotReadPlan::build_plan(&requests).is_none());
+        // Given: repeated bindings introduce no new addresses.
+        let duplicates = vec![requests[0]; 5000];
+        // When / Then: duplicates remain eligible for grouped reuse.
+        assert!(super::super::SnapshotReadPlan::build_plan(&duplicates).is_some());
+    }
+
+    #[test]
+    fn plan_address_limit_counts_full_source_and_root_strings() {
+        // Given: a forty-byte tree identifier counted twice plus its source path total 1,048,576 bytes.
+        let tree = create_oid('a');
+        let exact = BTreeSet::from([SourceUri::parse(&"a".repeat(1_048_496)).unwrap()]);
+        let overflow = BTreeSet::from([SourceUri::parse(&"a".repeat(1_048_497)).unwrap()]);
+        let exact_request = ProvenanceRequest {
+            source_snapshot: Some(&tree),
+            sources: &exact,
+        };
+        let overflow_request = ProvenanceRequest {
+            source_snapshot: Some(&tree),
+            sources: &overflow,
+        };
+        // When / Then: a single extra address byte rejects the complete plan.
+        assert!(super::super::SnapshotReadPlan::build_plan(&[exact_request]).is_some());
+        assert!(super::super::SnapshotReadPlan::build_plan(&[overflow_request]).is_none());
+    }
+
+    #[test]
+    fn plan_counts_roots_without_local_sources_and_repeated_path_strings() {
+        // Given: two source addresses repeat a long path and a separate root has only remote sources.
+        let tree = create_oid('a');
+        let remote_tree = create_oid('b');
+        let path = "a".repeat(524_220);
+        let sources = BTreeSet::from([
+            SourceUri::parse(&format!("{path}#L1-L1")).unwrap(),
+            SourceUri::parse(&format!("{path}#L2-L2")).unwrap(),
+        ]);
+        let remote = BTreeSet::from([SourceUri::parse("https://example.test/a").unwrap()]);
+        let requests = [
+            ProvenanceRequest {
+                source_snapshot: Some(&tree),
+                sources: &sources,
+            },
+            ProvenanceRequest {
+                source_snapshot: Some(&remote_tree),
+                sources: &remote,
+            },
+        ];
+        // When / Then: 1,048,572 bytes fit, but the extra declared root exceeds one MiB.
+        assert!(super::super::SnapshotReadPlan::build_plan(&requests[..1]).is_some());
+        assert!(super::super::SnapshotReadPlan::build_plan(&requests).is_none());
+    }
+
+    #[test]
+    fn plan_address_arithmetic_overflow_rejects_without_allocating() {
+        // Given: impossible accumulated address lengths can overflow either addition.
+        // When / Then: checked arithmetic and the exact byte limit reject safely.
+        assert_eq!(super::super::get_address_byte_count(usize::MAX, 1, 0), None);
+        assert_eq!(super::super::get_address_byte_count(0, usize::MAX, 1), None);
+        assert_eq!(
+            super::super::get_address_byte_count(1_048_575, 1, 0),
+            Some(1_048_576)
+        );
+        assert_eq!(super::super::get_address_byte_count(1_048_576, 0, 1), None);
+    }
+
+    #[test]
+    fn plan_overflow_uses_whole_call_fallback() {
+        // Given: an early shared group precedes a source whose address exceeds the plan budget.
+        let service = create_service(GitFault::None);
+        let tree = create_oid('a');
+        let sources = ["a#L1-L1".to_owned(), "a".to_owned(), "b".repeat(1_048_577)]
+            .map(|source| BTreeSet::from([SourceUri::parse(&source).unwrap()]));
+        let requests: Vec<_> = sources
+            .iter()
+            .map(|sources| ProvenanceRequest {
+                source_snapshot: Some(&tree),
+                sources,
+            })
+            .collect();
+        // When: one over-budget address disables grouping for the whole call.
+        let results = service.observe_sources_batch(&requests).unwrap();
+        // Then: even the first group retains separate legacy reads and clean observations.
+        assert!(results.iter().all(|result| result.flags.is_empty()));
+        assert_eq!(service.git.reads.get(), 3);
+        assert_eq!(service.filesystem.reads.get(), 3);
+    }
+
+    #[test]
+    fn snapshot_cache_overflow_recomputes_without_rejecting() {
         // Given: one root plus more distinct addresses than the combined 4096-entry limit.
         let service = create_service(GitFault::None);
         let tree = create_oid('a');
@@ -351,7 +703,7 @@ fn full_audit_still_pins_available_roots() {
 
 #[test]
 fn leave_remote_unknown_without_file_reads_or_retention() {
-    // Given: a remote source bound to an available historical tree.
+    // Given: a remote source bound to an available snapshot tree.
     let service = create_service(GitFault::None);
     let tree = create_oid('a');
     let source = SourceUri::parse("https://host/path#L1-L2").unwrap();
@@ -380,7 +732,7 @@ fn leave_remote_unknown_without_file_reads_or_retention() {
 
 #[test]
 fn verify_each_root_once_and_never_pin_during_read() {
-    // Given: two local sources share one available historical root.
+    // Given: two local sources share one available snapshot root.
     let service = create_service(GitFault::None);
     let tree = create_oid('a');
     let source = SourceUri::parse("a#L1-L1").unwrap();
@@ -533,6 +885,7 @@ enum GitFault {
     Verify,
     Read,
     ReadInvalid,
+    ReadMissing,
     Pin,
 }
 
@@ -543,6 +896,7 @@ struct RecordedGit {
     strong_pins: RefCell<Vec<TreeOid>>,
     fault: Cell<GitFault>,
     reads: Cell<usize>,
+    paths: RefCell<Vec<String>>,
     bytes: RefCell<BTreeMap<TreeOid, Vec<u8>>>,
     states_sequence: RefCell<Vec<SnapshotState>>,
 }
@@ -551,6 +905,8 @@ struct RecordedFiles {
     reads: Cell<usize>,
     is_failing: bool,
     changes: RefCell<Vec<Option<Vec<u8>>>>,
+    git: Rc<RecordedGit>,
+    next_git_fault: Cell<Option<GitFault>>,
 }
 
 // Share the recorder between the boxed collaborator and independent test probes.
@@ -602,11 +958,16 @@ impl GitSnapshots for Rc<RecordedGit> {
     fn blob_get_by_tree_oid_and_path(
         &self,
         tree: &TreeOid,
-        _: &RepoPath,
+        path: &RepoPath,
     ) -> Result<Vec<u8>, SnapshotError> {
         self.reads.set(self.reads.get() + 1);
+        self.paths.borrow_mut().push(path.as_str().to_owned());
         match self.fault.get() {
             GitFault::Read => Err(create_git_failure()),
+            GitFault::ReadMissing => Err(SnapshotError::new(
+                SnapshotErrorKind::NotFound,
+                "missing blob",
+            )),
             GitFault::ReadInvalid => Err(SnapshotError::new(
                 SnapshotErrorKind::InvalidRequest,
                 "not a blob",
@@ -644,6 +1005,9 @@ impl FileReader for RecordedFiles {
 
     fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
         self.reads.set(self.reads.get() + 1);
+        if let Some(fault) = self.next_git_fault.take() {
+            self.git.fault.set(fault);
+        }
         if self.is_failing {
             return Err(FileError::new_with_cause(
                 FileErrorKind::Io,
@@ -743,6 +1107,7 @@ fn create_service(fault: GitFault) -> RecordedProvenance {
         strong_pins: RefCell::new(Vec::new()),
         fault: Cell::new(fault),
         reads: Cell::new(0),
+        paths: RefCell::new(Vec::new()),
         bytes: RefCell::new(BTreeMap::new()),
         states_sequence: RefCell::new(Vec::new()),
     });
@@ -752,6 +1117,8 @@ fn create_service(fault: GitFault) -> RecordedProvenance {
             reads: Cell::new(0),
             is_failing: false,
             changes: RefCell::new(Vec::new()),
+            git: Rc::clone(&git),
+            next_git_fault: Cell::new(None),
         },
     );
     RecordedProvenance { service, git }

@@ -519,3 +519,40 @@ pool. D-108 subsequently replaces complete-corpus ranking with bounded retrieval
 after disjoint element bounds are validated, preserving CRLF, Unicode and EOF
 coordinates without repeated prefix scans. See the
 [search experiment spec](../../superpowers/specs/2026-11-06-search-optimization-design.md).
+
+## Historical source groups — issue #108 (2026-11-10)
+
+[Approved observation boundary](../../superpowers/specs/2026-11-10-issue-108-historical-provenance-design.md)
+and [I-4/I-7](contracts/I-4-sources.md#реализованная-граница-issue-108--2026-11-10)
+refine historical reuse inside one `observe_sources_batch`. Provenance owns a
+bounded, I/O-free plan keyed by `(TreeOid, RepoPath)`. The first demanded successful
+verified blob read prepares hashes or missing-range results for all planned
+source addresses of that group, then releases the blob before capturing live bytes.
+Required line boundaries are located in one byte scan; each unique valid source address
+uses SHA-256 over its borrowed exact slice, preserving LF, CRLF, binary bytes and
+an unterminated final line. Distinct trees/paths never share a group. A batch with
+one request and multiple source addresses also groups history; the separate
+`observe_sources` API retains its sequential historical-read behavior.
+
+Requests and source bindings keep their order. Every local binding captures live
+bytes afresh after its historical result and before the next binding. Future
+groups perform no speculative I/O, so their errors cannot precede the current
+live failure. A missing file does not prepare a group, existing exact `None`
+results retain priority after recovery, and unavailable roots are rechecked.
+Stable-object flags/issues and typed failures remain unchanged.
+
+Later damage, disappearance or policy changes can remain unseen by prepared
+historical results in the same batch. The next actual Git read checks objects
+and policies anew; the next batch and singleton observation start without those
+results. This is no command-wide atomic view of Git objects or live files.
+The plan is accepted in full before I/O only within 4096 unique roots plus exact
+historical results and 1 MiB of address strings. Limit or counter overflow sends
+the whole call through the existing bounded sequential fallback, without rejecting
+or truncating input. No payloads are retained between groups or calls.
+
+Git continues to own path resolution and actual-read integrity checks. Raw reads,
+`compare_revision`, strong pin and full closure audits retain their contracts;
+whole-corpus `check` and `index --full` still reject unrelated required descendant
+damage before SQL publication. Historical #65 specifications and captured receipts
+remain evidence for their revisions. No persistent cache, schema, runtime, refs,
+Markdown edits or author-basis updates are introduced by this grouping.

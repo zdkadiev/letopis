@@ -108,3 +108,76 @@ samples, not the controlled campaigns above, and are not pooled with them.
 [Worktree walk and exclusion stack](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
 
 [Discovery measurements and search](performance-bottlenecks.md#search "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#search")
+
+## Current command profiles and refresh candidate {#command-profiles-2026-11-10}
+<!-- letopis: {"created_at":1794260240,"source_snapshot":"d427b2746a0502450f64ef2caf12ca49f9476e27"} -->
+
+On 2026-11-10, an optimized build of commit `cc9a021` was measured on macOS
+with a synthetic 10,000-element corpus and embeddings disabled. Unprofiled
+medians of three runs were: search 0.100 s, traverse 0.108 s, inspect 0.792 s,
+check 1.920 s, status 1.883 s, and `index --full` 5.286 s. A no-change `index`
+took 0.113 s in one run. Search after changing one file took 0.421 s; after
+changing all fixture files it took 5.820 s, each median of three. OS page cache
+and shared-host load were uncontrolled; these are not production measurements.
+
+One Samply profile per workload attributed 57.3% and 55.0% of sampled CPU for
+one- and two-file refreshes respectively to `collect_source_references`.
+For each source edge it scans the knowledge IDs to detect a conflict. Replacing
+that scan with an equivalent indexed lookup is a candidate, not a measured
+speedup: preserve conflict detection and validate behavior and scaling first.
+The refresh scenarios execute search after editing the fixture, not `index`.
+
+Search, traverse and unchanged index profiles mainly showed refresh and file
+change detection. Inspect showed Git blob writing, staging and synchronization.
+Check and status profiles attributed 50.3% and 51.5% of sampled CPU to the
+historical source hash lookup; source provenance as a whole accounted for 90.6%
+and 92.3%. Full index and bulk refresh also spent sampled CPU in provenance.
+An init profile had only 60 samples and a config profile only one, insufficient
+to rank their bottlenecks. Inclusive profile shares overlap and are not wall-time
+shares. Real-provider search and production workloads were not assessed.
+
+Raw captures and receipts are local ignored artifacts under
+`.artifacts/profile-20261110-*`; they are not portable repository evidence.
+
+[Source reference reconciliation](../../src/service/document_refresher.rs "letopis:type=external;path=src/service/document_refresher.rs")
+[Source provenance](../../src/service/provenance.rs "letopis:type=external;path=src/service/provenance.rs")
+[Git operations](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
+[Scenario definitions](../../tests/performance/scenarios.py "letopis:type=external;path=tests/performance/scenarios.py")
+[Earlier check and status findings](performance-bottlenecks.md#check-status "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#check-status")
+
+## Historical range reuse after issue 108 {#historical-range-reuse-2026-11-10}
+<!-- letopis: {"created_at":1794274714,"source_snapshot":"cd688426bf88773c9d3fc3fb3f658a0a31302cd9"} -->
+
+On synthetic embeddings-disabled shared-source corpora, three alternating pairs
+measured check/status medians of 1.201→0.973 / 1.153→0.925 s at 10k and
+11.729→9.423 / 11.312→8.966 s at 100k (1.234–1.262x). OS page cache and
+shared-host load were uncontrolled; these are not production measurements.
+
+Reuse belongs to one accepted batch and historical tree/path group. Diagnostics
+chunk knowledge at 256 nodes: the measured 100k shared status executed 391
+grouped reads and 391 actual blob decodes, not one decode for the entire CLI.
+Its 23,851 historical SHA calls covered 2,815,200 bytes; 100,000 fresh live SHA
+calls covered 32,343,750 bytes. Hashes for identical source addresses were already reused;
+no measured baseline SHA-call reduction is claimed. Live capture remains fresh.
+
+The candidate probe measured about 7.992 s CPU in live capture versus
+0.008 / 0.071 s historical/live SHA-256 for that status case. Thread CPU/wall
+intervals include timer overhead; inclusive scopes overlap. sha2 0.10.9 uses
+its software backend in the checked feature configuration. CPU SHA256 support
+does not imply that this backend uses it, or make hashing the next priority.
+
+Unique-path controls stayed near parity, with observed check wall regressions
+of 1.15% at 10k flat and 1.97% at 100k sharded (CPU +0.16%). Whole-child RSS
+rose about 3.6–3.8% in the 100k sharded control; no significance or full allocation
+cause is established. Plan/result maxima were 62 entries for shared and 257
+for unique paths. CLI chunks did not reach the 4096-entry / 1 MiB fallback caps.
+
+Original flat 100k publication timed out at 600 s; its observed candidate was
+intentionally interrupted. The approved sharded control uses 100 files per leaf
+and different paths/tree shape, so its success does not erase that limitation.
+
+[Measured results](../../docs/zkit/letopis/checks/issue-108/report.md#L1-L77 "letopis:type=external;path=docs/zkit/letopis/checks/issue-108/report.md#L1-L77")
+[Batch provenance](../../src/service/provenance.rs "letopis:type=external;path=src/service/provenance.rs")
+[Diagnostic batch size](../../src/service/mod.rs#L24-L24 "letopis:type=external;path=src/service/mod.rs#L24-L24")
+[Batch ownership](../../src/service/utils.rs#L310-L335 "letopis:type=external;path=src/service/utils.rs#L310-L335")
+[Earlier findings](performance-bottlenecks.md#check-status "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#check-status")

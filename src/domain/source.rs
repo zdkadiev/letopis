@@ -1,4 +1,6 @@
 use super::{LineRange, RepoPath, ValueError};
+use std::collections::BTreeMap;
+use std::ops::Range;
 
 /// A canonical local source address or an opaque absolute HTTP/HTTPS address.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -122,6 +124,94 @@ impl LocalSource {
     }
 }
 
+/// Converts inclusive line ranges into byte ranges in the supplied file contents.
+///
+/// Each byte range starts at the first byte of its starting line and ends
+/// immediately after its ending line. A `None` input addresses the whole file,
+/// including an empty file. As in [`LocalSource::select_bytes`], line feed bytes remain
+/// part of their lines, carriage return and binary bytes are preserved, and a
+/// trailing line feed adds no empty line. The bytes are scanned at most once.
+/// Only requested line boundaries are retained; no per-line index is built.
+/// This operation does not read files or copy their contents.
+///
+/// # Arguments
+///
+/// * `file_bytes` - the complete file contents used to locate the requested ranges.
+/// * `line_ranges` - inclusive line ranges, or `None` for the whole file, in result order.
+///
+/// # Returns
+/// One zero-based, end-exclusive byte range per input in the original order,
+/// including duplicates, or `None` when the complete line range is unavailable.
+pub fn map_line_ranges_to_byte_ranges(
+    file_bytes: &[u8],
+    line_ranges: &[Option<LineRange>],
+) -> Vec<Option<Range<usize>>> {
+    let line_byte_ranges_by_line_number = get_line_byte_ranges(file_bytes, line_ranges);
+    let mut byte_ranges = Vec::with_capacity(line_ranges.len());
+    for line_range in line_ranges {
+        let Some(line_range) = line_range else {
+            byte_ranges.push(Some(0..file_bytes.len()));
+            continue;
+        };
+        let start = line_byte_ranges_by_line_number.get(&line_range.get_start());
+        let end = line_byte_ranges_by_line_number.get(&line_range.get_end());
+        byte_ranges.push(match (start, end) {
+            (Some(start), Some(end)) => Some(start.start..end.end),
+            _ => None,
+        });
+    }
+    byte_ranges
+}
+
+/// Returns byte ranges for the first and last lines of the requested line ranges.
+///
+/// Scans the file at most once and retains only requested boundary lines, avoiding
+/// a complete line index. Line feed bytes remain part of their lines; carriage
+/// return bytes are preserved, and a trailing line feed adds no empty line.
+///
+/// # Arguments
+///
+/// * `file_bytes` - the complete file contents used to locate line boundaries.
+/// * `line_ranges` - inclusive line ranges whose boundary lines are requested;
+///   `None` selects the whole file and requires no line boundaries.
+///
+/// # Returns
+/// Zero-based, end-exclusive byte ranges keyed by distinct one-based boundary
+/// line numbers. Missing lines are omitted; no requested lines yields an empty map.
+fn get_line_byte_ranges(
+    file_bytes: &[u8],
+    line_ranges: &[Option<LineRange>],
+) -> BTreeMap<u64, Range<usize>> {
+    let mut line_numbers = Vec::new();
+    for line_range in line_ranges.iter().flatten() {
+        line_numbers.push(line_range.get_start());
+        line_numbers.push(line_range.get_end());
+    }
+    line_numbers.sort_unstable();
+    line_numbers.dedup();
+    let mut requested_line_numbers = line_numbers.into_iter().peekable();
+    let mut line_byte_ranges_by_line_number = BTreeMap::new();
+    if requested_line_numbers.peek().is_none() {
+        return line_byte_ranges_by_line_number;
+    }
+    let mut offset = 0;
+    for (line, line_number) in file_bytes
+        .split_inclusive(|byte| *byte == b'\n')
+        .zip(1_u64..)
+    {
+        let start = offset;
+        offset += line.len();
+        if requested_line_numbers.peek() == Some(&line_number) {
+            line_byte_ranges_by_line_number.insert(line_number, start..offset);
+            requested_line_numbers.next();
+        }
+        if requested_line_numbers.peek().is_none() {
+            break;
+        }
+    }
+    line_byte_ranges_by_line_number
+}
+
 fn is_remote_scheme(raw: &str) -> bool {
     raw.split_once(':').is_some_and(|(scheme, _)| {
         scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
@@ -160,3 +250,7 @@ fn parse_line_range(fragment: &str) -> Result<LineRange, ValueError> {
         end.parse().map_err(|_| ValueError::InvalidRange)?,
     )
 }
+
+#[cfg(test)]
+#[path = "source_test.rs"]
+mod tests;

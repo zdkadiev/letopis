@@ -746,10 +746,20 @@ pub trait SourceProvenance {
 
     /// Returns one observation per request in order, each from a fresh live capture.
     ///
-    /// Stops at the same first demanded error as sequential observation. Implementations
-    /// may reuse bounded immutable historical successes for this call only; no persistent
-    /// cache or retention is allowed. The default preserves existing test doubles and
-    /// implementations by calling `observe_sources` sequentially.
+    /// Each local binding captures live bytes separately, after its historical result
+    /// and before the next binding. Implementations may reuse the first successfully
+    /// verified historical file contents across its planned ranges within this call.
+    /// Subsequent damage or policy changes can remain unseen until the next actual
+    /// Git read; a later batch starts fresh. Exact missing results retain priority
+    /// if that file subsequently recovers. Unavailable roots are rechecked.
+    ///
+    /// Planning performs no I/O and future groups are read only when demanded, so
+    /// their errors never precede the current live capture's failure. Reuse stays
+    /// bounded and local to this call; no persistent cache or retention is allowed.
+    /// The default calls `observe_sources` sequentially.
+    ///
+    /// # Returns
+    /// One observation per request in the original order, or the first demanded error.
     ///
     /// # Arguments
     ///
