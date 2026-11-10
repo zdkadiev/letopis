@@ -10,8 +10,8 @@ pub use graph::{
 };
 pub use identity::{Anchor, KnowledgeId, RepoPath};
 pub use sha256::Sha256;
-/// Validated local source components and opaque remote source identities.
-pub use source::{LocalSource, SourceUri};
+/// Source addresses and conversion from line ranges to byte ranges.
+pub use source::{LocalSource, SourceUri, map_line_ranges_to_byte_ranges};
 /// Deterministic findings derived from the current knowledge graph.
 pub use validation::{GraphProblem, find_graph_problems};
 pub use value::{BlobOid, ByteSpan, LineRange, TreeOid, ValueError};

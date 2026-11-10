@@ -17,7 +17,7 @@ Each ordinary row has two conditioning calls per side followed by three successf
 | 100000 | shared | check | 3/3 | 11.729340 → 9.422573 | 1.245x | 11.580312 → 9.197418 | 199.05 → 203.95 |
 | 100000 | shared | status | 3/3 | 11.311962 → 8.966203 | 1.262x | 11.201395 → 8.831660 | 197.98 → 201.02 |
 
-Both sides validated exactly N knowledge nodes, N external edges, and 61 distinct source selectors for shared or N for unique-path variants. Status returned revision 1 and embedding backlog 0. There are 48 successful ordinary measured calls across the eight rows; profile-stage controls are separate. Shared speedups are 1.234–1.262x. Small samples do not support p95/p99 or significance claims.
+Both sides validated exactly N knowledge nodes, N external edges, and 61 distinct source addresses for shared or N for unique-path variants. Status returned revision 1 and embedding backlog 0. There are 48 successful ordinary measured calls across the eight rows; profile-stage controls are separate. Shared speedups are 1.234–1.262x. Small samples do not support p95/p99 or significance claims.
 
 Observed control regressions are retained: 10k flat distinct check wall +1.15%; 100k sharded check wall +1.97% and CPU +0.16%. Sharded status is near parity. Median whole-child RSS rises by 3.82% (9,568,256 bytes) for sharded check and 3.57% (8,388,608 bytes) for sharded status; shared 100k check rises by 2.46% (5,144,576 bytes). This is a measured memory tradeoff, not zero regression and not an allocation/leak attribution.
 
@@ -51,7 +51,7 @@ An isolated instrumented candidate source copy measured the following complete C
 | 100000 / distinct-sharded / check | 391 | 100001/401395 | 100000 / 450,000,000 | 100000 / 450,000,000 |
 | 100000 / distinct-sharded / status | 391 | 100000/400391 | 100000 / 450,000,000 | 100000 / 450,000,000 |
 
-Historical exact-selector SHA deduplication already existed before this change. The new implementation removes repeated verified Git reads and boundary searches across distinct ranges of one accepted group; a measured baseline SHA-call reduction is not claimed. Task 3 separately proved one actual blob decode, three tree decodes and three historical SHA calls over 20 bytes in its real loose-object fixture; that existing evidence was reused, not repeated or presented as a whole-CLI count.
+Historical hash reuse for identical source addresses already existed before this change. The new implementation removes repeated verified Git reads and boundary searches across distinct ranges of one accepted group; a measured baseline SHA-call reduction is not claimed. Task 3 separately proved one actual blob decode, three tree decodes and three historical SHA calls over 20 bytes in its real loose-object fixture; that existing evidence was reused, not repeated or presented as a whole-CLI count.
 
 ### Candidate costs (CPU / wall seconds)
 
@@ -65,7 +65,7 @@ Representative status calls show the disjoint SHA/boundary/live-capture scopes a
 
 At 100k sharded status, actual ODB lookup/decode CPU was 2.434614 s for blobs and 15.580807 s for trees; object checksum CPU was 5.540084 s nested within the inclusive historical Git lookup. Actual decoded content was 450,000,000 blob bytes and 4,145,702,294 tree bytes. For 100k shared status, blob/tree lookup-decode CPU was 0.008447/0.034115 s; object checksum CPU was 0.004185 s. These measured nested scopes are not an additive decomposition.
 
-Boundary byte counts mean input-buffer bytes, not bytes necessarily scanned: whole-file-only groups return without scanning line boundaries. At 100k shared status there were 23,851 grouped selector results, 391 boundary preparations and 100,000 fresh live selections; historical/live boundary input bytes were 1,759,500 / 450,000,000. At 100k sharded status each side had 100,000 whole-file selections over 450,000,000 input bytes. Hash-byte totals in the counter table count exact addressed bytes.
+Boundary byte counts mean input-buffer bytes, not bytes necessarily scanned: whole-file-only groups return without scanning line boundaries. At 100k shared status there were 23,851 grouped source address results, 391 boundary preparations and 100,000 fresh live selections; historical/live boundary input bytes were 1,759,500 / 450,000,000. At 100k sharded status each side had 100,000 whole-file selections over 450,000,000 input bytes. Hash-byte totals in the counter table count exact addressed bytes.
 
 Instrumentation adds clock reads, counter aggregation and maxima updates. Empty-scope calibration measured roughly 0.09–0.23 microseconds CPU and 0.19–0.50 microseconds wall per scope, not subtracted; short hashes/boundary operations are especially affected. Probe process timings are not ordinary samples or bare-operation benchmarks.
 
@@ -104,7 +104,7 @@ The original flat 100k acceptance remains partial. The agreed representative 100
 
 ## Harness, knowledge and self-review
 
-Controller expanded Task 5 ownership to the minimal distinct-sharded harness addition, committed as 81e96a8. TDD RED: absent variant rejected by real fixture API and CLI. Focused GREEN: 10 tests; full Python harness suite: 94 tests in 25.475 s, OK with 8 optional integration skips. Four mutants (wrong leaf width/path, missing recursive hashes, missing CLI choice) were rejected; exact code restored and 10 tests passed again in 6.793 s. The new 201-file fixture checks leaf boundaries, unique whole-file selectors, deterministic hashes/tree, actual Git tree bytes, counts and navigation. No shipping Rust behavior changed in Task 5.
+Controller expanded Task 5 ownership to the minimal distinct-sharded harness addition, committed as 81e96a8. TDD RED: absent variant rejected by real fixture API and CLI. Focused GREEN: 10 tests; full Python harness suite: 94 tests in 25.475 s, OK with 8 optional integration skips. Four mutants (wrong leaf width/path, missing recursive hashes, missing CLI choice) were rejected; exact code restored and 10 tests passed again in 6.793 s. The new 201-file fixture checks leaf boundaries, unique whole-file source addresses, deterministic hashes/tree, actual Git tree bytes, counts and navigation. No shipping Rust behavior changed in Task 5.
 
 Non-product setup errors were retained: an initial test-write invocation used a wrong relative path and wrote nothing; it is not TDD RED. Probe-source rustfmt first tried to follow a cfg(test) path omitted from the product archive; its failed source copy/log were preserved and skip_children fixed preparation before any probe build. The instrumentation wrapper initially expected an optional dSYM absent in the unpacked debug build; before any product invocation, exact probe symbols were generated once with dsymutil. No failed/timed-out heavy product call was retried.
 
@@ -126,7 +126,7 @@ Ruling: Expand current Task3 implementer ownership only to correct the Task2 tes
 
 Ruling: Expand Task4 ownership narrowly to rustfmt-only import correction in Task3 provenance_test.rs found by cargo fmt --check — fixes final formatting gate without another implementer — cost is a test-only formatting hunk outside the original integration files, no runtime behavior.
 
-Ruling: After the already-started Task4 legacy mutation wave finishes (including its final planned empty-selector mutant), isolated Cargo source-copy builds require their own target directory; package-only clean of shared letopis artifacts followed by canonical focused/full rebuild restores shipping provenance — avoids mutant artifact reuse — costs rebuild time, not source or dependency deletion.
+Ruling: After the already-started Task4 legacy mutation wave finishes (including its final planned mutant for an empty line range list), isolated Cargo source-copy builds require their own target directory; package-only clean of shared letopis artifacts followed by canonical focused/full rebuild restores shipping provenance — avoids mutant artifact reuse — costs rebuild time, not source or dependency deletion.
 
 Ruling: Resolve plan's ambiguous 'singleton' against stronger approved spec: observe_sources API stays legacy, but observe_sources_batch must group accepted plans even for one request containing multiple ranges; remove len>1 guard with a failing one-request test — preserves one-blob-read promise — costs small metadata planning overhead for single-request batches. Task4 ownership narrowly expanded to this guard and focused unit regression, with independent review before acceptance.
 

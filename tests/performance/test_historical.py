@@ -64,21 +64,21 @@ class HistoricalTests(unittest.TestCase):
             right = historical.prepare_historical_fixture(root / "right", 201, "distinct-sharded")
             repository = left["repository"]
             source_files = sorted((repository / "sources").rglob("*.txt"))
-            # Then: no duplicate selectors or flat-tree fallback hides the layout.
+            # Then: no duplicate source paths or flat-tree fallback hides the layout.
             self.assertEqual(left["counts"], {"knowledge": 201, "source": 201, "edges": 201, "includes": 0})
             self.assertEqual(left["source_file_count"], 201)
             self.assertEqual([len(list(path.iterdir())) for path in sorted((repository / "sources").iterdir())], [100, 100, 1])
             self.assertEqual(left["source_tree"], right["source_tree"])
             self.assertEqual(left["input_sha256"], right["input_sha256"])
             data = b"".join(path.read_bytes() for path in sorted((repository / "knowledge").iterdir()))
-            selectors = re.findall(rb'path=(sources/[^"\n]+)', data)
-            self.assertEqual(len(set(selectors)), 201)
+            source_paths = re.findall(rb'path=(sources/[^"\n]+)', data)
+            self.assertEqual(len(set(source_paths)), 201)
             self.assertNotIn(b"#L", data)
             for path in ("sources/shard-0000/source-0.txt", "sources/shard-0000/source-99.txt",
                          "sources/shard-0001/source-100.txt", "sources/shard-0002/source-200.txt"):
-                self.assertIn(path.encode(), selectors)
+                self.assertIn(path.encode(), source_paths)
             tree_paths = run_git(repository, "ls-tree", "-r", "--name-only", left["source_tree"]).splitlines()
-            self.assertEqual(set(tree_paths), set(selectors))
+            self.assertEqual(set(tree_paths), set(source_paths))
             self.assertEqual(len(source_files), 201)
             for path in source_files:
                 relative = str(path.relative_to(repository))

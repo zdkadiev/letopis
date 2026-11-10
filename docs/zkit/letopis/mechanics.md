@@ -527,11 +527,11 @@ and [I-4/I-7](contracts/I-4-sources.md#реализованная-граница
 refine historical reuse inside one `observe_sources_batch`. Provenance owns a
 bounded, I/O-free plan keyed by `(TreeOid, RepoPath)`. The first demanded successful
 verified blob read prepares hashes or missing-range results for all planned
-selectors of that group, then releases the blob before capturing live bytes.
-Required line boundaries are located in one byte scan; each unique valid selector
+source addresses of that group, then releases the blob before capturing live bytes.
+Required line boundaries are located in one byte scan; each unique valid source address
 uses SHA-256 over its borrowed exact slice, preserving LF, CRLF, binary bytes and
 an unterminated final line. Distinct trees/paths never share a group. A batch with
-one request and multiple selectors also groups history; the separate
+one request and multiple source addresses also groups history; the separate
 `observe_sources` API retains its sequential historical-read behavior.
 
 Requests and source bindings keep their order. Every local binding captures live

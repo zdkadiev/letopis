@@ -106,7 +106,7 @@ def prepare_historical_fixture(output: Path, nodes: int, variant: str) -> dict:
     repository = fixture["repository"]
     shutil.rmtree(repository / "sources")
     (repository / "sources").mkdir()
-    paths = ["sources/shared.txt"] if variant == "shared" else [get_source_selector(index, variant) for index in range(nodes)]
+    paths = ["sources/shared.txt"] if variant == "shared" else [build_source_address(index, variant) for index in range(nodes)]
     for relative in paths:
         path = repository / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,21 +114,21 @@ def prepare_historical_fixture(output: Path, nodes: int, variant: str) -> dict:
     run_git(repository, "add", "-A", "--", "sources")
     source_tree = run_git(repository, "write-tree").decode().strip()
     randomizer = random.Random(65)
-    selectors, index = set(), 0
+    source_addresses, index = set(), 0
     for relative in sorted(fixture["input_sha256"]):
         if not relative.startswith("knowledge/"):
             continue
         count = (repository / relative).read_bytes().count(b"## Synthetic knowledge")
         with (repository / relative).open("wb") as stream:
             for _ in range(count):
-                source = get_source_selector(index, variant)
-                selectors.add(source)
+                source = build_source_address(index, variant)
+                source_addresses.add(source)
                 stream.write(build_fragment(index, source, source_tree, randomizer))
                 index += 1
     inputs = {str(path.relative_to(repository)): hash_file(path)
               for directory in ("sources", "knowledge") for path in sorted((repository / directory).rglob("*"))
               if path.is_file()}
-    counts = {"knowledge": nodes, "source": len(selectors), "edges": nodes, "includes": 0}
+    counts = {"knowledge": nodes, "source": len(source_addresses), "edges": nodes, "includes": 0}
     requests = {name: build_request(name)[1] for name in ("check", "status")}
     expected = {name: {"command": name, "counts": counts} for name in requests}
     manifest = {"schema_version": 1, "variant": variant, "options": fixture["options"],
@@ -143,7 +143,7 @@ def prepare_historical_fixture(output: Path, nodes: int, variant: str) -> dict:
     return dict(manifest, repository=repository)
 
 
-def get_source_selector(index: int, variant: str) -> str:
+def build_source_address(index: int, variant: str) -> str:
     if variant == "distinct-sharded":
         return f"sources/shard-{index // 100:04d}/source-{index}.txt"
     if variant == "distinct":

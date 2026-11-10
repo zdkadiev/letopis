@@ -157,7 +157,7 @@ Reuse belongs to one accepted batch and historical tree/path group. Diagnostics
 chunk knowledge at 256 nodes: the measured 100k shared status executed 391
 grouped reads and 391 actual blob decodes, not one decode for the entire CLI.
 Its 23,851 historical SHA calls covered 2,815,200 bytes; 100,000 fresh live SHA
-calls covered 32,343,750 bytes. Exact-selector hash deduplication existed before;
+calls covered 32,343,750 bytes. Hashes for identical source addresses were already reused;
 no measured baseline SHA-call reduction is claimed. Live capture remains fresh.
 
 The candidate probe measured about 7.992 s CPU in live capture versus

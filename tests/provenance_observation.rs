@@ -215,7 +215,7 @@ fn diagnose_declared_unavailable_roots_even_without_external_sources() {
 #[test]
 fn batch_ranges_keep_exact_bytes_and_separate_author_trees() {
     for format in FORMATS {
-        // Given: overlapping selectors and another author tree for the same path.
+        // Given: overlapping line ranges and another author tree for the same path.
         let repo = TempRepo::new(format);
         let basis = create_basis(repo.get_root(), &[("code", b"one\r\n\0two\nlast")]);
         let other = create_basis(repo.get_root(), &[("code", b"other\r\n\0two\nlast")]);

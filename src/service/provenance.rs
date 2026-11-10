@@ -5,15 +5,17 @@ use super::{
     SnapshotRefsUpdater, SnapshotState, SourceProvenance, SourceRevisionComparison,
     SourceRevisionRequest, VerifiedGitSnapshots,
 };
-use crate::domain::{LocalSource, RepoPath, Sha256, SourceUri, TreeOid};
+use crate::domain::{
+    LocalSource, RepoPath, Sha256, SourceUri, TreeOid, map_line_ranges_to_byte_ranges,
+};
 use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
 };
 
-const HISTORICAL_ENTRY_LIMIT: usize = 4096;
-const HISTORICAL_PLAN_ADDRESS_BYTE_LIMIT: usize = 1024 * 1024;
+const SNAPSHOT_ENTRY_LIMIT: usize = 4096;
+const SNAPSHOT_PLAN_ADDRESS_BYTE_LIMIT: usize = 1024 * 1024;
 
 /// Compares exact addressed bytes and separately retains author-declared bases.
 pub(crate) struct ProvenanceService<F> {
@@ -21,19 +23,21 @@ pub(crate) struct ProvenanceService<F> {
     filesystem: F,
 }
 
-/// Operation-local immutable successes only; live captures and failures are never retained.
+/// Snapshot roots and source hashes retained for one observation call.
+/// Current file contents and failures are never retained.
 #[derive(Debug)]
-struct HistoricalObservations<'service, 'request, F> {
+struct SnapshotObservations<'service, 'request, F> {
     provenance: &'service ProvenanceService<F>,
-    plan: Option<HistoricalPlan<'request>>,
-    available: BTreeSet<TreeOid>,
-    hashes: BTreeMap<(TreeOid, SourceUri), Option<Sha256>>,
+    snapshot_read_plan: Option<SnapshotReadPlan<'request>>,
+    available_snapshots: BTreeSet<TreeOid>,
+    source_hashes_by_tree_and_source: BTreeMap<(TreeOid, SourceUri), Option<Sha256>>,
 }
 
-/// Borrowed groups whose complete root and selector results fit the call budget.
+/// Groups of borrowed source addresses whose roots and cached results fit the call budget.
 #[derive(Debug)]
-struct HistoricalPlan<'request> {
-    groups: BTreeMap<(&'request TreeOid, &'request RepoPath), Vec<&'request SourceUri>>,
+struct SnapshotReadPlan<'request> {
+    sources_by_tree_and_path:
+        BTreeMap<(&'request TreeOid, &'request RepoPath), Vec<&'request SourceUri>>,
 }
 
 impl<F> ProvenanceService<F> {
@@ -69,18 +73,18 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
         &self,
         request: ProvenanceRequest<'_>,
     ) -> DocumentResult<ProvenanceObservation> {
-        HistoricalObservations::new(self, None).observe_sources(request)
+        SnapshotObservations::new(self, None).observe_sources(request)
     }
 
     fn observe_sources_batch(
         &self,
         requests: &[ProvenanceRequest<'_>],
     ) -> DocumentResult<Vec<ProvenanceObservation>> {
-        let plan = HistoricalPlan::build_plan(requests);
-        let mut observations = HistoricalObservations::new(self, plan);
+        let snapshot_read_plan = SnapshotReadPlan::build_plan(requests);
+        let mut snapshot_observations = SnapshotObservations::new(self, snapshot_read_plan);
         requests
             .iter()
-            .map(|request| observations.observe_sources(*request))
+            .map(|request| snapshot_observations.observe_sources(*request))
             .collect()
     }
 
@@ -100,10 +104,10 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
         if request.source.get_local().is_none() {
             return Ok(SourceRevisionComparison::Unfetched);
         }
-        let historical = self.get_snapshot_hash_by_tree_and_source(basis, request.source)?;
-        let requested =
-            self.get_snapshot_hash_by_tree_and_source(request.revision, request.source)?;
-        Ok(match (historical, requested) {
+        let source_hash = self.get_source_hash_by_tree_and_source(basis, request.source)?;
+        let requested_source_hash =
+            self.get_source_hash_by_tree_and_source(request.revision, request.source)?;
+        Ok(match (source_hash, requested_source_hash) {
             (Some(left), Some(right)) if left == right => SourceRevisionComparison::Equal,
             (Some(_), Some(_)) => SourceRevisionComparison::Different,
             _ => SourceRevisionComparison::SourceNotFound,
@@ -160,7 +164,7 @@ impl<F: FileReader> ProvenanceService<F> {
         }
     }
 
-    fn get_snapshot_hash_by_tree_and_source(
+    fn get_source_hash_by_tree_and_source(
         &self,
         tree: &TreeOid,
         source: &SourceUri,
@@ -179,7 +183,7 @@ impl<F: FileReader> ProvenanceService<F> {
         Ok(local.select_bytes(&bytes).map(Sha256::digest))
     }
 
-    /// Gets all planned selector hashes from one verified historical file read.
+    /// Gets all planned line range hashes from one verified snapshot file read.
     ///
     /// # Arguments
     ///
@@ -187,18 +191,19 @@ impl<F: FileReader> ProvenanceService<F> {
     /// * `sources` — Nonempty, unique local sources sharing the group's path.
     ///
     /// # Returns
-    /// No outer value for a missing blob, otherwise one optional hash per selector.
+    /// No outer value for a missing blob, otherwise one optional hash per line range.
     ///
     /// # Errors
-    /// Propagates object, policy, type and I/O failures other than a missing blob.
-    fn get_historical_hashes_by_tree_and_sources(
+    /// Propagates object integrity, repository policy, object type and input or output
+    /// failures other than a missing blob.
+    fn get_source_hashes_by_tree_and_sources(
         &self,
         tree: &TreeOid,
         sources: &[&SourceUri],
     ) -> Result<Option<Vec<Option<Sha256>>>, SnapshotError> {
         #[expect(
             clippy::expect_used,
-            reason = "HistoricalPlan groups contain at least one local source"
+            reason = "SnapshotReadPlan groups contain at least one local source"
         )]
         let local = sources
             .first()
@@ -212,21 +217,24 @@ impl<F: FileReader> ProvenanceService<F> {
             Err(error) if error.get_kind() == SnapshotErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
         };
-        let selectors: Vec<_> = sources
+        let line_ranges: Vec<_> = sources
             .iter()
             .filter_map(|source| source.get_local())
             .map(LocalSource::get_lines)
             .collect();
-        let byte_ranges = LocalSource::get_byte_ranges(&bytes, &selectors);
+        let byte_ranges = map_line_ranges_to_byte_ranges(&bytes, &line_ranges);
         let mut hashes = Vec::with_capacity(byte_ranges.len());
         for byte_range in byte_ranges {
-            let selected = byte_range.and_then(|range| bytes.get(range));
-            hashes.push(selected.map(Sha256::digest));
+            let bytes = byte_range.and_then(|range| bytes.get(range));
+            hashes.push(bytes.map(Sha256::digest));
         }
         Ok(Some(hashes))
     }
 
-    fn get_current_hash_by_source(&self, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
+    fn get_current_source_hash_by_source(
+        &self,
+        source: &SourceUri,
+    ) -> DocumentResult<Option<Sha256>> {
         let Some(local) = source.get_local() else {
             return Ok(None);
         };
@@ -241,26 +249,26 @@ impl<F: FileReader> ProvenanceService<F> {
     }
 }
 
-impl<'service, 'request, F: FileReader> HistoricalObservations<'service, 'request, F> {
-    /// Creates an empty history without performing I/O.
+impl<'service, 'request, F: FileReader> SnapshotObservations<'service, 'request, F> {
+    /// Creates an empty snapshot observation state without reading sources.
     ///
     /// # Arguments
     ///
     /// * `provenance` — Service whose Git and filesystem access observes bindings.
-    /// * `plan` — Complete bounded group plan, or the sequential fallback.
+    /// * `snapshot_read_plan` — Complete bounded source groups, or sequential reading without a plan.
     fn new(
         provenance: &'service ProvenanceService<F>,
-        plan: Option<HistoricalPlan<'request>>,
+        snapshot_read_plan: Option<SnapshotReadPlan<'request>>,
     ) -> Self {
         Self {
             provenance,
-            plan,
-            available: BTreeSet::new(),
-            hashes: BTreeMap::new(),
+            snapshot_read_plan,
+            available_snapshots: BTreeSet::new(),
+            source_hashes_by_tree_and_source: BTreeMap::new(),
         }
     }
 
-    /// Observes one binding, reusing only successful historical results.
+    /// Observes one binding, reusing only successful snapshot results.
     ///
     /// # Arguments
     ///
@@ -284,16 +292,16 @@ impl<'service, 'request, F: FileReader> HistoricalObservations<'service, 'reques
             if source.get_local().is_none() {
                 continue;
             }
-            let historical = basis
-                .map(|tree| self.get_historical_hash_by_tree_and_source(tree, source))
+            let source_hash = basis
+                .map(|tree| self.get_source_hash_by_tree_and_source(tree, source))
                 .transpose()?;
-            let current = self.provenance.get_current_hash_by_source(source)?;
-            if current.is_none() || historical == Some(None) {
+            let current_source_hash = self.provenance.get_current_source_hash_by_source(source)?;
+            if current_source_hash.is_none() || source_hash == Some(None) {
                 observation.issues.insert(ProvenanceIssue::SourceNotFound {
                     source: source.clone(),
                 });
                 observation.flags.insert(SearchFlag::SourceNotFound);
-            } else if historical.is_some_and(|hash| hash != current) {
+            } else if source_hash.is_some_and(|hash| hash != current_source_hash) {
                 observation.flags.insert(SearchFlag::SourceChanged);
             }
         }
@@ -301,7 +309,7 @@ impl<'service, 'request, F: FileReader> HistoricalObservations<'service, 'reques
     }
 
     fn get_snapshot_state_by_tree(&mut self, tree: &TreeOid) -> DocumentResult<SnapshotState> {
-        if self.available.contains(tree) {
+        if self.available_snapshots.contains(tree) {
             return Ok(SnapshotState::Available);
         }
         let state = self
@@ -310,58 +318,69 @@ impl<'service, 'request, F: FileReader> HistoricalObservations<'service, 'reques
             .tree_verify_by_oid(tree)
             .map_err(map_error_to_source_provenance_document_error)?;
         if state == SnapshotState::Available && self.is_capacity_available() {
-            self.available.insert(tree.clone());
+            self.available_snapshots.insert(tree.clone());
         }
         Ok(state)
     }
 
-    fn get_historical_hash_by_tree_and_source(
+    fn get_source_hash_by_tree_and_source(
         &mut self,
         tree: &TreeOid,
         source: &SourceUri,
     ) -> DocumentResult<Option<Sha256>> {
         let key = (tree.clone(), source.clone());
-        if let Some(hash) = self.hashes.get(&key) {
+        if let Some(hash) = self.source_hashes_by_tree_and_source.get(&key) {
             return Ok(*hash);
         }
-        if let Some(group) = self.plan.as_ref().and_then(|plan| {
-            let local = source.get_local()?;
-            plan.groups.get(&(tree, local.get_path()))
-        }) {
+        if let Some(group) = self
+            .snapshot_read_plan
+            .as_ref()
+            .and_then(|snapshot_read_plan| {
+                let local = source.get_local()?;
+                snapshot_read_plan
+                    .sources_by_tree_and_path
+                    .get(&(tree, local.get_path()))
+            })
+        {
             let hashes = self
                 .provenance
-                .get_historical_hashes_by_tree_and_sources(tree, group)
+                .get_source_hashes_by_tree_and_sources(tree, group)
                 .map_err(map_error_to_source_provenance_document_error)?;
             if let Some(hashes) = hashes {
                 for (source, hash) in group.iter().zip(hashes) {
                     // Earlier exact absence survives a later successful group recovery.
-                    self.hashes
+                    self.source_hashes_by_tree_and_source
                         .entry((tree.clone(), (*source).clone()))
                         .or_insert(hash);
                 }
-                return Ok(self.hashes.get(&key).copied().flatten());
+                return Ok(self
+                    .source_hashes_by_tree_and_source
+                    .get(&key)
+                    .copied()
+                    .flatten());
             }
             if self.is_capacity_available() {
-                self.hashes.insert(key, None);
+                self.source_hashes_by_tree_and_source.insert(key, None);
             }
             return Ok(None);
         }
         let hash = self
             .provenance
-            .get_snapshot_hash_by_tree_and_source(tree, source)
+            .get_source_hash_by_tree_and_source(tree, source)
             .map_err(map_error_to_source_provenance_document_error)?;
         if self.is_capacity_available() {
-            self.hashes.insert(key, hash);
+            self.source_hashes_by_tree_and_source.insert(key, hash);
         }
         Ok(hash)
     }
 
     fn is_capacity_available(&self) -> bool {
-        self.available.len() + self.hashes.len() < HISTORICAL_ENTRY_LIMIT
+        self.available_snapshots.len() + self.source_hashes_by_tree_and_source.len()
+            < SNAPSHOT_ENTRY_LIMIT
     }
 }
 
-impl<'request> HistoricalPlan<'request> {
+impl<'request> SnapshotReadPlan<'request> {
     fn build_plan(requests: &'request [ProvenanceRequest<'_>]) -> Option<Self> {
         let mut roots = BTreeSet::new();
         let mut addresses = BTreeSet::new();
@@ -371,7 +390,7 @@ impl<'request> HistoricalPlan<'request> {
                 continue;
             };
             if !roots.contains(tree) {
-                if roots.len() + addresses.len() == HISTORICAL_ENTRY_LIMIT {
+                if roots.len() + addresses.len() == SNAPSHOT_ENTRY_LIMIT {
                     return None;
                 }
                 address_bytes = get_address_byte_count(address_bytes, tree.as_str().len(), 0)?;
@@ -381,7 +400,7 @@ impl<'request> HistoricalPlan<'request> {
                 if source.get_local().is_none() || addresses.contains(&(tree, source)) {
                     continue;
                 }
-                if roots.len() + addresses.len() == HISTORICAL_ENTRY_LIMIT {
+                if roots.len() + addresses.len() == SNAPSHOT_ENTRY_LIMIT {
                     return None;
                 }
                 address_bytes = get_address_byte_count(
@@ -392,29 +411,31 @@ impl<'request> HistoricalPlan<'request> {
                 addresses.insert((tree, source));
             }
         }
-        let mut groups: BTreeMap<_, Vec<_>> = BTreeMap::new();
+        let mut sources_by_tree_and_path: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for (tree, source) in addresses {
             if let Some(local) = source.get_local() {
-                groups
+                sources_by_tree_and_path
                     .entry((tree, local.get_path()))
                     .or_default()
                     .push(source);
             }
         }
         // Admission reserves logical capacity for every root and exact result together.
-        Some(Self { groups })
+        Some(Self {
+            sources_by_tree_and_path,
+        })
     }
 }
 
 fn get_address_byte_count(
-    current: usize,
+    current_byte_count: usize,
     tree_length: usize,
     source_length: usize,
 ) -> Option<usize> {
-    let bytes = current
+    let bytes = current_byte_count
         .checked_add(tree_length)?
         .checked_add(source_length)?;
-    (bytes <= HISTORICAL_PLAN_ADDRESS_BYTE_LIMIT).then_some(bytes)
+    (bytes <= SNAPSHOT_PLAN_ADDRESS_BYTE_LIMIT).then_some(bytes)
 }
 
 fn build_observation(
