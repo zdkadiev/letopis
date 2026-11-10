@@ -273,3 +273,19 @@ scope; OS page cache and shared-host load are uncontrolled. These synthetic
 disabled-provider runs do not establish production or real-provider performance.
 
 Harness checks: `cd tests/performance && /opt/homebrew/bin/python3.12 -B -m unittest test_historical`.
+
+### Supplemental unique-path hierarchy
+
+`--variant distinct-sharded` keeps one distinct whole-file source per knowledge
+element and the same source bytes as `distinct`, but puts 100 files in each
+`sources/shard-NNNN/` directory (1,000 leaf directories at 100k). This separately
+labelled control tests unique-path/fallback behavior without one huge flat Git
+tree. The deterministic path is `sources/shard-{index // 100:04d}/source-{index}.txt`.
+Before and after must use the same variant and equivalent hashes/requests.
+
+Use a new `.../timings-100000-distinct-sharded` evidence directory and the same
+120/600/1200-second budgets and three-pair schedule. This is a different input
+shape, not a retry or successful completion of a censored flat-tree workload.
+Do not compare absolute timings across the flat/sharded variants as an isolated
+product speedup; paths, tree shape, and source-tree OID differ. Preserve original
+timeout/cancellation receipts and the reason a supplemental control was needed.

@@ -1,6 +1,7 @@
 """Historical fixture bytes and durable campaign scheduling contracts."""
 
 import contextlib
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -53,6 +54,50 @@ class HistoricalTests(unittest.TestCase):
             self.assertTrue(all(content == contents[0] for content in contents))
             self.assertEqual(run_git(repository, "ls-tree", "-r", "--name-only", fixture["source_tree"]).count(b"\n"), 30)
             self.assertFalse(json.loads((repository / ".letopis/config.json").read_text())["embedding_model"]["enabled"])
+
+    def test_sharded_distinct_fixture_preserves_unique_whole_file_sources(self):
+        # Given: enough unique files to cross two leaf-directory boundaries.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            # When: rendering the supplemental control twice with real Git trees.
+            left = historical.prepare_historical_fixture(root / "left", 201, "distinct-sharded")
+            right = historical.prepare_historical_fixture(root / "right", 201, "distinct-sharded")
+            repository = left["repository"]
+            source_files = sorted((repository / "sources").rglob("*.txt"))
+            # Then: no duplicate selectors or flat-tree fallback hides the layout.
+            self.assertEqual(left["counts"], {"knowledge": 201, "source": 201, "edges": 201, "includes": 0})
+            self.assertEqual(left["source_file_count"], 201)
+            self.assertEqual([len(list(path.iterdir())) for path in sorted((repository / "sources").iterdir())], [100, 100, 1])
+            self.assertEqual(left["source_tree"], right["source_tree"])
+            self.assertEqual(left["input_sha256"], right["input_sha256"])
+            data = b"".join(path.read_bytes() for path in sorted((repository / "knowledge").iterdir()))
+            selectors = re.findall(rb'path=(sources/[^"\n]+)', data)
+            self.assertEqual(len(set(selectors)), 201)
+            self.assertNotIn(b"#L", data)
+            for path in ("sources/shard-0000/source-0.txt", "sources/shard-0000/source-99.txt",
+                         "sources/shard-0001/source-100.txt", "sources/shard-0002/source-200.txt"):
+                self.assertIn(path.encode(), selectors)
+            tree_paths = run_git(repository, "ls-tree", "-r", "--name-only", left["source_tree"]).splitlines()
+            self.assertEqual(set(tree_paths), set(selectors))
+            self.assertEqual(len(source_files), 201)
+            for path in source_files:
+                relative = str(path.relative_to(repository))
+                self.assertEqual(path.read_bytes(), historical.SOURCE_BYTES)
+                self.assertEqual(run_git(repository, "show", left["source_tree"] + ":" + relative), path.read_bytes())
+                self.assertEqual(left["input_sha256"][relative], hashlib.sha256(path.read_bytes()).hexdigest())
+
+    def test_cli_accepts_supplemental_sharded_variant(self):
+        # Given: the supplemental workload selected through the public CLI.
+        argv = ["historical.py", "--before", "/before.json", "--after", "/after.json",
+                "--nodes", "100000", "--variant", "distinct-sharded", "--stage", "timings",
+                "--evidence", "/new-evidence"]
+        # When: parsing without launching the expensive external campaign.
+        with patch("sys.argv", argv), patch("historical.run_campaign", return_value={"outcome": "complete"}) as campaign:
+            historical.main()
+        # Then: the real parser dispatches the requested variant and scale.
+        arguments = campaign.call_args.args[0]
+        self.assertEqual(arguments.variant, "distinct-sharded")
+        self.assertEqual(arguments.nodes, 100000)
 
     def test_three_pairs_alternate_sides(self):
         # Given: instrumented inexpensive calls and real standalone fixtures.

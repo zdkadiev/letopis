@@ -27,7 +27,7 @@ def main() -> None:
     parser.add_argument("--before", type=Path, required=True)
     parser.add_argument("--after", type=Path)
     parser.add_argument("--nodes", type=int, choices=(10000, 100000), required=True)
-    parser.add_argument("--variant", choices=("shared", "distinct"), required=True)
+    parser.add_argument("--variant", choices=("shared", "distinct", "distinct-sharded"), required=True)
     parser.add_argument("--stage", choices=("timings", "profiles"), required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--scenarios", nargs="+", choices=("check", "status"))
@@ -100,15 +100,17 @@ def build_manifest(arguments, builds):
 
 def prepare_historical_fixture(output: Path, nodes: int, variant: str) -> dict:
     """Create standalone inputs with a complete, byte-identical historical source tree."""
-    if variant not in ("shared", "distinct"):
+    if variant not in ("shared", "distinct", "distinct-sharded"):
         raise ValueError("unknown historical variant")
     fixture = prepare_fixture(output, nodes)
     repository = fixture["repository"]
     shutil.rmtree(repository / "sources")
     (repository / "sources").mkdir()
-    paths = ["sources/shared.txt"] if variant == "shared" else [f"sources/source-{index}.txt" for index in range(nodes)]
+    paths = ["sources/shared.txt"] if variant == "shared" else [get_source_selector(index, variant) for index in range(nodes)]
     for relative in paths:
-        (repository / relative).write_bytes(SOURCE_BYTES)
+        path = repository / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(SOURCE_BYTES)
     run_git(repository, "add", "-A", "--", "sources")
     source_tree = run_git(repository, "write-tree").decode().strip()
     randomizer = random.Random(65)
@@ -124,7 +126,8 @@ def prepare_historical_fixture(output: Path, nodes: int, variant: str) -> dict:
                 stream.write(build_fragment(index, source, source_tree, randomizer))
                 index += 1
     inputs = {str(path.relative_to(repository)): hash_file(path)
-              for directory in ("sources", "knowledge") for path in sorted((repository / directory).iterdir())}
+              for directory in ("sources", "knowledge") for path in sorted((repository / directory).rglob("*"))
+              if path.is_file()}
     counts = {"knowledge": nodes, "source": len(selectors), "edges": nodes, "includes": 0}
     requests = {name: build_request(name)[1] for name in ("check", "status")}
     expected = {name: {"command": name, "counts": counts} for name in requests}
@@ -134,13 +137,15 @@ def prepare_historical_fixture(output: Path, nodes: int, variant: str) -> dict:
                 "source_file_count": len(paths), "source_bytes_per_file": len(SOURCE_BYTES),
                 "config_sha256": hash_file(repository / ".letopis/config.json"),
                 "packing": fixture["packing"],
-                "comparison_limit": "variants differ in source cardinality; absolute timings do not isolate one variable"}
+                "comparison_limit": "variants differ in source cardinality or directory shape; absolute timings do not isolate one variable"}
     # Retain the original generator receipt; this new receipt describes actual rewritten bytes.
     write_json(output / "historical.json", manifest)
     return dict(manifest, repository=repository)
 
 
 def get_source_selector(index: int, variant: str) -> str:
+    if variant == "distinct-sharded":
+        return f"sources/shard-{index // 100:04d}/source-{index}.txt"
     if variant == "distinct":
         return f"sources/source-{index}.txt"
     if index % 16 == 0:
