@@ -2,7 +2,7 @@ use super::{LineRange, LocalSource, RepoPath};
 
 #[test]
 fn batch_ranges_preserve_exact_line_bytes() {
-    // Given
+    // Given: whole-file, complete and incomplete selectors over mixed line endings.
     let selectors = [
         None,
         Some(LineRange::new(1, 1).unwrap()),
@@ -11,7 +11,7 @@ fn batch_ranges_preserve_exact_line_bytes() {
         Some(LineRange::new(3, 4).unwrap()),
     ];
 
-    // When / Then
+    // When / Then: exact byte ranges preserve line endings and reject the incomplete selector.
     assert_eq!(
         LocalSource::get_byte_ranges(b"a\r\nb\nlast", &selectors),
         vec![Some(0..9), Some(0..3), Some(3..5), Some(3..9), None]
@@ -20,10 +20,10 @@ fn batch_ranges_preserve_exact_line_bytes() {
 
 #[test]
 fn batch_ranges_distinguish_empty_files_from_missing_lines() {
-    // Given
+    // Given: whole-file and first-line selectors over an empty file.
     let selectors = [None, Some(LineRange::new(1, 1).unwrap())];
 
-    // When / Then
+    // When / Then: only the whole-file selector has an empty range.
     assert_eq!(
         LocalSource::get_byte_ranges(b"", &selectors),
         vec![Some(0..0), None]
@@ -32,13 +32,13 @@ fn batch_ranges_distinguish_empty_files_from_missing_lines() {
 
 #[test]
 fn batch_ranges_do_not_add_an_empty_line_after_trailing_lf() {
-    // Given
+    // Given: first- and second-line selectors over a file ending in LF.
     let selectors = [
         Some(LineRange::new(1, 1).unwrap()),
         Some(LineRange::new(2, 2).unwrap()),
     ];
 
-    // When / Then
+    // When / Then: the trailing LF belongs to the first line and adds no second line.
     assert_eq!(
         LocalSource::get_byte_ranges(b"a\n", &selectors),
         vec![Some(0..2), None]
@@ -47,7 +47,7 @@ fn batch_ranges_do_not_add_an_empty_line_after_trailing_lf() {
 
 #[test]
 fn batch_ranges_preserve_binary_bytes_and_selector_order_with_duplicates() {
-    // Given
+    // Given: unordered and repeated selectors over binary bytes and mixed line endings.
     let selectors = [
         Some(LineRange::new(3, 3).unwrap()),
         Some(LineRange::new(1, 2).unwrap()),
@@ -57,7 +57,7 @@ fn batch_ranges_preserve_binary_bytes_and_selector_order_with_duplicates() {
         None,
     ];
 
-    // When / Then
+    // When / Then: byte ranges preserve binary content, selector order and duplicates.
     assert_eq!(
         LocalSource::get_byte_ranges(b"\xff\0\r\n\n\x80", &selectors),
         vec![
@@ -73,14 +73,14 @@ fn batch_ranges_preserve_binary_bytes_and_selector_order_with_duplicates() {
 
 #[test]
 fn batch_ranges_handle_maximum_line_numbers_without_overflow() {
-    // Given
+    // Given: selectors containing maximum line numbers and one available line.
     let selectors = [
         Some(LineRange::new(1, u64::MAX).unwrap()),
         Some(LineRange::new(u64::MAX, u64::MAX).unwrap()),
         Some(LineRange::new(1, 1).unwrap()),
     ];
 
-    // When / Then
+    // When / Then: unavailable ranges return None without overflowing.
     assert_eq!(
         LocalSource::get_byte_ranges(b"a\n", &selectors),
         vec![None, None, Some(0..2)]
@@ -89,14 +89,15 @@ fn batch_ranges_handle_maximum_line_numbers_without_overflow() {
 
 #[test]
 fn batch_ranges_accept_empty_selector_lists() {
-    // When / Then
+    // Given: nonempty and empty files with no selectors.
+    // When / Then: both selections return no byte ranges.
     assert!(LocalSource::get_byte_ranges(b"a\nb\n", &[]).is_empty());
     assert!(LocalSource::get_byte_ranges(b"", &[]).is_empty());
 }
 
 #[test]
 fn batch_ranges_match_independent_selection_for_small_binary_arrays() {
-    // Given
+    // Given: all small binary arrays and ordered selectors including unavailable lines.
     let mut selectors = vec![None];
     for start in 1..=7 {
         for end in start..=8 {
@@ -113,7 +114,7 @@ fn batch_ranges_match_independent_selection_for_small_binary_arrays() {
                 encoded /= alphabet.len();
             }
 
-            // When / Then
+            // When / Then: each batch selection matches the independent single-source selection.
             verify_batch_selection(&bytes, &selectors);
         }
     }

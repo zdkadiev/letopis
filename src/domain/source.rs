@@ -121,6 +121,11 @@ impl LocalSource {
     /// Only requested line boundaries are retained; no per-line index is built.
     /// This operation performs no I/O.
     ///
+    /// # Arguments
+    ///
+    /// * `bytes` - the complete file contents used to locate the selected ranges.
+    /// * `selectors` - inclusive line ranges, or `None` for the whole file, in result order.
+    ///
     /// # Returns
     /// One byte range per selector in the original order, including duplicates,
     /// or `None` when the complete selected line range is unavailable.

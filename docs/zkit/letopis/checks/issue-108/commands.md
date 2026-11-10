@@ -184,3 +184,19 @@ inclusive lines, and SHA-256 checked. Requests, complete responses, source-basis
 hashes, exact returned-tree bytes and CLI ledger are retained in
 `task-5-evidence/knowledge/`. The source basis uses report lines 1–77, allowing later
 review notes below the stable-results marker without changing the new binding.
+
+## Final compliance verification
+
+From the actual corrected task worktree, with no source-copy build into the canonical target:
+
+```sh
+CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target CARGO_BUILD_JOBS=2 make verify V=1
+```
+
+The corrected Rust diff contains only API documentation and described test phases; no operations or assertions change. Current Rust file hashes differ from the frozen measured candidate manifest for those two files only. Frozen before/after archives and all original timings, profiles and probes remain unchanged; none were rerun for these corrections. Exact fresh output and totals are in `final-fix-evidence/verify.log`, `verify.exit` and `verify.summary.json` beside the SDD ledger.
+
+The existing new knowledge element does not bind `src/domain/source.rs`. Its report lines 1-77, provenance file, diagnostic batch-size line and batch-owner range were compared byte-for-byte with existing basis `cd688426bf88773c9d3fc3fb3f658a0a31302cd9`; all matched. The entire knowledge file, including its previous dirty prefix and old metadata, remains unchanged, so no basis OID was changed.
+
+Using the immutable candidate executable verified against its binary SHA-256 and only this worktree's existing disabled-embedding configuration, fresh `check {}`, search for `"Historical range reuse"` with and without `needs_recheck:true`, and the original five-ID inspect request all exited 0/ok:true. Check returned no errors; the new element had no flags and was absent from the needs_recheck search. Inspect returned tree `1335e90eb6ed3b77df1ffc5f1b1336389647cf35`; all five descriptors were read from that tree and their exact addressed-byte SHA-256 hashes matched. Full requests/responses, basis comparisons and returned-tree byte proofs are in `final-fix-evidence/knowledge/`.
+
+Final result: exit 0. Debug plus example 1,297 passed / 0 failed / 11 ignored; release 1,287 passed / 0 failed / 11 ignored. Fmt, all-target check/Clippy, fixed-value lint, strict Rustdoc and doc tests passed; FIFO watchdog passed unchanged in both profiles.

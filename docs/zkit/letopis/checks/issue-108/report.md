@@ -84,9 +84,9 @@ Cargo feature evidence shows sha2 0.10.9 default/std without asm. Its dependency
 | Before | 5a6591bc9ded98a1ee9916b325133bbfa056cf5f | eedaaab966612d01a00058bf00260aa7f2e2d6706bdb51cdb159ea90b98dda7e |
 | Candidate | 557d8efce1adc1b8696fde76b2ee3a9d6c8edc29 | 50a1c9016ea2d4e6decb5661431de540d37e95ff960852d5334f31e0e5635b99 |
 
-Immutable source archives, per-input hashes, original release receipts, binaries and available symbols are in `.artifacts/issue-108/{before,after}-build/`. Both use cargo build --release --locked --offline --message-format=json with CARGO_PROFILE_RELEASE_DEBUG=1 and the same pinned rustc. The invocation-local freeze wrapper only redirects the build target; archive/hash verification is unchanged. Product inputs were clean at freeze; the preserved dirty knowledge/documentation delta is outside the product-input manifest. Later harness/report commits do not change the frozen Rust inputs.
+Immutable source archives, per-input hashes, original release receipts, binaries and available symbols are in `.artifacts/issue-108/{before,after}-build/`. Both use cargo build --release --locked --offline --message-format=json with CARGO_PROFILE_RELEASE_DEBUG=1 and the same pinned rustc. The invocation-local freeze wrapper only redirects the build target; archive/hash verification is unchanged. Product inputs were clean at freeze; the preserved dirty knowledge/documentation delta is outside the product-input manifest. The subsequent harness/report commits through d27c168 did not change those frozen Rust inputs. Final review corrections add only API documentation and test phase comments to Rust files; current source bytes therefore differ from the frozen manifest while the algorithm and assertions are unchanged. The measurements remain tied to the immutable 557d8ef candidate and its archive, not a claim of byte-identical current inputs.
 
-Full shipping CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target CARGO_BUILD_JOBS=2 make verify V=1 exited 0 on final Rust state 557d8ef. Debug plus example: 1,297 passed, 0 failed, 11 ignored; release: 1,287 passed, 0 failed, 11 ignored. Fmt, all-target check/Clippy with -D warnings, fixed-value lint, rustdoc with -D warnings and doc tests passed. The previously failing FIFO watchdog passed unchanged in debug and release. No watchdog was skipped or relaxed, and no shipping Rust fix was made by Task 5. Storage/native/build/vendor are unchanged, so no extra native runner was required. Exact output and parsed totals: ignored `task-5-evidence/verify-initial.log` and its summary JSON.
+The initial full shipping CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target CARGO_BUILD_JOBS=2 make verify V=1 exited 0 on the measured Rust state 557d8ef. Debug plus example: 1,297 passed, 0 failed, 11 ignored; release: 1,287 passed, 0 failed, 11 ignored. Fmt, all-target check/Clippy with -D warnings, fixed-value lint, rustdoc with -D warnings and doc tests passed. The previously failing FIFO watchdog passed unchanged in debug and release. No watchdog was skipped or relaxed, and no shipping Rust fix was made by Task 5. Storage/native/build/vendor are unchanged, so no extra native runner was required. Exact output and parsed totals: ignored `task-5-evidence/verify-initial.log` and its summary JSON.
 
 The isolated probe used its own `.artifacts/issue-108/instrumentation-target`, never the canonical target. Binary SHA-256 2a6ae2def5cba5a132176d5f994cecd1a66b5993b9a83fbd4e3461f18655f8ac; patch SHA-256 979b0c083b3ba7c8223c7b08107ed4f532fb8e75decbe3b20ed2b66fcaa49098; source-manifest SHA-256 bd6e21699a1c3326ffa946b9f02b4ca133794985216e7ff119781031620aa21b. Exact source, patch, build log, generated dSYM, artifact hashes, raw measurements and counters are in ignored `task-5-evidence/instrumentation/`. All six calls passed independent CLI/count validation. The existing Task 3 real-decode evidence retains its own earlier instrumented identity and is not relabelled as this build.
 
@@ -110,7 +110,7 @@ Non-product setup errors were retained: an initial test-write invocation used a 
 
 The original user-checkout performance knowledge delta was saved byte-for-byte plus patch and carried into this worktree unchanged; original checkout/config/cache were untouched. Old created_at/source_snapshot values remain historical. New measured knowledge, exact source-basis/range checks and CLI validation are recorded below after completion.
 
-Self-review checked source identities, valid/failed attempt classification, no sample pooling across phases/variants, CLI-only profile PID attribution, inclusive overlap, actual/inferred counter distinction, 256-node batch scope, fixed cache admission/lifetime, fresh live capture, backend configuration, RSS tradeoff, preserved knowledge delta and owned-file commits. Independent Task 5 and whole-branch review belongs to the controller and is not claimed complete here.
+Self-review checked source identities, valid/failed attempt classification, no sample pooling across phases/variants, CLI-only profile PID attribution, inclusive overlap, actual/inferred counter distinction, 256-node batch scope, fixed cache admission/lifetime, fresh live capture, backend configuration, RSS tradeoff, preserved knowledge delta and owned-file commits. Independent Task 5 review subsequently approved the amended scope. Whole-branch final review found no production correctness/Critical/Important defects and three Minor compliance findings; the comment/documentation corrections await one controller-owned scoped re-review.
 
 ## Execution rulings preserved
 
@@ -155,7 +155,7 @@ Additional rulings during Task 5:
 | 5.4 profiles/cost/backend | PASS, 24 valid captures + six actual candidate cost calls + backend evidence |
 | 5.5 report and limits | Recorded with regressions, RSS rise, censors and scope qualifications |
 | 5.6 knowledge | PASS, verified complete source tree and stable addressed ranges; check/search/inspect/read-back |
-| 5.7 independent final review | Controller-owned, pending |
+| 5.7 independent final review | Whole-branch review complete; three Minor corrections submitted; scoped re-review pending |
 | 5.8 local commits/handoff | Harness commit 81e96a8; evidence/knowledge commit delivered in task-5-report.md; controller final user handoff pending |
 
 No push, merge or issue closure was performed. Exact invocations and raw-output locations are in [commands.md](commands.md). All raw campaign/probe artifacts are local ignored evidence; the committed report preserves the measured results and execution decisions, not portable copies of every raw capture.
@@ -165,3 +165,27 @@ No push, merge or issue closure was performed. Exact invocations and raw-output 
 The new element is `letopis/development/performance-bottlenecks.md#historical-range-reuse-2026-11-10`. Its verified complete source tree is `cd688426bf88773c9d3fc3fb3f658a0a31302cd9`; bindings include stable report lines 1–77 and the exact current provenance/batch-owner bytes. A separate temporary index left the real index unchanged. The old knowledge delta remains a byte-identical prefix with its original metadata.
 
 Using only the worktree cache with embeddings disabled, `check` exited 0/ok:true with `errors:[]`; search returned the new element at revision 2 with `flags:[]`. `inspect` exited 0 and returned snapshot `477b390f669446f42feb496cc329ccf4b0138b21`; all five knowledge/source descriptors were read from that same tree, sliced using returned inclusive lines and matched their returned SHA-256 hashes. Full requests/responses, basis/range hashes and returned-tree bytes are retained in `task-5-evidence/knowledge/`. Old sections keep their original basis and existing source_changed search flags; no new verification result is attributed to them.
+
+## Final review scope limits
+
+The final reviewer declined to extend judgment into the following areas. These execution rulings preserve evidence limits; they add no product decisions.
+
+Final: Ruling: Original flat100k startup remains an unchanged Git-scaling limitation outside108; retain censor and sampled hotspot — cost is no accepted flat100k latency result.
+
+Final: Ruling: Hardware SHA, live caching, parallelism, collect_source_references, singleton search/traverse and compare_revision remain outside this approved implementation — costs are remaining measured hotspots and no broader speedup promise.
+
+Final: Ruling: Production/minimumhardware/realprovider/coldcache/tail acceptance is not inferred from synthetic shared-host data — cost is limited generalizability, disclosed in report.
+
+Final: Ruling: Whole-RSS deltas are retained without assigning every byte or claiming universal leak bounds; code cache ownership/budgets and actual gauges are checked — cost is unresolved whole-process allocation attribution.
+
+Final: Ruling: No instrumented baseline decode/SHA totals are invented; compare actual ordinary results and candidate counters with separate direct/unit evidence — cost is no measured baseline operation-count reduction table.
+
+Final: Ruling: No exhaustive unchanged infrastructure/native/platform re-audit is added; reader/audit regressions plus mandatory project verification apply — cost is no new Linux/native acceptance beyond this branch's required checks.
+
+## Final compliance correction provenance
+
+The three Minor findings were addressed by documenting both get_byte_ranges parameters, describing Given / When / Then phases in all seven domain tests, and reconciling completed or superseded plan steps. Tasks 1-4 are complete; baseline-only scale timing was superseded by paired Task 5 runs. Original 5.3 flat 100k and final 5.8 handoff remain unfinished. The completed final review is followed by one scoped re-review of these corrections. No behavioral tests or mutations were added for comment-only changes; existing tests are included in the fresh required make verify. No benchmark, profile, or probe was rerun, and the 48 ordinary samples, their medians and stable report lines 1-77 remain unchanged.
+
+Fresh final CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target CARGO_BUILD_JOBS=2 make verify V=1 exited 0 on the corrected tree: debug plus example 1,297 passed / 0 failed / 11 ignored; release 1,287 passed / 0 failed / 11 ignored. Fmt, all-target check/Clippy -D warnings, fixed-value lint, strict Rustdoc and doc tests passed; the FIFO watchdog passed unchanged in both profiles. Exact log, exit and totals: ignored final-fix-evidence/{verify.log,verify.exit,verify.summary.json} beside the SDD ledger.
+
+The new knowledge element does not bind the changed domain file. All four existing addressed source bytes still match basis cd688426bf88773c9d3fc3fb3f658a0a31302cd9 exactly, so the entire knowledge file and metadata were preserved. Fresh check/search/needs_recheck/inspect succeeded; all five descriptors matched exact returned-tree SHA-256 at snapshot 1335e90eb6ed3b77df1ffc5f1b1336389647cf35. New proof is retained separately in final-fix-evidence/knowledge/.
