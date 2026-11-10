@@ -200,3 +200,8 @@ The existing new knowledge element does not bind `src/domain/source.rs`. Its rep
 Using the immutable candidate executable verified against its binary SHA-256 and only this worktree's existing disabled-embedding configuration, fresh `check {}`, search for `"Historical range reuse"` with and without `needs_recheck:true`, and the original five-ID inspect request all exited 0/ok:true. Check returned no errors; the new element had no flags and was absent from the needs_recheck search. Inspect returned tree `1335e90eb6ed3b77df1ffc5f1b1336389647cf35`; all five descriptors were read from that tree and their exact addressed-byte SHA-256 hashes matched. Full requests/responses, basis comparisons and returned-tree byte proofs are in `final-fix-evidence/knowledge/`.
 
 Final result: exit 0. Debug plus example 1,297 passed / 0 failed / 11 ignored; release 1,287 passed / 0 failed / 11 ignored. Fmt, all-target check/Clippy, fixed-value lint, strict Rustdoc and doc tests passed; FIFO watchdog passed unchanged in both profiles.
+
+
+## Archived process paths
+
+The commands above preserve the paths used during execution. Process scripts and logs formerly under `.superpowers/sdd/2026-11-10-issue-108-historical-provenance/` are now preserved at `.artifacts/issue-108/process/` with the same suffix. For replay, substitute that archive prefix for the former scratch prefix and run from the task worktree. Build, fixture, timing, profile and instrumentation paths already under `.artifacts/issue-108/` are unchanged.

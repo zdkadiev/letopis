@@ -155,8 +155,8 @@ Additional rulings during Task 5:
 | 5.4 profiles/cost/backend | PASS, 24 valid captures + six actual candidate cost calls + backend evidence |
 | 5.5 report and limits | Recorded with regressions, RSS rise, censors and scope qualifications |
 | 5.6 knowledge | PASS, verified complete source tree and stable addressed ranges; check/search/inspect/read-back |
-| 5.7 independent final review | Whole-branch review complete; three Minor corrections submitted; scoped re-review pending |
-| 5.8 local commits/handoff | Harness commit 81e96a8; evidence/knowledge commit delivered in task-5-report.md; controller final user handoff pending |
+| 5.7 independent final review | PASS: whole-branch review found no production defect; all three Minor corrections approved by scoped re-review |
+| 5.8 local commits/handoff | Local implementation, evidence, knowledge and compliance commits complete; final report prepared; integration awaits user choice |
 
 No push, merge or issue closure was performed. Exact invocations and raw-output locations are in [commands.md](commands.md). All raw campaign/probe artifacts are local ignored evidence; the committed report preserves the measured results and execution decisions, not portable copies of every raw capture.
 
@@ -184,8 +184,15 @@ Final: Ruling: No exhaustive unchanged infrastructure/native/platform re-audit i
 
 ## Final compliance correction provenance
 
-The three Minor findings were addressed by documenting both get_byte_ranges parameters, describing Given / When / Then phases in all seven domain tests, and reconciling completed or superseded plan steps. Tasks 1-4 are complete; baseline-only scale timing was superseded by paired Task 5 runs. Original 5.3 flat 100k and final 5.8 handoff remain unfinished. The completed final review is followed by one scoped re-review of these corrections. No behavioral tests or mutations were added for comment-only changes; existing tests are included in the fresh required make verify. No benchmark, profile, or probe was rerun, and the 48 ordinary samples, their medians and stable report lines 1-77 remain unchanged.
+The three Minor findings were addressed by documenting both get_byte_ranges parameters, describing Given / When / Then phases in all seven domain tests, and reconciling completed or superseded plan steps. Tasks 1-4 are complete; baseline-only scale timing was superseded by paired Task 5 runs. Original 5.3 flat 100k remains unavailable. The scoped re-review approved all three corrections with no new breakage; final local handoff is prepared. No behavioral tests or mutations were added for comment-only changes; existing tests are included in the fresh required make verify. No benchmark, profile, or probe was rerun, and the 48 ordinary samples, their medians and stable report lines 1-77 remain unchanged.
 
 Fresh final CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target CARGO_BUILD_JOBS=2 make verify V=1 exited 0 on the corrected tree: debug plus example 1,297 passed / 0 failed / 11 ignored; release 1,287 passed / 0 failed / 11 ignored. Fmt, all-target check/Clippy -D warnings, fixed-value lint, strict Rustdoc and doc tests passed; the FIFO watchdog passed unchanged in both profiles. Exact log, exit and totals: ignored final-fix-evidence/{verify.log,verify.exit,verify.summary.json} beside the SDD ledger.
 
 The new knowledge element does not bind the changed domain file. All four existing addressed source bytes still match basis cd688426bf88773c9d3fc3fb3f658a0a31302cd9 exactly, so the entire knowledge file and metadata were preserved. Fresh check/search/needs_recheck/inspect succeeded; all five descriptors matched exact returned-tree SHA-256 at snapshot 1335e90eb6ed3b77df1ffc5f1b1336389647cf35. New proof is retained separately in final-fix-evidence/knowledge/.
+
+
+## Final controller disposition and process archive
+
+The whole-branch review found no production correctness, Critical or Important defect. Its three Minor documentation/compliance findings were corrected in commit `19c8a71`; the single scoped re-review approved all three and reported no new breakage. Fresh mandatory verification on that corrected Rust state passed as recorded above. The final bookkeeping commit changes only this report, the command guide and plan status; measured results and report lines 1–77 remain unchanged. Original flat 100k ordinary acceptance is still unavailable, while the separately labelled representative controls are complete. No merge, push, PR or issue closure is part of this handoff.
+
+Process audit material has been archived intact at `.artifacts/issue-108/process/`. Historical paths beginning `.superpowers/sdd/2026-11-10-issue-108-historical-provenance/` map to that archive with the same suffix; raw records retain their original as-run paths and identities. The archive includes task reports, review packages, canonical verification logs, mutation patches/logs, knowledge byte proofs and execution ledger. Build/campaign/profile/probe artifacts already stored elsewhere under `.artifacts/issue-108/` keep their original paths. This archives the plan scratch workspace without deleting its evidence.
