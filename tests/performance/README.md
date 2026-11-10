@@ -232,7 +232,7 @@ unassessed. [Issue-67 evidence index](../../docs/zkit/letopis/checks/issue-67/ev
 It creates standalone repositories with seed 65, 30 elements per Markdown file,
 2,000 bytes per fragment and disabled embeddings. Every element has the same
 search marker and one external link. `shared` uses one 100-line source, whole-file
-selectors for every sixteenth element and otherwise line `1 + index % 64`;
+source addresses for every sixteenth element and otherwise line `1 + index % 64`;
 `distinct` gives each element its own whole-file source with identical content.
 Each shape owns a complete source tree and exact fixture hashes/counts. Their
 different source cardinalities mean absolute times do not isolate one variable.
