@@ -1,6 +1,6 @@
 ---
 name: letopis
-description: Use when saving, checking, searching, traversing, or reading source-linked coding knowledge in a Git repository with Letopis.
+description: Use when setting up Letopis or authoring, organizing, validating, or maintaining source-linked coding knowledge in a Git repository.
 ---
 
 # Letopis knowledge
