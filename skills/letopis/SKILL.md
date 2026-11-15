@@ -1,153 +1,30 @@
 ---
 name: letopis
-description: Use when setting up Letopis or authoring, organizing, validating, or maintaining source-linked coding knowledge in a Git repository.
+description: Use when setting up Letopis or authoring source-linked Markdown with Letopis element IDs, graph links, and Git provenance.
 ---
 
-# Letopis knowledge
+# Letopis authoring
 
-Letopis indexes marked Markdown. The agent edits Markdown and code; CLI commands read,
-check, refresh, observe and rebuild the projection. Run from the Git root. In examples,
-`letopis` means the supplied executable. Requests are JSON on stdin; require exit 0 and
-`ok:true` before using a result. A failure has `ok:false` and `error`.
-`letopis --help` and `letopis <command> --help` print the commands and each
-command's request fields as plain text.
+Letopis indexes marked Markdown. Edit the documents to change knowledge. Run the CLI
+from the Git root with a JSON request on stdin. Require exit 0 and `ok:true`
+before using a response. Use `letopis <command> --help` for current request fields.
 
-## Organize concept files
+Use [Search](../letopis-search/SKILL.md) to find and read knowledge,
+[Capture](../letopis-capture/SKILL.md) to retain findings from prior work, and
+[Dream](../letopis-dream/SKILL.md) to consolidate or repair existing knowledge.
+For setup, discovery, embedding configuration, index maintenance, and cancellation,
+read [operations](references/operations.md).
 
-Store knowledge in a `letopis/` folder at the repository root. No corpus
-registration is required. Reuse the repository's existing organization.
-The `letopis/` knowledge folder is distinct from the private `.letopis/`
-service directory, which is excluded from indexing.
+## Knowledge files
 
-By default, Letopis discovers `.md` and `.markdown` files from Git's tracked
-paths and untracked paths allowed by standard Git ignores. The optional
-`discovery.respect_gitignore` boolean in `.letopis/config.json` defaults to true;
-false also admits untracked files hidden by `.gitignore`, `info/exclude` and
-Git's global excludes. `.letopis/ignore` applies root-relative Gitignore patterns
-to both tracked and untracked candidates, including `!` negation. Excluded parents
-still block child negation; `.git` and `.letopis` components always stay excluded.
-The ignore file is optional; `init` writes a commented default when it is
-absent and never replaces an existing file.
+Follow the project's knowledge layout, defaulting to `letopis/` at the Git root.
+Marked `.md` and `.markdown` files can live anywhere allowed by
+[discovery settings](references/operations.md#discovery-settings). Letopis keeps generated
+service state in `.letopis/`. Only Letopis markup outside code blocks declares knowledge.
 
-Only Letopis markup outside code blocks declares knowledge; ordinary Markdown
-alone creates no elements. A clean `check` does not prove a filtered file was
-indexed. If a concept is missing, check Git eligibility, the discovery toggle and
-Letopis patterns before changing its content or rebuilding. Malformed or unsafe
-policy inputs stop refreshing commands and preserve the last publication;
-invalid embedding settings alone still allow FTS when discovery is valid. See
-[operations](references/operations.md#discovery-settings) for author examples.
-
-Group closely related knowledge in a file named after its common concept. A
-file may hold one whole-file element or several section elements about that
-concept. Keep each element's explanation, rationale, limits, examples, pitfalls
-and sources together rather than creating an element for each fact. Search
-first and update a suitable existing concept rather than creating a duplicate
-or a narrowly fragmented file.
-
-Organize knowledge by the subject it explains, rather than by its origin or
-form. Keep a concept's domain explanation, implementation details, external
-integrations and pitfalls together as separate marked sections when they serve
-the same purpose. Before creating a file, search across these perspectives for
-an existing concept that should contain the knowledge.
-
-During consolidation, group files by their shared subject before considering
-their size. Keep independently useful concepts separate even when they share
-packages or sources. File-size targets guide organization; they do not
-determine conceptual boundaries.
-
-Aim for roughly 30–40 readable lines per knowledge element. Shorter elements
-are fine when the concept needs less space; do not add filler. Avoid hiding a
-large amount of text in very long lines. If a concept grows beyond this range,
-split it along meaningful subtopics into separate knowledge elements. Prefer
-marked sections in the same concept file when the subtopics belong together;
-use separate concept-named files when that makes the organization clearer.
-Link related elements with `related_to`, or use `includes` when an overview
-contains them. Keep each element's claims, qualifications and sources together.
-
-Aim for concept files of roughly 200–800 lines when enough related knowledge
-exists. Consider merging subconcept files shorter than 200 lines into their
-shared concept file, keeping their knowledge as separate marked elements.
-When a concept file grows beyond 1,000 lines, consider splitting it into two
-files named for meaningful subconcepts. These file-size guidelines do not
-override conceptual cohesion: a file may be shorter, and unrelated material
-should not be added to reach a target. Update element IDs and incoming links
-after moving them; these file sizes are separate from element-size guidance.
-
-Name the file after its common concept so its purpose is clear from the path.
-Follow the repository's naming convention; otherwise use descriptive lowercase
-hyphenated names with `.md`, such as `cache-key.md` or `http-retry-budget.md`.
-Keep names stable as the explanation grows. Avoid generic buckets such as
-`notes.md` or `decisions.md` for unrelated concepts.
-
-A folder represents a collection of related concepts. The agent chooses the
-grouping and creates a collection folder when the current concepts need one;
-ordinary grouping needs no separate user instruction. Reuse suitable existing
-collections and keep the hierarchy shallow, without scaffolding future topics.
-Avoid accumulating hundreds of files in one folder: as a collection grows,
-organize related concepts into clearly named, meaningful subfolders. Choose
-groups by their conceptual relationships, not by arbitrary file counts.
-For example:
-
-```text
-letopis/
-  cache/
-    cache-key.md
-    cache-invalidation.md
-  http-retry-budget.md
-```
-
-Folders organize files; they do not create graph elements or containment.
-When a collection needs to be searched or traversed as knowledge, represent
-the collection itself in a marked Markdown file and link to its members with
-`letopis:type=includes`. Create that overview only when it serves a current
-need. A concept may belong to several such collections through explicit links
-without duplicating its file. Keep `includes` acyclic.
-
-## Find, check, and read
-
-Search before creating another record. Search and traverse return metadata, never
-file contents; an empty search is not proof that a claim is true.
-
-```sh
-printf '%s\n' '{"query":"cache","limit":10}' | letopis search
-printf '%s\n' '{}' | letopis check
-printf '%s\n' '{"element_ids":["letopis/cache/cache-key.md"],"mode":"both","direction":"both","depth":2,"limit":20,"edge_limit":40}' | letopis traverse
-printf '%s\n' '{"element_ids":["letopis/cache/cache-key.md","src/cache.rs#L2-L4"]}' | letopis inspect
-```
-
-`check` succeeds with `{"ok":true,"result":{"errors":[]}}` only when it finds
-no current validation errors. Fix reported markup, dangling links, or `includes`
-cycles in Markdown, then run it again. `traverse` supports `relations`,
-`containment`, or `both`; `outgoing`, `incoming`, or `both`; optional `edge_types`.
-It excludes the starting IDs and includes `edges` only if `edge_limit` is sent.
-`search` accepts optional filters: `needs_recheck`, `sources`, `source_revisions`.
-Treat a recheck flag as a prompt to examine current source bytes and provenance.
-
-Search/traverse/inspect automatically refresh the database without editing Markdown.
-Routine reads verify addressed source objects; a full source-snapshot audit needs
-unscoped `check` or `index --full`. For audit guarantees and rebuild behavior, read
-[operations](references/operations.md#source-snapshot-audits).
-
-One `inspect` call returns `result.snapshot` (a retained Git tree OID) and
-`result.elements` keyed by normalized requested IDs. Each value has `path`,
-optional inclusive `lines`, and `hash` (SHA-256 of addressed bytes or null).
-Inspect returns no text, flags, edges, or provenance basis. Read **both** knowledge
-and local source from that same tree, using the returned path and lines:
-
-```sh
-git show <inspect-snapshot>:letopis/cache/cache-key.md
-git show <inspect-snapshot>:src/cache.rs
-```
-
-For `src/cache.rs#L2-L4`, select inclusive lines 2–4 from the captured source
-bytes, preserving their original bytes for hash comparison. A declared source
-with missing bytes or unavailable range can have `hash:null`; do not present
-it as verified source text. A source whose last current `external` declaration
-was removed, a deleted knowledge element, or any other unknown ID makes the
-**whole** inspect request fail with `not_found`. HTTP/HTTPS source addresses stay
-opaque and are not fetched. `cat` and ordinary live reads are useful for quick
-inspection, but separate reads can cross concurrent edits and do not form one
-snapshot. Search/traverse results likewise do not lock later filesystem reads.
+Folders group related files. To make a collection searchable and traversable, represent
+it with a marked overview and connect members with acyclic `includes` edges. A concept
+can belong to several collections through links to the same element.
 
 ## Write marked Markdown
 
@@ -201,8 +78,7 @@ HTTP/HTTPS source targets are exempt from this comparison and remain opaque.
 See the [exact navigation rules](../../docs/zkit/letopis/contracts/X-4-markdown.md#link-path).
 `external` binds a source and `includes`
 defines containment; other relation names follow lowercase underscore grammar.
-Plain Markdown links do not create graph edges. Check after every edit, then
-search/inspect the saved ID and read its returned tree bytes.
+Use plain Markdown links for navigation and marked links for graph edges.
 
 ## Record an honest source basis
 
@@ -232,43 +108,18 @@ it starts from HEAD; it must never point at `.git/index`. Do not stage or commit
 someone else's files to make a basis. The tree must exist and have the source
 bytes before recording it. If source changes after the comparison, recheck it.
 
-After a code edit, run `check` and search with `{"query":"cache","limit":10,
-"filters":{"needs_recheck":true}}`, inspect/read current bytes, compare them
-with the old basis, update the knowledge claim if needed, make a new verified
-source tree, then update `source_snapshot`. A changed source does not become
-verified just by changing the OID. Repeat `check`, search, and inspect afterward.
+If a source changes, compare the old and current addressed bytes and recheck the
+claim and its local bindings before recording a replacement basis.
 
-For a file or anchor rename, update the element's path/heading and every incoming
-knowledge link. Run `check` to expose dangling references and cycles, and use
-`traverse` with `direction:"incoming"` on the old ID before the rename to locate
-known referers. After repairing them, run `check` and inspect the new ID. Preserve
-`created_at`; keep `source_snapshot` only while its checked source binding still
-supports the statement.
+## Check edits
 
-## Operational guidance
+```sh
+printf '%s\n' '{}' | letopis check
+```
 
-For first-time setup, embedding configuration, status diagnostics, or a deliberate
-rebuild, read [operations](references/operations.md). Ordinary Markdown edits need
-the next refreshing command. The mandatory-path binary upgrade requires an
-[explicit reindex](references/operations.md#mandatory-path-upgrade-issue-69), even
-for unchanged files; status alone cannot perform it. Before cancelling a command,
-read [foreground cancellation](references/operations.md#cancel-your-own-foreground-call).
-
-Run the skill's `scripts/audit_knowledge.py` from the repository root to check
-knowledge organization without editing files. It prints JSON and exits 1 when an
-element exceeds the recommended 40 lines, a file exceeds 800 lines, or a file
-mixes a whole-file element with marked sections. It reads Markdown only; run
-`check` for markup, link and provenance validation.
-
-Run the skill's `scripts/check_links.py` to invoke `letopis check` and print its
-findings grouped by reason: broken knowledge links (`dangling_target`), missing
-sources (`source_not_found`), navigation path mismatches and unusable source
-snapshots. It exits 1 when findings exist and 2 when the command fails.
-
-The public CLI has `init`, `check`, `config`, `search`, `status`, `traverse`,
-`inspect`, and `index`. Use Git to read captured bytes and edit Markdown to
-change knowledge; there are no `read`, `snapshot`, `apply`, or `cancel` commands.
-
-## Publish the index explicitly
-
-Use `letopis index` to publish changed Markdown without collecting validation findings. `letopis index --verify` additionally verifies complete source snapshot closures; `letopis index --full` forces an expensive reparse and the same audit. Both flags together mean full mode. Pipe `{"paths":["letopis/cache"]}` to restrict observed owner files and removals to that directory; `{}` or empty paths selects the whole corpus. Scoped indexing leaves outside file rows and knowledge projections untouched, while snapshot closure verification remains global. `check` paths filter findings only and do not scope its refresh. The result contains revision, published, files_updated, files_removed, and invalid_files_updated. Use `check` to see findings.
+Read `result.errors` even with `ok:true`. Fix relevant findings in the Markdown and
+rerun the check. Confirm the saved element and its evidence using
+[a single inspect snapshot](../letopis-search/SKILL.md#read-snapshot-evidence).
+If the saved element is missing, check discovery before editing its markup or
+rebuilding the index. Use [Dream's repair workflow](../letopis-dream/references/workflow.md#plan-changes-and-their-links)
+when moving or renaming elements that may have incoming links.
