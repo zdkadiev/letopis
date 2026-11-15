@@ -1,13 +1,25 @@
 # Performance measurements and bottlenecks
 
-## Check and status bottlenecks {#check-status}
+## Check and status before historical range reuse {#check-status}
 <!-- letopis: {"created_at":1794000000,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
 
-For check and status on the synthetic 100k corpus, Samply after tree-validation reuse recorded historical snapshot hashing at 66.11% and 66.68% of observed CPU, current source hashing at 28.02% and 29.32%, and Git object verification at 63.60% and 64.01%, respectively. These are inclusive sampled scopes that overlap; do not add them or treat them as wall-time shares. The profiles had 36,423 and 37,262 usable stacks. Before reuse, structural validation had 23.76% and 25.10% observed CPU; afterward no samples landed there, which does not mean no validations occurred.
+On 2026-11-06, check and status on the synthetic 100k corpus were sampled
+after tree-validation reuse. Historical snapshot hashing accounted for 66.11%
+and 66.68% of observed CPU, current source hashing for 28.02% and 29.32%, and
+Git object verification for 63.60% and 64.01%, respectively. Inclusive CPU
+scopes overlap. The profiles had 36,423 and 37,262 usable stacks. Before reuse,
+structural validation accounted for 23.76% and 25.10% of observed CPU. The
+later profiles captured no samples in that scope.
 
 Earlier separate temporary Rust instrumentation, not Samply, measured historical hashing about 30.5s CPU, object decoding 13.5–13.6s, tree validation 9.7–9.8s, object hashing 5.8s, live captures 8.1–8.2s and graph diagnostics 0.6–0.7s. Nested scopes overlap. Its 100k source bindings caused about 400k decodes and 4.8 GB decoded content. Measurement commits, fixture and shared-host conditions are recorded in the reports.
 
-The source-diagnostic batch owner is service/utils.rs; provenance.rs observes each binding and live file. git/reader.rs decodes and verifies historical trees. The existing operation-local cache retains successful hashes keyed by tree and complete source URI; distinct ranges in the same file remain distinct. Live captures are never cached. Reuse of verified full historical file bytes across ranges, or parallel bounded batches, remains an unmeasured proposal subject to corruption and failure-order guarantees.
+In the measured revision, `service/utils.rs` owned diagnostic batches,
+`provenance.rs` observed bindings, and `git/reader.rs` verified historical
+objects. The operation-local cache reused hashes for identical tree and source
+addresses. Distinct ranges of one file were read separately and live captures
+stayed fresh. Issue 108 later implemented and measured historical reads shared
+across ranges. Parallel batches remain a separate proposal with corruption
+and failure-order constraints.
 
 [Samply report](../../docs/zkit/letopis/checks/issue-65/native-followup/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/native-followup/report.md")
 [Samply data](../../docs/zkit/letopis/checks/issue-65/native-followup/native-summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/native-followup/native-summary.json")
@@ -16,18 +28,31 @@ The source-diagnostic batch owner is service/utils.rs; provenance.rs observes ea
 [Source provenance](../../src/service/provenance.rs "letopis:type=external;path=src/service/provenance.rs")
 [Git reader](../../src/git/reader.rs "letopis:type=external;path=src/git/reader.rs")
 
+[Issue 108 measurements](#historical-range-reuse-2026-11-10 "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#historical-range-reuse-2026-11-10")
+
 ## Search bottlenecks {#search}
 <!-- letopis: {"created_at":1794000000,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
 
-For the bounded hybrid-search 100k recording, Samply observed 3,323 usable stacks and 1.537790s CPU: document refresh 44.846%, vector retrieval owner 37.263%, and eligibility 7.626%. These inclusive CPU shares can overlap and are not latency shares. Search refreshes in service/search.rs; vec1 retrieval runs in storage/vector.rs. SQLite may scan the full vector collection despite the SQL output limit. FTS and vector channels each return at most L candidates, L defaults to 100 and is capped at 100; no refill follows filtering.
+For the 2026-11-07 bounded hybrid search on 100k elements, Samply observed
+3,323 usable stacks and 1.537790 s CPU. Document refresh accounted for 44.846%,
+vector retrieval 37.263%, and eligibility 7.626% of sampled CPU. Inclusive scopes
+overlap. The measured code refreshed in `service/search.rs` and retrieved vec1
+results in `storage/vector.rs`. SQLite could scan the full vector collection.
 
-A flat/cos native full-K SQL probe improved 2.145223→0.107106s CPU (20.03x), but complete search changed 65.593→65.830s in that separate experiment: no end-to-end gain was established. Before bounded retrieval, Markdown cursor and bounded successful parse reuse changed a different full hybrid campaign 111.886→61.102s (1.831x). These campaigns must not be added or pooled.
+An earlier flat/cos experiment found a native query speedup and near-parity on
+the complete CLI search. A different pre-bounding campaign measured
+111.886→61.102 s (1.831x) after Markdown cursor and bounded successful parse
+reuse. Each comparison applies to its own campaign.
 
 [Bounded search report](../../docs/zkit/letopis/checks/issue-65/bounded-search/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/report.md")
 [Vector index experiment](../../docs/zkit/letopis/checks/issue-65/vector-index/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/report.md")
 [Markdown search experiment](../../docs/zkit/letopis/checks/issue-65/search-optimization/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/search-optimization/report.md")
 [Search service](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
 [Vector storage](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
+
+[Native and whole-CLI vec1 measurements](../architecture/storage.md#vec1-measurements "letopis:type=related_to;path=letopis/architecture/storage.md#vec1-measurements")
+
+[Current search behavior](../architecture/search-pipeline.md#request-bounds "letopis:type=related_to;path=letopis/architecture/search-pipeline.md#request-bounds")
 
 ## Measured latencies and speedups {#measurements}
 <!-- letopis: {"created_at":1794000000,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
@@ -109,7 +134,7 @@ samples, not the controlled campaigns above, and are not pooled with them.
 
 [Discovery measurements and search](performance-bottlenecks.md#search "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#search")
 
-## Current command profiles and refresh candidate {#command-profiles-2026-11-10}
+## November 10 command profiles and refresh candidate {#command-profiles-2026-11-10}
 <!-- letopis: {"created_at":1794260240,"source_snapshot":"d427b2746a0502450f64ef2caf12ca49f9476e27"} -->
 
 On 2026-11-10, an optimized build of commit `cc9a021` was measured on macOS
@@ -148,8 +173,9 @@ Raw captures and receipts are local ignored artifacts under
 ## Historical range reuse after issue 108 {#historical-range-reuse-2026-11-10}
 <!-- letopis: {"created_at":1794274714,"source_snapshot":"cd688426bf88773c9d3fc3fb3f658a0a31302cd9"} -->
 
-On synthetic embeddings-disabled shared-source corpora, three alternating pairs
-measured check/status medians of 1.201→0.973 / 1.153→0.925 s at 10k and
+The issue 108 candidate `557d8ef` was measured on synthetic embeddings-disabled
+shared-source corpora. Three alternating pairs measured check/status medians
+of 1.201→0.973 / 1.153→0.925 s at 10k and
 11.729→9.423 / 11.312→8.966 s at 100k (1.234–1.262x). OS page cache and
 shared-host load were uncontrolled; these are not production measurements.
 

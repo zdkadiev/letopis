@@ -1,3 +1,5 @@
+# Markdown indexing
+
 ## Discovery and candidate selection {#discovery}
 <!-- letopis: {"created_at":1793278527,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
@@ -22,6 +24,52 @@ Only marked Markdown produces nodes.
 
 [Application candidate selection](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
 
+## Parsing pipeline {#pipeline}
+<!-- letopis: {"created_at":1793728313,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
+`MarkdownParser` implements `MarkdownCodec::file_parse` as a pure codec: it receives a repository-relative path and
+file bytes, and returns parsed data or diagnostics. It does not read the filesystem,
+write Markdown, access Git or SQLite, or call an embedding provider.
+
+First it validates UTF-8 and parses the whole document with `pulldown-cmark`,
+including heading attributes and byte offsets. It scans the Markdown events for
+Letopis metadata comments. A file without such comments returns `None`; examples
+inside fenced or indented code blocks do not declare elements.
+
+A metadata comment must occupy its own line and contain valid JSON with required
+`created_at` and optional `source_snapshot`; unknown fields are rejected. At the
+first line it declares a whole-file element, identified by path. Immediately after
+an explicitly anchored heading it declares a section element, identified by
+`path#anchor`. A section ends at the next heading of equal or higher level, or EOF.
+Duplicate or invalid anchors, orphan metadata and nested elements are errors.
+
+For each element the parser records metadata, byte span, inclusive line range and
+SHA-256 of its exact source bytes. It then collects graph edges from inline links
+inside the element whose title follows `letopis:type=TYPE;path=ADDRESS`. The
+`external` type targets a source; other types target knowledge. Images and ordinary
+or reference-style links do not declare edges. Local navigation paths are checked
+against the declared target path; remote external addresses remain opaque.
+
+Finally, the parser renders search text from the element's parsed events, excluding
+metadata comments, and computes a separate SHA-256 `search_hash` of that text.
+The result contains elements, their search text and hashes, and a set of edges.
+The exact element hash and search hash serve different purposes: a markup change
+can alter the former without changing the latter.
+
+[Parser, element layout, metadata, links and search text](../../src/markdown/parser.rs "letopis:type=external;path=src/markdown/parser.rs")
+
+[Markdown contract](../../docs/zkit/letopis/contracts/X-4-markdown.md "letopis:type=external;path=docs/zkit/letopis/contracts/X-4-markdown.md")
+
+## Diagnostics and publication boundary {#diagnostics}
+<!-- letopis: {"created_at":1793728313,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
+
+Invalid UTF-8, metadata, layout or declared links produce diagnostics, not a
+partial parsed projection. The refresh service records an invalid file while
+retaining its last valid published projection; it owns publication and transactions,
+not the parser.
+
+[Projection and publication](#publication "letopis:type=related_to;path=letopis/architecture/markdown-projection.md#publication")
+
 ## Refresh and publication {#publication}
 <!-- letopis: {"created_at":1793278527,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
@@ -39,16 +87,20 @@ a failed write is not published as a partial successful revision. Policy bytes
 and presence are rechecked before no-op returns and commits; a concurrent edit
 aborts rather than mixing policies. A newly excluded owner is removed normally.
 
-Routine refresh uses root retention for source snapshots. Verified refresh and
-`index --full` request closure verification; full mode uses the library `reindex`
-method to reparse the selected projection rather than apply an incremental one. The full unscoped `check` also requests verified refresh.
+Routine refresh retains source roots. An unscoped `check` and `index --verify`
+also audit the full source-snapshot closures. `index --full` verifies closures and
+uses the library `reindex` method to reparse the selected corpus. For `index`,
+`paths` limits owner-file updates and removals. For `check`, it selects
+reported findings while the refresh still covers the corpus.
 
 [Refresh implementation](../../src/service/document_refresher.rs "letopis:type=external;path=src/service/document_refresher.rs")
 
 [Markdown parser](../../src/markdown/parser.rs "letopis:type=external;path=src/markdown/parser.rs")
 
-[Parsing Markdown documents](markdown-parsing.md#pipeline "letopis:type=related_to;path=letopis/architecture/markdown-parsing.md#pipeline")
+[Parsing Markdown documents](#pipeline "letopis:type=related_to;path=letopis/architecture/markdown-projection.md#pipeline")
 
 [Cache transaction](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
 
 [Storage model](storage.md#schemas "letopis:type=related_to;path=letopis/architecture/storage.md#schemas")
+
+[Check scope](cli-observation.md#check-scope "letopis:type=related_to;path=letopis/architecture/cli-observation.md#check-scope")

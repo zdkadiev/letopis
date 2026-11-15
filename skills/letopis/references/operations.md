@@ -15,6 +15,10 @@ source object is intact. Inspect fully verifies its own newly captured reading t
 
 ## Discovery settings
 
+Letopis discovers tracked `.md` and `.markdown` files and untracked Markdown
+admitted by standard Git ignores. Marked documents can be stored throughout the
+repository without corpus registration.
+
 Add `"discovery":{"respect_gitignore":false}` beside `embedding_model` in
 `.letopis/config.json` to admit Git-ignored untracked Markdown. The default is
 true; omitting the section/member uses that default. False disables all standard
@@ -47,7 +51,7 @@ Config/status/init/drain do not refresh membership. A policy edit during prepare
 publication or inspection causes a safe failure/retry; it cannot publish a mixed
 policy. Discovery changes never enter embedding identity or reset retained state.
 
-## Initialize, configure, observe, and reindex
+## Initialize, configure, and observe
 
 Interactive commands use an empty request without waiting for stdin. An open pipe
 with no data after 250 ms also supplies an empty request. For commands that need
@@ -112,19 +116,6 @@ with a changed configuration identity or a vector reset, not merely on the next
 publication. `status` does not rebuild a missing or stale cache and does not make a
 subsequent live-file read atomic.
 
-`index --full` is explicit maintenance, not the normal edit path:
-
-```sh
-printf '%s\n' '{}' | letopis index --full
-```
-
-It rebuilds graph and FTS from the corpus under `index.lock` and returns
-`{"ok":true,"result":{"revision":N}}`. It does not wait for vectors, does not
-confirm changed sources, and preserves author-declared `source_snapshot`. Ordinary
-edits need only the next refreshing command; use `index --full` after cache loss or
-a deliberate full rebuild. A physically corrupt cache is a separate recovery
-decision, not something this command silently repairs.
-
 ## Mandatory-path upgrade (issue #69)
 
 Marked links require `letopis:type=TYPE;path=ADDRESS` with the complete terminal
@@ -179,17 +170,25 @@ work.
 
 ## Current boundaries
 
-The CLI has `init`, `check`, `config`, `search`, `status`, `traverse`, mixed
-`inspect`, and `index --full`. Cancellation is a signal to your own foreground
-process, not a command. Invalid files retain their previous valid projections
-with current diagnostics; a fresh cache cannot recover a previous projection of
-currently invalid Markdown. Reindex preserves author-declared `source_snapshot`
-and never confirms changed sources for the agent. It also preserves existing
-vectors keyed by unchanged search hashes when rebuilding a deleted cache. It does
-not repair physical cache corruption or provide selective paths.
-Embeddings are optional; FTS remains usable without a configured provider.
-Packaging, installation and operational procedures remain TK-43/TK-44 work.
+Invalid files retain their previous valid projections with current diagnostics.
+A fresh cache can publish only valid Markdown. A rebuild can reuse existing
+vectors keyed by unchanged search hashes. Physical cache corruption requires its
+own recovery procedure. Full-text search works without a configured provider.
 
 ## Explicit index publication
 
-`letopis index` publishes changed documents without returning validation findings. `--verify` audits all effective snapshot closures; `--full` always reparses and publishes, including unchanged files, and implies the audit. Provide optional JSON `paths` to limit owner-file observations and removals; omitted/empty means all. Out-of-scope rows remain untouched, and source closure audits stay global. Use `check` for diagnostics; its `paths` filter findings, not the refresh.
+Ordinary edits need the next refreshing command. Use `letopis index` for explicit
+publication, `--verify` for an audit of all effective source snapshot closures,
+and `--full` to reparse and publish even unchanged files. `--full` implies
+`--verify`, preserves authored `source_snapshot` bases, and returns after graph
+and full-text publication. Verify changed claims against their sources in Markdown.
+
+```sh
+printf '%s\n' '{"paths":["letopis/cache"]}' | letopis index
+```
+
+Optional `paths` limits owner-file observations and removals. An omitted or empty
+list selects the corpus. Scoped runs preserve out-of-scope rows and source closure
+audits remain global. The result reports `revision`, `published`, `files_updated`,
+`files_removed`, and `invalid_files_updated`. Use `check` for validation findings.
+Its `paths` field filters reported findings while refresh still covers the corpus.

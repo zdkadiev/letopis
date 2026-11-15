@@ -78,25 +78,26 @@ filesystem timestamps into index metadata.
 
 Cache node, edge, file, FTS and neighbor queries live with `CacheStorage` in
 `storage/cache.rs`. Vector, embedding work, pruning and status-supporting SQL
-observations live in `storage/vector.rs`; unit tests stay inline. `StatusService`
-owns configuration-mode policy, identity interpretation and backlog/failed arithmetic.
+observations live in `storage/vector.rs`. The status service interprets those
+observations under the current embedding policy.
 
 [Generic file, path and identity checks](../../src/filesystem/local.rs "letopis:type=external;path=src/filesystem/local.rs")
 
 [Composition](../../src/lib.rs "letopis:type=external;path=src/lib.rs")
 
-[Status policy](../../src/service/status.rs "letopis:type=external;path=src/service/status.rs")
+[Status read scope](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
+
+[Status policy](cli-observation.md#status "letopis:type=related_to;path=letopis/architecture/cli-observation.md#status")
 
 ## Exact vec1 execution modes {#vec1-modes}
 <!-- letopis: {"created_at":1793727646,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
-Integrated into the working tree on 2026-11-07, new and reset vector indexes use
-`flat/cos`. `none` is exact cosine search through a SQL scan/sort of raw vectors;
+New and reset vector indexes use `flat/cos`. `none` is exact cosine search
+through a SQL scan/sort of raw vectors.
 `flat/cos` is also exact exhaustive search, using packed original f32 vectors,
-the same cosine function and a compact result heap. It has no coarse buckets
-or quantized codes. Actual-root host verification passed; the index-only
-experiment below established no whole-CLI wall-time improvement. The later
-bounded SQL experiment is recorded at the end of this concept.
+the same cosine function and a compact result heap. The index uses original
+vectors directly. The November 2026 index-only experiment measured the native
+change and its whole-CLI effect separately.
 
 Flat moves the authoritative full-vector payload into native index blocks;
 base shadow rows become bucket references. Read vector bytes through the virtual
@@ -106,9 +107,7 @@ survive a physical-mode change, together with attempts and query diagnostics.
 
 [Native vec1 implementation](../../vendor/vec1/vec1.c "letopis:type=external;path=vendor/vec1/vec1.c")
 
-[Schema recognition](../../src/storage/schema.rs "letopis:type=external;path=src/storage/schema.rs")
-
-[Guarded physical index preparation](../../src/storage/schema.rs "letopis:type=external;path=src/storage/schema.rs")
+[Schema recognition and physical index preparation](../../src/storage/schema.rs "letopis:type=external;path=src/storage/schema.rs")
 
 ## vec1 upgrade and verification {#vec1-upgrade}
 <!-- letopis: {"created_at":1793727646,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
@@ -145,9 +144,15 @@ Trained vec1 models can use coarse buckets and quantized codes. Full `K` control
 result capacity, not bucket coverage: default probing can omit candidates even
 when `K` equals corpus size. `nprobe:1` means one bucket, not all buckets; complete
 coverage requires the explicit bucket count and no early slack stop. Quantized
-metrics can change rank even with complete coverage. Full eligible-channel rank
-fusion and first-demand candidate error/freshness guarantees cannot be replaced
-by ANN or winner-only observation without a separate accepted contract change.
+metrics can change rank even with complete coverage. The experiment preceded
+D-108, when eligibility and ranking covered each full result channel. The
+current SQL bound limits candidates after joins and exact native retrieval.
+
+[Native experiment and coverage controls](../../docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md")
+
+[Host verification results](../../docs/zkit/letopis/checks/issue-65/vector-index/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/vector-index/report.md")
+
+[Bounded search contract](search-pipeline.md#request-bounds "letopis:type=related_to;path=letopis/architecture/search-pipeline.md#request-bounds")
 
 ## vec1 measurements {#vec1-measurements}
 <!-- letopis: {"created_at":1793727646,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
@@ -217,16 +222,13 @@ observations after rollback/retry rather than keeping active cursors across it.
 ## Bounded SQL retrieval after the index experiment {#bounded-sql}
 <!-- letopis: {"created_at":1793727646,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
-D-108 now uses L=min(requested limit or 100,100) for both SQL channels and final
-output. FTS and vector SQL return at most L knowledge hits after ordering/joins;
-Rust checks only their bounded union, without filter refill. Native K stays full
-inside SQLite for current-node coverage and URI ties; this is not an ANN or vector
-storage migration. On the same real-vector 100k corpus, three pairs measured
-66.622→1.344s at L5 and70.915→1.867s at L100; this supersedes the old index-only
-whole-search result as the latest query measurement. The old native speedup and
-population/write-layout limitations remain historical facts, not new drain data.
-Original and owned100k payloads retain all307200000 bytes and their ordered hash.
+D-108 bounded the SQL results after joins and ordering. Native `K` stays full
+inside SQLite to cover eligible current nodes and preserve URI tie order. The
+follow-up benchmark measured the bounded search change on the same real-vector
+100k corpus. The earlier index-only and write-layout results apply to their own
+experiments. The original and copied 100k payloads retained all 307,200,000
+bytes and their ordered hash.
 
 [Bounded SQL measurements](../../docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json")
-[Bounded search contract](../../docs/superpowers/specs/2026-11-07-bounded-search-design.md "letopis:type=external;path=docs/superpowers/specs/2026-11-07-bounded-search-design.md")
+[Current search behavior](search-pipeline.md#request-bounds "letopis:type=related_to;path=letopis/architecture/search-pipeline.md#request-bounds")
 [Original vector preservation](../../docs/zkit/letopis/checks/issue-65/bounded-search/vector-preservation/summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/vector-preservation/summary.json")
