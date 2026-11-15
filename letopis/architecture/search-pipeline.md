@@ -1,3 +1,31 @@
+# Knowledge retrieval
+
+## Graph model and traversal {#graph-and-traversal}
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+Knowledge elements are identified by repository path or path plus anchor. A graph
+edge is identified by the triple `(source, target, type)`; `external` targets a
+source address and other types target knowledge. Self-loops and target-kind/type
+mismatches are rejected. An element with an outgoing `includes` edge is a
+metavertex; this kind is derived rather than authored as Markdown metadata.
+
+The domain `Graph` contains selected identities and optional edges; it does not
+load storage. The application `GraphService` receives the shared cache owner and enters a read
+scope; nested calls join the caller's pinned view. It expands neighbors breadth-first,
+tracks visited node keys, omits start
+nodes from discovered elements, and stops at the requested depth and element limit.
+The optional edge limit is separate from the element limit.
+
+`TraversalService` refreshes documents, observes embedding configuration and opens
+a storage read view before invoking graph traversal. It enriches selected elements
+with locations, revision and current observation flags. Search and traversal return
+links and metadata, not the Markdown body.
+
+[Graph domain](../../src/domain/graph.rs "letopis:type=external;path=src/domain/graph.rs")
+
+[Graph traversal](../../src/service/graph.rs "letopis:type=external;path=src/service/graph.rs")
+
+[Traversal service](../../src/service/traversal.rs "letopis:type=external;path=src/service/traversal.rs")
+
 ## Request bounds and retrieval {#request-bounds}
 <!-- letopis: {"created_at":1793278527,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
 
@@ -31,18 +59,14 @@ runtime, embedding identity reset or physical vector ownership change is involve
 ## Measured search behavior {#measurements}
 <!-- letopis: {"created_at":1793278527,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
 
-The synthetic 100k corpus with real 768-dimensional Gemma vectors, query `case 000000`,
-measured three ordinary pairs per L: L5 wall median66.622→1.344s (49.59x), L100
-70.915→1.867s (37.99x). All six outputs per L match byte-for-byte in this scenario;
-that is not a general full-corpus ranking equivalence or relevance-quality proof.
-Separate genuine Samply at L100 shows refresh44.846%, vector retrieval37.263%,
-search eligibility7.626% of observed CPU; inclusive scopes overlap, not wall shares.
-Actual-root make verify and host storage acceptance passed. Measurements are warm
-local observations, not a Linux/minimum-hardware gate; no document drain was timed.
+The 2026-11-07 trials used separate synthetic 10k and 100k corpora with real
+768-dimensional Gemma vectors and the warm-model query `case 000000`. At each
+limit, all six 100k outputs matched byte-for-byte for that query. The agreement
+is specific to the measured query and corpus. Host storage and `make verify`
+passed for the measured change. The trials covered query execution on one host.
 
-The separate 10k synthetic corpus measured L5 5.294→0.182s (29.15x) and L100
-5.261→0.291s (18.06x), three paired runs each. This is one query with warm model;
-these separate campaigns do not establish linear scaling or general relevance.
+[Paired command timings](../development/performance-bottlenecks.md#measurements "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#measurements")
+[Search CPU profiles](../development/performance-bottlenecks.md#search "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#search")
 
 [10k measurements](../../docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md")
 [Paired measurements](../../docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json")

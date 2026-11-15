@@ -6,10 +6,9 @@ component keeps no cross-thread lock: single-owner state uses `RefCell` for the
 pinned directory handles and, in tests only, injected fault hooks; the component
 does not provide synchronized cross-thread access. Cross-process exclusion is a kernel advisory lock on a file.
 
-Services choose the coordination filename: refresh, verified refresh and reindex
-take `index.lock`, drain takes `embed.lock`. `FileLocker` exposes waiting and
-non-waiting acquisition with an associated RAII lock type, so the filesystem never
-names a consumer's file role.
+Services choose coordination filenames. Corpus publication takes `index.lock`.
+Drain takes `embed.lock`. `FileLocker` exposes waiting and non-waiting
+acquisition with an associated RAII lock type.
 
 Acquisition opens or creates the entry below a pinned parent directory with
 `O_NOFOLLOW`, `O_NONBLOCK` and close-on-exec, verifies the observed identity,

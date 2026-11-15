@@ -13,11 +13,12 @@ multi-statement operations retain responsibility-based names; closure scopes are
 and external trait names keep their established forms. New and touched mutex
 fields use a `_mutex` suffix; a lock guard is named for the protected state.
 
-The graph neighbor query `edges_get_by_nodes_row_id_and_type` names the joined
-`nodes.row_id` filter and the optional edge type. The Git entry lookup uses
+The graph neighbor query `edges_get_by_row_id_and_type` names the row key
+and the optional edge type. The Git entry lookup uses
 `tree_entry_get_by_name`; generic filesystem alias validation uses
 `file_verify_distinct_by_paths`. The response writer and Git cleanup owner name their mutex
-fields `completion_mutex` and `state_mutex`, respectively.
+fields `completion_mutex` and `state_mutex`, respectively. Refresh outcomes use
+`PublicationState` to name whether a revision was published.
 
 [Agent conventions](../../AGENTS.md "letopis:type=external;path=AGENTS.md")
 
@@ -38,10 +39,8 @@ fields `completion_mutex` and `state_mutex`, respectively.
 ## Verification checks {#checks}
 <!-- letopis: {"created_at":1793790204,"source_snapshot":"91961631e000754f6a0e1e589a54042248f540ee"} -->
 
-The convention forbids helpers whose sole purpose is to return a fixed error or
-fixed response. Constructing the value at its call site preserves explicit
-context; repeated message text can be kept in a named constant. Refresh
-outcomes use `PublicationState` instead of passing an unexplained boolean.
+The convention keeps fixed errors and responses at their call sites, with named
+constants available for repeated message text.
 
 `make check` runs formatting, all-target compilation, selected Clippy rules and
 root tests. `make verify` adds strict Rustdoc and release-profile tests. The
