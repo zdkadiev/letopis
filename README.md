@@ -66,6 +66,8 @@ The pinned Rust toolchain is selected automatically. Put `target/dist/letopis` o
 
 Letopis is designed for coding agents and automation. Your agent writes knowledge as Markdown and reads relevant passages back into its context. It calls Letopis through a JSON protocol: requests go to **stdin**, responses come from **stdout**, so commands fit into Unix shell pipelines. Use the [Letopis skill](skills/letopis/SKILL.md) to author and maintain knowledge. Ask the agent `/search <query>` to answer from the project knowledge base with [letopis-search](skills/letopis-search/SKILL.md).
 
+Use [letopis-capture](skills/letopis-capture/SKILL.md) to retain decisions, trade-offs, and observations from prior work. Ask the agent `/capture` to propose entries for review, `/capture yolo` to let it select and save entries, or `/capture <what to capture>` to save a specific finding.
+
 **1. Initialize the repository.** From the root of an existing Git working tree:
 
 ```sh
