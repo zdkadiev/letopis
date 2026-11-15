@@ -22,9 +22,10 @@ Marked `.md` and `.markdown` files can live anywhere allowed by
 [discovery settings](references/operations.md#discovery-settings). Letopis keeps generated
 service state in `.letopis/`. Only Letopis markup outside code blocks declares knowledge.
 
-Folders group related files. To make a collection searchable and traversable, represent
-it with a marked overview and connect members with acyclic `includes` edges. A concept
-can belong to several collections through links to the same element.
+A folder is a parent concept that can contain both concept files and subfolders.
+To make a collection searchable and traversable, give it a marked overview and
+connect its file elements and child overviews with acyclic `includes` edges.
+A concept can belong to several collections through links to the same element.
 
 ## Write marked Markdown
 
@@ -108,8 +109,10 @@ it starts from HEAD; it must never point at `.git/index`. Do not stage or commit
 someone else's files to make a basis. The tree must exist and have the source
 bytes before recording it. If source changes after the comparison, recheck it.
 
-If a source changes, compare the old and current addressed bytes and recheck the
-claim and its local bindings before recording a replacement basis.
+Keep the recorded `source_snapshot` as long as the evidence in that tree supports
+the claim and its bindings. Treat `source_changed` as a cue to review the claim.
+Record a different tree only when the claim or its evidence requires a different
+version. Verify every local binding against that replacement before saving it.
 
 ## Check edits
 

@@ -11,6 +11,7 @@ import unittest
 
 
 SCRIPTS = Path(__file__).resolve().parent
+ORGANIZATION_AUDIT = SCRIPTS.parents[1] / 'letopis' / 'scripts' / 'audit_knowledge.py'
 
 
 class AuditsTest(unittest.TestCase):
@@ -19,6 +20,39 @@ class AuditsTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.run_git('init', '-q')
+
+    def test_organization_audit_flags_more_than_forty_direct_concept_files(self):
+        # Given: a folder contains 40 marked files, a child concept, and an unmarked page.
+        knowledge = b'<!-- letopis: {"created_at":1700000000} -->\n# Concept\n'
+        for index in range(40):
+            self.write(f'letopis/broad/topic-{index}.md', knowledge)
+        self.write('letopis/broad/child/detail.md', knowledge)
+        self.write('letopis/broad/navigation.md', b'# Navigation\n')
+
+        # When: the organization audit checks the folder and its child.
+        status, report = self.run_script(ORGANIZATION_AUDIT)
+
+        # Then: exactly 40 direct concept files are within the guideline.
+        self.assertEqual(status, 0, report)
+        self.assertEqual(report['concept_files_by_folder'], {
+            'letopis/broad': 40,
+            'letopis/broad/child': 1,
+        })
+
+        # Given: a 41st direct concept uses the other supported Markdown extension.
+        self.write('letopis/broad/extra.markdown', knowledge)
+
+        # When: the organization audit runs again.
+        status, report = self.run_script(ORGANIZATION_AUDIT)
+
+        # Then: only the parent folder is flagged for a split review.
+        self.assertEqual(status, 1, report)
+        self.assertEqual(report['problems'], [{
+            'kind': 'folder_too_broad',
+            'path': 'letopis/broad',
+            'files': 41,
+            'limit': 40,
+        }])
 
     def test_snapshot_verifies_exact_inclusive_lines_and_distinguishes_remote(self):
         # Given: the source has CRLF, an embedded CR, and no final newline.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Audit Letopis knowledge organization without changing any files.
 
-Reports elements that exceed the recommended length, files that grow beyond the
-recommended size, and files that mix a whole-file element with marked sections.
+Reports large elements or files, mixed element layouts, and folders with more
+than 40 direct concept files.
 The output is JSON on stdout; the exit status is 1 when any problem is reported.
 
 Usage:
@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+from collections import Counter
 import json
 import re
 import sys
@@ -18,6 +19,8 @@ from pathlib import Path
 
 METADATA = re.compile(r'^\s*<!--\s*letopis:')
 HEADING = re.compile(r'^(#{1,6})\s+(.*?)(?:\s*\{#([A-Za-z][A-Za-z0-9_-]*)\})?\s*$')
+MAX_CONCEPT_FILES = 40
+MARKDOWN_EXTENSIONS = {'.md', '.markdown'}
 
 
 def get_elements(path, lines):
@@ -58,11 +61,16 @@ def audit(root, element_lines, file_lines):
     largest = []
     element_count = 0
     file_count = 0
+    concept_files_by_folder = Counter()
 
-    for path in sorted(root.rglob('*.md')):
+    for path in sorted(root.rglob('*')):
+        if path.suffix not in MARKDOWN_EXTENSIONS or not path.is_file():
+            continue
         file_count += 1
         lines = path.read_text(encoding='utf-8').splitlines()
         elements, is_whole_file = get_elements(path, lines)
+        if elements:
+            concept_files_by_folder[str(path.parent)] += 1
 
         if is_whole_file and any(
             match and match.group(3) for match in map(HEADING.match, lines)
@@ -93,11 +101,21 @@ def audit(root, element_lines, file_lines):
                     'limit': element_lines,
                 })
 
+    for folder, count in sorted(concept_files_by_folder.items()):
+        if count > MAX_CONCEPT_FILES:
+            problems.append({
+                'kind': 'folder_too_broad',
+                'path': folder,
+                'files': count,
+                'limit': MAX_CONCEPT_FILES,
+            })
+
     largest.sort(key=lambda item: item['lines'], reverse=True)
     return {
         'root': str(root),
         'files': file_count,
         'elements': element_count,
+        'concept_files_by_folder': concept_files_by_folder,
         'problems': problems,
         'largest': largest[:5],
     }
@@ -105,7 +123,7 @@ def audit(root, element_lines, file_lines):
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(
-        description='Audit Letopis knowledge element and file sizes.',
+        description='Audit Letopis knowledge elements, files, and folders.',
     )
     parser.add_argument('--root', default='letopis',
                         help='knowledge folder to scan (default: letopis)')

@@ -19,13 +19,13 @@ Use the [Letopis authoring skill](../letopis/SKILL.md) for markup and provenance
 
 Inventory the corpus from Markdown, starting with `letopis/` and any marked documents elsewhere. Record a baseline with an unscoped `letopis check`, a local Markdown navigation audit, and a review of actual claims and concept boundaries. Check for duplicate and contradictory claims, stale or missing evidence, dangling edges, broken navigation, obsolete entries, and concepts filed under the wrong subject.
 
-Treat each folder, file, and marked section as a concept boundary. Use the [split and merge guidance](references/workflow.md#split-or-merge-concepts) to decide which subjects need separate homes. Retire obsolete knowledge when evidence shows that it has lost its current and historical value. Keep useful historical context explicitly dated or versioned.
+Treat each folder, file, and marked section as a concept boundary. A folder can contain both concept files and child concept folders. Review folders with more than 40 direct concept files for a possible split. Use the [split and merge guidance](references/workflow.md#split-or-merge-concepts) to decide which concepts belong together. Retire obsolete knowledge when evidence shows that it has lost its current and historical value. Keep useful historical context explicitly dated or versioned.
 
 Record the evidence, affected paths, proposed repair, and verification for each finding. For moves, splits, merges, and retirements, map old IDs and navigation destinations to replacements or account for their removal. List unresolved conflicts with the evidence needed to decide them.
 
 ## Apply and verify
 
-Apply the plan in coherent groups. Preserve accurate claims, qualifications, and provenance along with surviving elements' `created_at`. Repair both the Markdown destinations and the marked targets of affected links. Verify newly cited source bytes before recording a `source_snapshot`.
+Apply the plan in coherent groups. Preserve accurate claims, qualifications, and provenance along with surviving elements' `created_at`. Repair both the Markdown destinations and the marked targets of affected links. Keep the recorded `source_snapshot` wherever its evidence still supports the entry.
 
 Run unscoped `letopis check` again for graph integrity and full source-snapshot verification. Check local destinations and backlinks, confirm expected edges with `traverse`, and verify changed or representative elements and local source addresses against a fresh `inspect` Git tree. Review the final diff and account for each planned repair and any remaining finding.
 
