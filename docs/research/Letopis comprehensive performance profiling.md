@@ -95,9 +95,9 @@ The complete 100k full-index profile had **183,971 usable stacks**, **177.888334
 
 | Inclusive sampled scope | 10k full index | 100k full index | Code |
 |---|---:|---:|---|
-| `EffectiveGraph::apply` | 19.81% | 53.35% | [Graph application](../src/service/document_refresher.rs#L947-L973) |
-| `DocumentPublication::reconcile_sources` | 9.72% | 23.92% | [Source reconciliation](../src/service/document_refresher.rs#L731-L762) |
-| `EffectiveGraph::collect_source_references` | 4.84% | 22.63% | [Reference collection](../src/service/document_refresher.rs#L983-L1007) |
+| `EffectiveGraph::apply` | 19.81% | 53.35% | [Graph application](../../src/service/document_refresher.rs#L947-L973) |
+| `DocumentPublication::reconcile_sources` | 9.72% | 23.92% | [Source reconciliation](../../src/service/document_refresher.rs#L731-L762) |
+| `EffectiveGraph::collect_source_references` | 4.84% | 22.63% | [Reference collection](../../src/service/document_refresher.rs#L983-L1007) |
 | SQLite source-file presence | 33.58% | 11.05% | Inclusive attribution, not exclusive SQLite wall time |
 
 **These shares overlap and cannot be added.** Weighted thread CPU is not wall-time attribution. The publication loop calls graph application per changed file; `edges.retain` scans effective edges each time. Code suggests approximately O(FE) edge scanning for F files and E edges. Reference collection uses `knowledge.keys().any(...)` per source edge, suggesting worst-case O(SN) comparisons for S references and N knowledge IDs. Actual iterations and counterfactual savings were not measured. Native `_platform_memcmp` appeared in 27.63% and `sqlite3_step` in 6.96% of the 100k profile, overlapping Rust scopes.
@@ -111,7 +111,7 @@ The complete 100k full-index profile had **183,971 usable stacks**, **177.888334
 | Unchanged 10k `search` / `traverse` | Change detection 72.96% / 66.69% | Only 111 / 109 stacks; coarse evidence |
 | 10k one-file refresh | Source-reference collection 56.11% | 426 stacks; search-after-edit scenario |
 
-Shared status/check ownership is [diagnostic batching](../src/service/utils.rs#L279-L360), [source provenance](../src/service/provenance.rs), [confined capture](../src/filesystem/local.rs#L557-L703) and [root identity verification](../src/filesystem/local.rs#L1220-L1227).
+Shared status/check ownership is [diagnostic batching](../../src/service/utils.rs#L279-L360), [source provenance](../../src/service/provenance.rs), [confined capture](../../src/filesystem/local.rs#L557-L703) and [root identity verification](../../src/filesystem/local.rs#L1220-L1227).
 
 ### Startup and capture quality
 
@@ -174,7 +174,7 @@ Symbolized debug1 SHA-256:
 Executable/dSYM UUID: `FFEBF8EC-A110-37A6-AA8B-747F67DAEA21`.
 Build receipts pin 116 product inputs; the native observer receipt covers 130.
 
-Use a disposable checkout, pinned Rust, Python 3.12, Git and locked dependencies; fetch missing dependencies before offline builds. The tracked [runner](../tests/performance/run.py) and [fixture/build helpers](../tests/performance/scenarios.py) provide a symptom reproducer:
+Use a disposable checkout, pinned Rust, Python 3.12, Git and locked dependencies; fetch missing dependencies before offline builds. The tracked [runner](../../tests/performance/run.py) and [fixture/build helpers](../../tests/performance/scenarios.py) provide a symptom reproducer:
 
 ```sh
 OUT="$(mktemp -d "${TMPDIR:-/tmp}/letopis-results-XXXXXX")"
