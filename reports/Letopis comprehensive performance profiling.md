@@ -1,160 +1,210 @@
-# Letopis profiling exposes large-graph publication costs
+# Letopis performance profiling results — November 17, 2026
 
-> **Publication scope:** this repository includes the report and supporting Markdown
-> notes, not the multi-gigabyte raw capture archive or research tools. Links into
-> `evidence/` and `tools/` refer to that local archive, not downloadable GitHub files.
-> See [reading order and evidence availability](../research_notes/Letopis%20comprehensive%20performance%20profiling/README.md).
+**A full index of 100,000 knowledge nodes took 178.499 seconds and peaked at 443.61 MiB RSS in one stock-release run.** Status and check each took about 11 seconds and 370 MiB RSS. CPU profiles identify source observation/filesystem verification and graph publication as the main investigation targets—not proven optimization savings.
 
-**A complete 100,000-node full index took 178.499 seconds and peaked at 443.61 MiB RSS in one stock-release run; its sampled counterpart concentrated CPU in graph application and source reconciliation.** The 100k corpus contained 100,000 knowledge nodes, 100,000 source nodes and 500,000 edges. Check and status each took about 11 seconds, while unchanged search, traverse and no-op index took about 0.7 seconds in their respective three-run series. These are synthetic, single-host results, not production capacity guarantees. Across the campaign, all eight public commands have usable CPU evidence, but help and version do not; memory allocation evidence consists of four live snapshots, not full-lifetime profiles. Local deterministic OpenAI-protocol mocks exercised embedding paths, not an actual model or provider. The strongest next investigation is to isolate the graph scans observed during publication, while preserving filesystem confinement, identity checks, snapshot durability and source-current correctness. ([100k baseline](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md); [CPU profiles](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_profiles.md))
+This publication contains final results and source-linked knowledge only. Intermediate notes, plans, scripts, binaries and the approximately 3.4 GB raw archive remain local. Artifact paths below identify retained evidence; they are not downloadable repository files.
 
 ## Scope and environment
 
-This report covers `init`, `config`, `status`, `index`, `check`, `inspect`, `search` and `traverse`, plus internal `embed --drain`, help, version and an intentionally invalid argument. The supplementary catalog includes index flags and scopes, graph shapes, search and traversal variants, and mocked embedding states. It is a bounded survey of these paths, not proof that every possible combination, corpus or execution state has been profiled. Foreground response is not the entire detached-worker workflow. ([Command inventory](../research_notes/Letopis%20comprehensive%20performance%20profiling/command_inventory.md); [159-case inventory](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/supplementary-prepare-20261117-v1/case-inventory.md))
+The study covered `init`, `config`, `status`, `index`, `check`, `inspect`, `search` and `traverse`, plus internal `embed --drain`, help, version and an intentionally invalid argument. The 159-case supplementary catalog exercised index flags/scopes, graph shapes, search/traversal variants and mocked embedding states. This is bounded coverage, not every possible input or execution state.
 
-Measurements ran on macOS 26.6.2, arm64 Mac16,7, 14 physical and logical cores, 48 GiB RAM, Rust 1.95.0, Letopis CLI 0.3.1, and samply 0.13.1. Source revision was `0046a6d83709fcfb2a610a3789d8ef6d9ba2bcd8`. Stock release and optimized debug-information release were separately archived; the latter supplied symbols for profiles and is not the shipping distribution profile with LTO. No CPU affinity, OS-cache control or isolated host was established. First application use is not a cold-cache experiment. ([Build validation](../research_notes/Letopis%20comprehensive%20performance%20profiling/build_validation.md); [methodology](../research_notes/Letopis%20comprehensive%20performance%20profiling/profiling_methodology.md))
+- Source revision: [`0046a6d83709fcfb2a610a3789d8ef6d9ba2bcd8`](https://github.com/zdkadiev/letopis/commit/0046a6d83709fcfb2a610a3789d8ef6d9ba2bcd8).
+- Host: macOS 26.6.2, arm64 Mac16,7, 14 physical/logical cores, 48 GiB RAM.
+- Rust 1.95.0; Letopis CLI 0.3.1; Samply 0.13.1.
+- Stock release supplied baseline timings; a separate optimized debug1 release supplied symbols. Neither was the shipping LTO distribution profile.
+- No affinity, isolated host, OS-cache control or thermal control was established. First application use is not a cold-cache experiment.
+- Product source, Cargo manifest and lockfile were unchanged. Synthetic repositories contain their own fixture commits.
 
-All actual research agents used OpenAI models, Sol or Terra. Provider-region failures were recovered using already completed data; no blind canonical rerun was used. Product source, Cargo manifest and lockfile were not changed for this research. Synthetic repositories have their own fixture commits; this statement does not mean no commits existed anywhere.
+## Methodology and workload accounting
 
-## Methodology
+Foreground wall time includes process launch, captured I/O and owned-process cleanup. Fixture preparation, reset and independent correctness oracles are outside that timer. Darwin `wait4` supplies user/system CPU and lifetime peak RSS for the child and OS-accounted reaped descendants—not simultaneous process-family memory. Some legacy rows retain only combined CPU. Supplementary rows retain separate user/system, faults and block operations; block operations are not byte counts.
 
-Stock foreground wall time includes process launch, captured I/O and owned-process cleanup; fixture preparation and independent result checks are outside the timed interval. Darwin `wait4` records user and system CPU and a lifetime peak RSS for the direct child and OS-accounted reaped descendants, not a simultaneous process-family peak. Some legacy canonical records retain only combined CPU; supplementary rows retain separate user, system, faults and block-operation counters. Block operations are not byte counts. Neither total descendants, bytes of I/O, exact SQL counts nor lock-wait time were independently measured. Calibration used separate helper and `/usr/bin/time` invocations, not identical processes. ([Memory audit and calibration](../research_notes/Letopis%20comprehensive%20performance%20profiling/memory_evidence_audit.md))
+CPU medians are computed from each invocation's **user + system**, not by adding separate component medians. Wall, CPU and RSS are marginal summaries and need not describe the same invocation.
 
-Samply profiles use weighted sampled thread CPU and symbol/PID validation, not wall-time attribution. Inclusive caller and callee shares overlap. Ten 10k debug1 ordinary/profile pairs were separate from stock data; wrapper-inclusive paired times include sampler launch and saving. There was no matched 100k debug1 ordinary control, so stock 178.499 seconds and sampler-wrapper 185.133 seconds cannot yield an overhead estimate. The short-command direct-root captures likewise have no same-build ordinary controls. ([CPU audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_audit.md); [direct-root results](../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_results.md))
+| Campaign | Observations |
+|---|---|
+| Canonical 60/1k/10k | 352 valid rows: 319 measured, 30 conditioning, three first use |
+| Canonical 100k | 20 valid rows: 19 measured, one first publication |
+| Supplementary catalog | 159 validations and 740 baseline rows; all 159 cases completed |
+| Separate drain sweep | Three validations and nine baseline rows |
 
-The canonical 60/1k/10k survey produced **352 valid rows: 319 measured, 30 conditioning and three first-use**. The separate 100k extension produced **20 valid rows: 19 measured and one first publication**. The supplementary catalog produced **159 validation and 740 baseline rows**, with 13 cases at n=1, 129 at n=3 and 17 at n=20; all 1,798 saved foreground streams were rehashed. A separate drain sweep produced three validations and nine baseline rows. Thus **1,087 stock baseline observations** comprise 319 + 19 + 740 + 9; one catalog observation is an expected invalid-argv exit 1, not a successful operational command. Validation, conditioning, first-use and sampled runs are not included in that total. Do not pool cases, fixture identities or tails. ([Canonical audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_evidence_audit.md); [catalog audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_evidence_audit.md); [drain audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_audit.md))
+Total stock baseline observations: **1,087 = 319 + 19 + 740 + 9**, including one expected invalid-argv exit 1, not 1,087 successful operational commands. Validation, conditioning, first use and profiles are excluded. Catalog repetitions were 13 cases × 1, 129 × 3 and 17 × 20. Its 899 row identities and 1,798 foreground stream hashes reconciled without missing or duplicate slots. Do not pool case/configuration/build identities or infer tail percentiles from these sample counts.
 
-## Workloads
+| Workload family | Input and interpretation |
+|---|---|
+| Canonical, seed 65 | 60/1k/10k/100k knowledge nodes; 2,000-byte fragments; 30 per Markdown file; equal source-node counts; five edges per knowledge node |
+| Canonical 100k | 100k knowledge nodes, 100k source nodes, 500k edges, 73,333 includes and 3,334 knowledge files |
+| Supplementary, seed 20261117 | Sparse 0/100/1k/10k; 1k chain, star, dense, long-text, source, stale, dangling and cycle variants |
+| Sanitized repository export | Actual projection: 45 knowledge nodes, 204 edges; source-node count unavailable |
+| Loopback OpenAI-protocol mock | Deterministic 32-dimensional vectors; protocol/vector work, not actual model/provider performance |
 
-| Family | Input and state | Purpose and boundary |
+The real export retained missing history/paths: every check/status repeat reported 89 findings—44 unavailable snapshots and 45 missing sources. Full index updated 13 files with zero invalid files updated; its 0.0803 s median describes that bounded 45-node projection, not a clean production knowledge base. Source-node addresses are not distinct source-file counts.
+
+Canonical 60/1k/10k used disabled Ollama configuration; 100k used disabled OpenAI configuration. No provider calls were intended, but network traffic was not independently traced. Differing configurations, fixture preparations and host conditions prevent treating cross-scale ratios as a controlled complexity experiment.
+
+## Per-command results
+
+Wall and CPU are seconds; RSS is median lifetime peak in MiB. Values are medians except n=1.
+
+| Command and state | Knowledge nodes / workload | n | Wall median [min–max] | CPU median | RSS median |
+|---|---|---:|---|---:|---:|
+| `init`, fresh | Sparse 0 | 20 | .066172 [.058114–.170055] | .0152745 | 11.125 |
+| `config` | Sparse 100 | 20 | .016592 [.0114–.0673] | .0047775 | 8.578 |
+| `status` | Canonical 100k | 3 | 10.679151 [10.551076–10.892807] | 10.161579 | 369.58 |
+| `index --full` | Canonical 100k | 1 | 178.498726 [single observation] | 174.625770 | 443.61 |
+| `index`, unchanged | Canonical 100k | 3 | .680731 [.676878–.686114] | .655125 | 17.17 |
+| `check` | Canonical 100k | 3 | 10.859230 [10.753415–10.943573] | 10.464636 | 371.39 |
+| `inspect` | Canonical 100k | 3 | 7.878149 [7.147968–47.384810] | 5.444781 | 60.08 |
+| `search`, unchanged | Canonical 100k | 3 | .727827 [.702877–.729675] | .680672 | 17.88 |
+| `traverse`, unchanged | Canonical 100k | 3 | .682390 [.680101–.691355] | .655148 | 17.84 |
+| `embed --drain` | Separate 100-text mock | 3 | .997387 [.932611–1.013247] | .175816 | 13.656 |
+
+The 100k inspect calls ran in order **47.384810 → 7.147968 → 7.878149 s**; the median hides substantial variation. No causal cache/wait explanation was established. First-publication search separately took 135.650655 s, CPU 132.357087 s and 363.67 MiB RSS once; it is not unchanged-query latency.
+
+### Small and large workloads
+
+Each cell is **n / median wall seconds / median combined CPU seconds / median peak RSS MiB**. Startup rows use sparse inputs; other rows use source-rich canonical inputs. These workload families are not interchangeable.
+
+| Command and scenario | Small cohort | Large cohort |
 |---|---|---|
-| Canonical synthetic, seed 65 | 60, 1k, 10k and 100k knowledge elements; 2 kB fragments, 30 per file, five edges per node; equal knowledge/source-node counts | Mixed graph and source work, first publication, changed and unchanged scenarios. At 100k: 500k edges and 73,333 includes. |
-| Supplementary synthetic, seed 20261117 | Sparse 0/100/1k/10k; 1k chain, star, dense, long-text, source, stale, dangling and cycle variants | Broader command, flag, topology and failure coverage; not interchangeable with canonical series. |
-| Sanitized own-repository export | Actual projection: 45 knowledge nodes, 204 edges; source-node count unavailable | Bounded real-content example, not a clean production database or full repository knowledge base. |
-| Loopback OpenAI-protocol mock | Deterministic 32-dimensional vectors, populated and queued states | Protocol and local vector-path exercise, not real provider latency, model CPU, RAM or quality. |
+| `init`, fresh, sparse 0 → 10k | 20 / .066172 / .0152745 / 11.125 | 20 / .067181 / .015353 / 11.102 |
+| `config`, sparse 100 → 10k | 20 / .016592 / .0047775 / 8.578 | 20 / .016421 / .004917 / 8.562 |
+| `status`, canonical 60 → 100k | 20 / .025701 / .013374 / 11.80 | 3 / 10.679151 / 10.161579 / 369.58 |
+| `index --full`, canonical 60 → 100k | 3 / .073136 / .038579 / 14.39 | 1 / 178.498726 / 174.625770 / 443.61 |
+| `check`, canonical 60 → 100k | 20 / .044191 / .025288 / 12.95 | 3 / 10.859230 / 10.464636 / 371.39 |
+| `inspect`, canonical 60 → 100k | 20 / .050729 / .023880 / 13.09 | 3 / 7.878149 / 5.444781 / 60.08 |
+| `search`, canonical 60 → 100k | 20 / .040933 / .021771 / 13.22 | 3 / .727827 / .680672 / 17.88 |
+| `traverse`, canonical 60 → 100k | 20 / .046525 / .026271 / 13.30 | 3 / .682390 / .655148 / 17.84 |
 
-The real export retained unavailable historical bases and missing paths: each check and status baseline reported **89 findings**, including 44 unavailable snapshots and 45 missing sources. Its full-index median of 0.0803 seconds describes that 45-node projection only. The manifest's placeholder knowledge count does not supersede observed database counts. Actual source files and source nodes are distinct quantities. ([Catalog evidence audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_evidence_audit.md); [stress validation](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress_audit.md))
+| Intermediate canonical workload | n | Wall median [min–max], s | CPU median, s | RSS median / maximum, MiB |
+|---|---:|---|---:|---|
+| 1k full index | 3 | .365304 [.362799–.366241] | .322583 | 22.08 / 22.42 |
+| 10k full index | 3 | 4.627904 [4.484957–4.966385] | 4.471358 | 77.23 / 77.42 |
+| 10k check | 20 | 1.047962 [1.019874–1.182814] | 1.019178 | 62.47 / 64.91 |
+| 10k status | 20 | .993107 [.959551–1.103140] | .974611 | 59.40 / 62.84 |
+| 10k unchanged search | 20 | .105040 [.101475–.108385] | .085430 | 14.57 / 14.77 |
+| 10k unchanged traverse | 20 | .108481 [.105017–.119115] | .088889 | 14.38 / 14.55 |
 
-## Command coverage
+At 10k, search after one changed file took .456478 s, after two files .441105 s and after bulk changes 4.827821 s, n=3 each. These refresh scenarios execute search after edits, not separate index commands. At 60 nodes only two knowledge files exist, so two-file and bulk refresh are not distinct edit counts.
 
-Each row identifies the strongest observed explanation, not a guarantee for all states. Times and memory below are stock, while attribution is from separate symbolized captures. CPU is the median of each invocation's **user + system seconds**, not the sum of separately computed component medians; RSS is median lifetime peak.
+Inspect's 10k sample count reduced under the existing adaptive policy after a 4.553 s conditioning call; its second conditioning call was .662 s. The 100k study had no conditioning and used one stable repository sequentially. These are not identically warmed/cold independent trials.
 
-| Command | Representative stock result; n, wall median [min–max], combined CPU median, RSS median | Sampled bottleneck and evidence limit |
+## Sampled bottlenecks and code locations
+
+The complete 100k full-index profile had **183,971 usable stacks**, **177.888334 s observed sampled CPU** and **185.133 s sampler-wrapper elapsed**. Product/result/count validation passed: revision 3, 3,334 updated files and zero invalid files.
+
+| Inclusive sampled scope | 10k full index | 100k full index | Code |
+|---|---:|---:|---|
+| `EffectiveGraph::apply` | 19.81% | 53.35% | [Graph application](../src/service/document_refresher.rs#L947-L973) |
+| `DocumentPublication::reconcile_sources` | 9.72% | 23.92% | [Source reconciliation](../src/service/document_refresher.rs#L731-L762) |
+| `EffectiveGraph::collect_source_references` | 4.84% | 22.63% | [Reference collection](../src/service/document_refresher.rs#L983-L1007) |
+| SQLite source-file presence | 33.58% | 11.05% | Inclusive attribution, not exclusive SQLite wall time |
+
+**These shares overlap and cannot be added.** Weighted thread CPU is not wall-time attribution. The publication loop calls graph application per changed file; `edges.retain` scans effective edges each time. Code suggests approximately O(FE) edge scanning for F files and E edges. Reference collection uses `knowledge.keys().any(...)` per source edge, suggesting worst-case O(SN) comparisons for S references and N knowledge IDs. Actual iterations and counterfactual savings were not measured. Native `_platform_memcmp` appeared in 27.63% and `sqlite3_step` in 6.96% of the 100k profile, overlapping Rust scopes.
+
+| Command / capture | Observed hot scopes | Qualification |
 |---|---|---|
-| `init` | Empty sparse fresh: 20, 0.0662 [0.0581–0.1701] s, CPU 0.0152745 s, 11.12 MiB | Git `open_with_cleanup` was present in about 50% of sampled CPU in one usable 10 kHz capture; inclusive scope, not leaf self-cost. |
-| `config` | Sparse 100: 20, 0.0166 [0.0114–0.0673] s, CPU 0.0047775 s, 8.58 MiB | Same Git-open scope about 82.6% of aggregate sampled CPU. Sixty-four outputs, 61 sampled PIDs; no per-call latency or child-exit trace from the aggregate. |
-| `status` | Canonical 100k: 3, 10.679 [10.551–10.893] s, CPU 10.161579 s, 369.58 MiB | Provenance/source observation and filesystem verification dominate sampled CPU; 100k capture is a censored prefix, not completed status latency. |
-| `index` | Canonical 100k full: 1, 178.499 s, CPU 174.625770 s, 443.61 MiB; no-op: 3, 0.681 [0.677–0.686] s, CPU 0.655125 s, 17.17 MiB | Full publication shows graph application and source reconciliation; 10k verified index capture shows change detection. Different states are not interchangeable. |
-| `check` | Canonical 100k: 3, 10.859 [10.753–10.944] s, CPU 10.464636 s, 371.39 MiB | Three 10k captures show source observation and root verification; separate 10k heap snapshot shows graph-vector allocations. |
-| `inspect` | Canonical 100k: 3, 7.878 [7.148–47.385] s, CPU 5.444781 s, 60.08 MiB | 10k sample contains Git object writing and synchronization; wall-time remainder is not a measured I/O-wait breakdown. |
-| `search` | Canonical 100k unchanged: 3, 0.728 [0.703–0.730] s, CPU 0.680672 s, 17.88 MiB | 10k unchanged capture points to change detection, with only 111 usable stacks. Mock hybrid is a separate path. |
-| `traverse` | Canonical 100k unchanged: 3, 0.682 [0.680–0.691] s, CPU 0.655148 s, 17.84 MiB | 10k unchanged change detection has 109 stacks; a separate long-text traversal capture observes link lookup. |
-| Internal `embed --drain` | Separate 100-text sweep: 3, 0.997 [0.933–1.013] s, CPU 0.175816 s, 13.656 MiB | One direct capture shows SQLite commit and synchronization scopes inside `drain_ready`; sampled CPU is not measured I/O wait. |
-| Help, version, invalid argv | Catalog coverage cases, n=1 each | Help/version remained insufficient even at 10 kHz; invalid argv intentionally exits 1. No zero-cost claim or detailed CPU ranking. |
+| Complete 10k `check`, three captures | `observe_sources_batch` 81.99%, 81.38%, 84.55%; root verification 55.73%, 54.72%, 57.19% | 1,114 / 1,134 / 1,349 usable stacks; nested scopes |
+| Complete 10k `status` | Source observation 85.92%; `file_get_by_path` 79.17% | 1,062 stacks |
+| 100k `status` prefix | Provenance-file attribution 84.31%; filesystem-file attribution 76.41%; `__open` 49.13% | Stopped at 10.013 s, exit -15; not completed status latency |
+| Complete 10k `inspect` | Git object write 62.40%; object sync 24.64%; `__fcntl` 22.17% | Does not measure blocked time |
+| Unchanged 10k `search` / `traverse` | Change detection 72.96% / 66.69% | Only 111 / 109 stacks; coarse evidence |
+| 10k one-file refresh | Source-reference collection 56.11% | 426 stacks; search-after-edit scenario |
 
-The 100k inspect calls occurred in order **47.384810, 7.147968, 7.878149 seconds**. Reporting the median without the first observation would hide material variation; no cause, including cache state, is established. Sampled `init` and `config` are direct-root diagnostic captures, while the representative times above are distinct stock scenarios. ([100k raw and summaries](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md); [selected catalog CPU/RSS](../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_evidence_audit.md); [direct-root attribution](../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_results.md))
+Shared status/check ownership is [diagnostic batching](../src/service/utils.rs#L279-L360), [source provenance](../src/service/provenance.rs), [confined capture](../src/filesystem/local.rs#L557-L703) and [root identity verification](../src/filesystem/local.rs#L1220-L1227).
 
-The following compact comparison gives **n / median wall seconds / median combined CPU seconds / median peak RSS MiB** for each public command. Canonical columns are source-rich seed-65 fixtures; startup rows instead use sparse seed-20261117 fixtures, explicitly labeled in the row. They are separate workload families, and startup at sparse 10k is not a 100k result. Different provider configurations and execution states prevent treating the columns as a controlled scaling experiment.
+### Startup and capture quality
 
-| Command and scenario | Small cohort: n / wall / CPU / RSS | Large cohort: n / wall / CPU / RSS |
-|---|---|---|
-| `init`, fresh, sparse 0 → 10k | 20 / 0.066172 / 0.0152745 / 11.125 | 20 / 0.067181 / 0.015353 / 11.102 |
-| `config`, sparse 100 → 10k | 20 / 0.016592 / 0.0047775 / 8.578 | 20 / 0.016421 / 0.004917 / 8.562 |
-| `status`, canonical 60 → 100k | 20 / 0.025701 / 0.013374 / 11.80 | 3 / 10.679151 / 10.161579 / 369.58 |
-| `index --full`, canonical 60 → 100k | 3 / 0.073136 / 0.038579 / 14.39 | 1 / 178.498726 / 174.625770 / 443.61 |
-| `check`, canonical 60 → 100k | 20 / 0.044191 / 0.025288 / 12.95 | 3 / 10.859230 / 10.464636 / 371.39 |
-| `inspect`, canonical 60 → 100k | 20 / 0.050729 / 0.023880 / 13.09 | 3 / 7.878149 / 5.444781 / 60.08 |
-| `search`, canonical 60 → 100k | 20 / 0.040933 / 0.021771 / 13.22 | 3 / 0.727827 / 0.680672 / 17.88 |
-| `traverse`, canonical 60 → 100k | 20 / 0.046525 / 0.026271 / 13.30 | 3 / 0.682390 / 0.655148 / 17.84 |
+Canonical sampling produced 12 validated captures: ten complete 10k captures, a complete 100k index and a deliberately stopped 100k status prefix. Ten ordinary debug1/profile pairs were separate from stock data. Check's three sampler-wrapper/ordinary ratios were 2.1521, 2.3802 and 1.8415, median 2.15×; median difference 1.302544 s. These include launch/save/symbolization, not intrinsic product slowdown. No matched 100k ordinary debug1 control exists; stock 178.499 s versus sampled-wrapper 185.133 s is not an overhead estimate.
 
-These medians summarize separate marginal distributions, not necessarily the same invocation. The 100k no-op index has no matched 60-node no-op series in the canonical survey. ([Canonical survey](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_survey.md); [raw sparse rows](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/supplementary-prepare-20261117-v1/measurements.jsonl))
+Four later window captures lacked an attributable product PID/library and remain unattributable, not zero-cost. Direct-root sampling then attempted eight categories in 15 captures: eight at 1 kHz and seven finite 10 kHz diagnostics. Six were usable and nine insufficient under at least 100 product-library stacks and positive resolved Letopis CPU. All requested outputs validated; sampler exits were 0. All eight public commands and internal drain have usable evidence across campaigns; help/version do not.
 
-## Timing and CPU results
+Config/help/version each used 64 read-only outputs with EOF. Config had 61 sampled PIDs at 10 kHz, not 64 independently traced executions. Help had only 38 product stacks and version eight. Individual child exits were not independently observed; PIDs derive from exact private-library path/UUID matches.
 
-The following canonical comparisons preserve per-series identities. CPU is median user plus system seconds; RSS is median lifetime peak. n=20 and n=3 characterize only these observations; they do not establish p95, p99 or a formal capacity gate.
+Config's `open_with_cleanup` carried 390,922 of 473,365 observed CPU µs; nested Git open-from-paths carried 315,898 and configuration-cache init 121,405. Fresh init's Git discovery/open scope carried 15,106 of 30,227 µs. These inclusive diagnostic scopes are not exclusive savings or per-call latency. Product-only counters were kept separate from all-library counters.
 
-| Workload | n | Wall median [min–max], s | CPU median, s | RSS median / max, MiB |
-|---|---:|---:|---:|---:|
-| 60 full index | 3 | 0.073 [0.072–0.102] | 0.039 | 14.39 / 14.50 |
-| 1k full index | 3 | 0.365 [0.363–0.366] | 0.323 | 22.08 / 22.42 |
-| 10k full index | 3 | 4.628 [4.485–4.966] | 4.471 | 77.23 / 77.42 |
-| 100k full index | 1 | 178.499 [178.499–178.499] | 174.626 | 443.61 / 443.61 |
-| 10k check | 20 | 1.048 [1.020–1.183] | 1.019 | 62.47 / 64.91 |
-| 10k status | 20 | 0.993 [0.960–1.103] | 0.975 | 59.40 / 62.84 |
-| 10k unchanged search | 20 | 0.105 [0.101–0.108] | 0.085 | 14.57 / 14.77 |
-| 10k unchanged traverse | 20 | 0.108 [0.105–0.119] | 0.089 | 14.38 / 14.55 |
-| 100k first-publication search | 1 | 135.651 [135.651–135.651] | 132.357 | 363.67 / 363.67 |
+Long-1k traversal actually returned 16 elements and 16 edges; link lookup carried 23,286 / 53,442 observed CPU µs. Verified sparse-10k index showed change detection at 42,209 / 68,848 µs. Populated mock search showed `wire_embedding_executor_at_root` at 23,660 / 39,704 µs; broad entry scopes do not identify exclusive leaf causes.
 
-The 60/1k/10k fixtures used disabled Ollama configuration and the 100k fixture disabled OpenAI configuration; both intended no provider calls, but network traffic was not independently traced. Cross-scale movement is an association across different runs and configurations, not a controlled complexity experiment. `refresh_one`, `refresh_several` and `refresh_bulk` are searches after edits, not index commands. At 10k their wall medians were 0.456, 0.441 and 4.828 seconds respectively, n=3 each. ([Canonical series](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_survey.md); [100k series](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md))
+## Mock embedding drain results
 
-Explicit drain scales separately from these disabled-embedding cases:
+Each size had one validation and three stock baseline repeats using deterministic localhost 32-dimensional vectors. User/system columns are separate medians, not a combined-CPU median.
 
-| Unique texts and vectors | n | Wall median [min–max], s | User / system median, s | RSS median, MiB |
-|---|---:|---:|---:|---:|
-| 2 | 3 | 0.051 [0.047–0.054] | 0.005 / 0.008 | 12.313 |
-| 100 | 3 | 0.997 [0.933–1.013] | 0.067 / 0.107 | 13.656 |
-| 1,000 | 3 | 9.040 [9.014–9.132] | 0.856 / 0.759 | 14.672 |
+| Unique texts | Wall median [min–max], s | User / system median, s | RSS median, MiB |
+|---:|---|---|---:|
+| 2 | .051378 [.047056–.054496] | .004962 / .008008 | 12.313 |
+| 100 | .997387 [.932611–1.013247] | .067246 / .107150 | 13.656 |
+| 1,000 | 9.040224 [9.013907–9.132058] | .855949 / .758505 | 14.672 |
 
-Every drain sweep validation and baseline had N unique hashes, queue N→0, N provider items and native confirmation of N covered vectors at 32 dimensions. The separate catalog 100-text drain has different fixture/configuration identity and must not be pooled with this 100-text cohort. Mock server resources and setup are outside foreground product accounting. ([Drain sweep](../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_results.md); [independent audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_audit.md))
+All 12 rows verified N unique hashes, queue N→0, N provider items, no recorded failures and native coverage N/zero missing at 32 dimensions. HTTP request counts happened to equal N; item coverage is the correctness condition. The 100-text combined CPU median is .175816 s. The catalog's separate 100-text cohort had .9948 s median wall and different identities; do not pool it.
 
-## Sampling profiles and bottlenecks
+Within one 100-text drain's `drain_ready` stacks, `sqlite3_step` accounted for 69,487 µs, `sqlite3WalFrames` 67,118 and `unixSync`/`full_fsync` 59,883 against 108,189 µs all-library observed CPU. These overlapping scopes motivate investigating SQLite commits/synchronization, not a measured wait or savings estimate.
 
-The complete 100k full-index sampler captured **183,971 usable stacks**, 177.888334 seconds of sampled CPU and a 185.133-second sampler-wrapper interval. Product completion and graph counts passed validation. The highest consequential inclusive scopes in that capture are:
-
-| Inclusive sampled CPU | Scope and source | Interpretation |
-|---:|---|---|
-| 53.35% | `EffectiveGraph::apply`, [document_refresher.rs](../src/service/document_refresher.rs) | Applies changed files; source contains edge `retain` over the effective edge set per changed file. |
-| 23.92% | `DocumentPublication::reconcile_sources`, [document_refresher.rs](../src/service/document_refresher.rs) | Enclosing source-reconciliation work; overlaps other scopes. |
-| 22.63% | `EffectiveGraph::collect_source_references`, [document_refresher.rs](../src/service/document_refresher.rs) | Source-reference conflict path includes `knowledge.keys().any(...)` scan. |
-| 11.05% | SQLite source locations in the same capture | Inclusive source-file presence, not SQLite's exclusive wall-time contribution. |
-
-These figures **overlap and cannot be added**, and the sampled source line is not an exclusive instruction-cost measurement. The code structure suggests O(FE) edge scanning for F changed files and E effective edges, and O(SN) knowledge-key scanning for S source references and N knowledge IDs. Actual scan counts were not measured; observed scale association does not establish a counterfactual speedup or wall-time promise. A 10k full-index capture showed 19.81%, 9.72% and 4.84% respectively for apply, reconciliation and collection, on a different fixture and state. ([CPU attribution and raw profile](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_profiles.md))
-
-Other useful scopes are in [provenance.rs](../src/service/provenance.rs), [local.rs](../src/filesystem/local.rs), [repository.rs](../src/git/repository.rs) and [durability.rs](../src/git/durability.rs). Three 10k check samples placed `observe_sources_batch` at 81.38–84.55% and root verification at 54.72–57.19%, inclusive. The 10k status sample placed source observation at 85.92%; the 100k status prefix showed 84.31%. Inspect's 10k profile showed object writing at 62.40% and object synchronization at 24.64%. Unchanged 10k search and traverse showed change detection at 72.96% and 66.69%; those short captures support only coarse interpretation. These nested shares are not additive and do not measure blocked time. ([CPU profiles](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_profiles.md))
-
-Independent direct-root reanalysis found, within the 100-item drain's `drain_ready` stacks, `sqlite3_step` at 69,487 µs, `sqlite3WalFrames` at 67,118 µs and `unixSync`/`full_fsync` at 59,883 µs, against 108,189 µs all-library observed CPU. These overlapping scopes point to a SQLite commit/synchronization investigation, not a measured wait or savings estimate. In config's aggregate, `gix::open::repository::open_from_paths` appeared for 315,898 µs and configuration-cache initialization for 121,405 µs of 473,365 µs observed; fresh init showed Git discovery for 15,106 µs of 30,227 µs. These figures are inclusive and capture-specific. ([Direct-root independent audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_audit.md))
-
-Coverage consists of **12 validated canonical captures**, including the complete 100k index and a deliberately terminated 100k status prefix, plus **15 direct-root captures in eight categories**, six usable and nine insufficient. Direct attempts used 1 kHz, followed when needed by one finite 10 kHz diagnostic. All eight public commands have usable evidence across the two campaigns, and the internal drain was sampled. Four earlier window captures lacked an attributable product PID/library and are **unattributable**, not zero-cost. Help and version remained insufficient. Native iteration-group output counts and sampler status do not provide individual child exit traces. ([Direct capture inventory](../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_results.md); [additional window limitations](../research_notes/Letopis%20comprehensive%20performance%20profiling/additional_cpu_results.md))
+Setup, observers and mock-server resources are outside foreground drain accounting. Launcher elapsed was 54.06 s including setup/validation. Per-product cap was 120 s; 1,800 s applied per driver stage, not globally. Disk and post-observation 1 GiB RSS stops were soft. Populated-query native checks separately verified the same DB before/after, 100 covered/zero missing/32 dimensions. No real model performance or adjunct search-scale sweep was measured.
 
 ## Memory results
 
-Four valid 10k live snapshots describe allocation prefixes: early full index, later full index, check and inspect. The early full-index snapshot observed a **5,767,168-byte node-vector allocation** and **1,192,464 bytes of SQLite page-cache allocations** in the sampled prefix. The later full-index prefix included 8,047,680 bytes attributed to `BasisPreflight::add_file` BTree construction and 5,565,776 bytes under `EffectiveGraph::from_storage`; stacks identify allocation origins, not definitive live ownership. Check showed 7,864,320 bytes in an edge vector and 5,767,168 in a node vector. Inspect showed a thread-creation VM allocation and smaller SQLite and compression allocations; reserved VM is not necessarily resident heap. ([Native memory results](../research_notes/Letopis%20comprehensive%20performance%20profiling/memory_results.md))
+Four valid 10k live snapshots describe allocation prefixes, not full-command allocation peaks or churn. Early full index at about 26 ms observed a 5,767,168-byte node vector and 1,192,464 bytes of SQLite page-cache allocations. Logged heap-plus-VM high-water was 12.5 MB and cumulative allocations 52.9 MB through that prefix only.
 
-Instrumented later check, inspect and full-index product lifetime RSS were 71,991,296, 24,002,560 and 85,082,112 bytes. These are not stock baselines or full-process allocation peaks. Offline leak scans reported zero leaks at each snapshot, which does not establish absence of leaks, retained reachable memory, or later peaks. The original early live launcher did not retain product wait4 peak RSS, so its post-run RSS guard is unverified. At-exit full-history capture failed because logging was lite; tool errors and unsuccessful attempts remain in the evidence. No full-lifetime allocation churn or peak ownership is available. ([Memory audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/memory_evidence_audit.md))
+| Later snapshot | Approximate launch-to-snapshot time | Prefix heap+VM high-water / live, MB | Instrumented product lifetime RSS, bytes |
+|---|---:|---|---:|
+| check | .187 s | 26.9 / 6.5 | 71,991,296 |
+| inspect | .133 s | 4.4 / 4.0 | 24,002,560 |
+| index --full | .738 s | 30.7 / 30.6 | 85,082,112 |
 
-## Limitations
+Check showed 7,864,320 bytes in an edge vector and 5,767,168 in a node vector under graph diagnostics/storage reads. Later full index showed 8,047,680 bytes/9,960 allocations attributed to `BasisPreflight::add_file` BTree building and 5,565,776 bytes/4,166 allocations under `EffectiveGraph::from_storage`. Inspect showed 2,146,304 bytes on thread creation, 559,104 SQLite and 379,968 compression initialization. Reserved VM is not necessarily resident heap; allocation origin does not establish full-peak live ownership.
 
-The campaign separates local FTS, mock hybrid, explicit drain and normal foreground commands. Detached-worker lifetime and resources, blocked-worker behavior and whole-workflow completion remain unmeasured. The vector canary returned the expected unique ID, the frozen input lacked the query token, and receipts recorded local HTTP and native vector coverage. However, its disposable cache was deleted; an independent raw FTS `MATCH` query is unavailable. This supports the bounded vector-path interpretation, not a direct proof of the raw FTS result. ([Catalog audit](../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_evidence_audit.md))
+Offline scans reported zero leaks at each snapshot, not absence of leaks, reachable retention or later peaks. At-exit full-history capture failed because logging was lite; working live logging used `MallocStackLoggingNoCompact=1` and no-content tools. Early runs lacked wait4 peak RSS, so their RSS guard is unverified; later captures retained actual exit/RSS and oracles. No valid status/search/traverse heap capture or full allocation chronology exists.
 
-No actual embedding model or provider, independent network trace, Linux run, multiagent contention, high-dimensional vector workload, 100k hybrid search, exact I/O bytes, lock timing, allocation chronology or latency-tail guarantee was measured. Shared-host scheduling, filesystem cache and thermal conditions were uncontrolled. Memory and disk stops were observed soft guards, not instantaneous hard limits. Results do not constitute a before/after comparison or establish production capacity.
+Separate helper and `/usr/bin/time -l` runs calibrated CPU/sleep/64 MiB touch: wait4 CPU .513/.0125/.0179 s and peak RSS 12,550,144/12,517,376/79,593,472 bytes. These were independent invocations, not exact same-process accounting comparisons.
 
-Fresh final verification passed: **94 performance helper tests in 21.287 seconds, eight skipped**, and **49 research-tool tests in 2.372 seconds** (41 driver and eight direct-adapter tests). Integration environment variables were intentionally unset; these are not Rust root or native product integration tests. An earlier 94-test run had one error following a fake first-publication timeout; the later pass and a targeted fake-unit pass do not explain or prove a fix for the original delay. ([Final performance log](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/final-verification-20261117-v1/existing-performance-tests.log); [research-tool log](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/final-verification-20261117-v1/research-tool-tests.log); [historical diagnosis](../research_notes/Letopis%20comprehensive%20performance%20profiling/existing_suite_diagnosis.md))
+## Limitations and validation
 
-## Recommendations
+No actual embedding model/provider, independent network trace, Linux/minimum-hardware run, multiagent contention, high-dimensional vectors, 100k hybrid search, exact byte I/O, lock waits or latency-tail guarantee was measured. Foreground response is not whole detached-worker completion. Soft resource checks were not hard live ceilings.
 
-First, investigate graph-publication scans with controlled instrumentation or matched one-variable experiments at multiple file, edge and source-reference counts. Measure actual iterations, CPU, elapsed time, allocations and correctness; compare equivalent build and fixture identities. Preserve behavior for changed and unchanged sources, invalid inputs and concurrent state. The observed profile motivates this investigation but does not justify a claimed speedup.
+The vector-only canary returned its expected ID and one local HTTP request; frozen text lacked the query token. Its disposable cache was removed, so an independent raw FTS `MATCH` query is unavailable, not a passed check.
 
-Second, study check/status provenance and inspect Git object synchronization using targeted traces that distinguish CPU, filesystem work and blocking. Preserve confinement, path and file identity checks, current-source verification, snapshot durability and recovery guarantees; disabling verification or synchronization is not an acceptable shortcut. Treat direct-root startup scopes as broad entry points, not proof that Git open itself is an exclusive leaf bottleneck.
+Study closeout recorded 94 performance-helper tests in 21.287 s, eight skipped, and 49 research-tool tests in 2.372 s. Integration prerequisites were unset; these are not Rust root/native integration checks. An earlier fake initial-publication timeout caused a helper error; the later pass does not explain or prove that delay fixed. No optimization was implemented; these are not before/after speedup results.
 
-Third, extend measurement only where decisions need it: realistic approved knowledge bases, explicit real-provider/model authorization, high-dimensional vectors, background completion and contention, and independently validated allocation timelines. Retain separate stock and diagnostic build identities, control or record host conditions, and increase repetitions before making tail or capacity claims. No schema change, async runtime or other product design change is implied by these observations.
+## Reproduction and retained evidence
 
-## Reproduction and evidence
+Stock executable SHA-256:
+`77343af98921fcb0c1342488702c1bc5fc302a56476d46790e8aa6439e9443db`.
+Symbolized debug1 SHA-256:
+`b16196a645ad011150bad2e3c65884e935b6d575add68fb3392bc0a117ee05b5`.
+Executable/dSYM UUID: `FFEBF8EC-A110-37A6-AA8B-747F67DAEA21`.
+Build receipts pin 116 product inputs; the native observer receipt covers 130.
 
-Reproduction is a **future new campaign**, not permission to overwrite saved evidence. Use the exact archived revision, pinned inputs and independent oracles; create new evidence directories and update any absolute paths in one-off launchers after reviewing them. For canonical 60/1k/10k, the recorded command template is:
-
-Prerequisites include the matching revision and complete 116-input product-build verification: [stock build receipt](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/build-archives-20261117-0046a6d-v1/stock_release/build.json), [symbolized build receipt](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/build-archives-20261117-0046a6d-v1/symbolized_release/build.json), and [build metadata](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/build_metadata.json). Supplementary mock/vector cases also require the matching [native observer build receipt](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/native-observer-20261117-v1/archived-build.json) and [archived observer binary](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/native-observer-20261117-v1/target_corpus-observer); see [supplementary preparation](../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_preparation.md) for its 130-input receipt and fixture setup. Archived absolute executable and temporary paths are host-specific, not portable: adapt them and verify the resulting identities. Validate each exact case, configuration and arguments before collecting its matching baseline; do not substitute a different validated case.
+Use a disposable checkout, pinned Rust, Python 3.12, Git and locked dependencies; fetch missing dependencies before offline builds. The tracked [runner](../tests/performance/run.py) and [fixture/build helpers](../tests/performance/scenarios.py) provide a symptom reproducer:
 
 ```sh
-/opt/homebrew/bin/python3.12 -B tests/performance/run.py \
-  --stage survey --nodes <60|1000|10000> \
-  --baseline "$PWD/research_notes/Letopis comprehensive performance profiling/evidence/build-archives-20261117-0046a6d-v1/stock_release/build.json" \
+OUT="$(mktemp -d "${TMPDIR:-/tmp}/letopis-results-XXXXXX")"
+python3.12 -B tests/performance/run.py \
+  --stage survey --nodes 10000 --scenarios check status reindex \
   --initial-timeout 600 --timeout 120 --stage-seconds 1200 \
-  --evidence "$PWD/research_notes/Letopis comprehensive performance profiling/evidence/NEW-canonical-<scale>"
+  --evidence "$OUT/10k"
 ```
 
-The 100k run used a one-off shared-fixture launcher rather than the unchanged survey entry point; inspect and adapt its [exact source and recorded invocation](../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md) to a new directory. The [supplementary campaign](../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_results.md), [drain sweep](../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_results.md), [direct-root launcher](../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_results.md), and [native-memory procedures](../research_notes/Letopis%20comprehensive%20performance%20profiling/memory_results.md) record exact commands, seeds, fixtures, inputs and resource limits; their archived scripts have fixed paths and must not be rerun against existing output.
+The harness scenario `reindex` executes `index --full` with `{}`. Without `--baseline`, the runner builds debug1, not stock; genuine matching stock receipts can be supplied with `--baseline`. Do not relabel builds. The generic runner copies/reset-refreshes fixtures; the original 100k campaign instead used one stable repository and disabled OpenAI configuration.
 
-Full per-case statistics, n, identities and ranges for all 159 supplementary cases are in [case-results.json](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/supplementary-prepare-20261117-v1/campaign-control/case-results.json); [raw catalog rows](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/supplementary-prepare-20261117-v1/measurements.jsonl), [canonical 100k rows](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/canonical-stress-100000-20261117-v1/samples.jsonl), [full 100k CPU profile](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/canonical-cpu-20261117-v1/100k-full-complete/profile.json.gz) and [drain rows](../research_notes/Letopis%20comprehensive%20performance%20profiling/evidence/drain-scale-20261117-run-v2/measurements.jsonl) retain the underlying evidence. Source-specific audits linked throughout qualify each result and supersede earlier preparatory notes.
+At 100k use explicit repetitions, disk capacity and product/stage budgets. Independently validate node/edge counts, findings and each response; preserve failed/censored/skipped attempts. For profiles, launch the actual private symbolized binary directly through Samply with JSON stdin/EOF and matching symbols. Verify PID/library identity and positive CPU samples. Never overwrite old evidence or execute archived hardcoded launchers unchanged.
 
-## Conclusion
+Retained local root: `research_notes/Letopis comprehensive performance profiling/evidence/`. It is deliberately excluded from publication. Artifact locations:
 
-The central distinction is between **publication work that grows with graph and source relationships** and **unchanged foreground operations that still perform change detection or provenance checks**. The evidence prioritizes where to measure next; it does not license weakening correctness or translating inclusive sampled CPU directly into promised latency savings.
+- `build-archives-20261117-0046a6d-v1/`: binaries, symbols and complete build receipts; `native-observer-20261117-v1/`: observer.
+- `canonical-survey-{60,1000,10000}-20261117-v1/`: raw samples, manifests and summaries.
+- `canonical-stress-100000-20261117-v1/`: `samples.jsonl`, `resource_summary.json`, corpus validation and invocation order.
+- `canonical-cpu-20261117-v1/`: raw profiles, symbol sidecars, attribution and paired controls; `100k-full-complete/`: complete large-index capture.
+- `supplementary-prepare-20261117-v1/`: 159-case catalog, measurements, `campaign-control/case-results.json`, stream/native receipts.
+- `direct-root-cpu-20261117-v1/`: 15 attempts, identities, attribution and output/native validation.
+- `native-memory-20261117-v1/` and `native-memory-extension-20261117-v1/`: graphs, allocation reports and tool failures.
+- `drain-scale-20261117-run-v2/`: 12 actual measurements and native receipts.
+
+Obtain the retained archive or a separately reviewed evidence subset for independent recomputation. Intermediate notes and preparation scripts are not required to read the published conclusions and are not included in the PR.
+
+## Optimization follow-ups
+
+1. [#111: status/check source verification](https://github.com/zdkadiev/letopis/issues/111). Isolate live capture, root/path verification and graph materialization while preserving fresh per-binding observations, first-error order, confinement and pinned-view correctness.
+2. [#112: full-index graph publication](https://github.com/zdkadiev/letopis/issues/112). Isolate per-file edge scans and source-ID membership with independently varied file/edge/reference counts. Preserve conflict rejection, source timestamps, last-valid projections and atomic rollback.
+3. Investigate inspect's variable write/synchronization path separately; its 47-second call remains unexplained.
+
+Use matched build/configuration/input identities, one-variable experiments, at least three alternating 10k/100k pairs and small/incremental controls. Report wall/CPU/RSS, all attempts and memory tradeoffs. No latency SLO or speedup is agreed. Verification, filesystem identity and snapshot durability must not be weakened; no new runtime, schema or cache architecture is implied.
