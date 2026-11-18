@@ -209,7 +209,7 @@ and different paths/tree shape, so its success does not erase that limitation.
 [Earlier findings](performance-bottlenecks.md#check-status "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#check-status")
 
 ## November 17 profiling method and build identity {#profiling-method-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 The 2026-11-17 study measured revision
 `0046a6d83709fcfb2a610a3789d8ef6d9ba2bcd8`, Letopis 0.3.1, Rust 1.95.0,
@@ -243,13 +243,11 @@ All research agents were OpenAI Sol/Terra; provider-region interruptions reused
 finished evidence rather than blindly repeating canonical benchmarks.
 The research changed no production source, Cargo manifest or lockfile.
 
-[Build provenance](../../research_notes/Letopis%20comprehensive%20performance%20profiling/build_validation.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/build_validation.md")
-[Measurement method](../../research_notes/Letopis%20comprehensive%20performance%20profiling/profiling_methodology.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/profiling_methodology.md")
 [Final report](../../reports/Letopis%20comprehensive%20performance%20profiling.md "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Workload coverage](#profiling-corpus-2026-11-17 "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#profiling-corpus-2026-11-17")
 
 ## November 17 workloads and observation accounting {#profiling-corpus-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Canonical seed-65 corpora had 60/1k/10k/100k knowledge nodes, 2,000-byte
 fragments, 30 elements per Markdown file, equal source-node counts and five
@@ -282,12 +280,10 @@ Total stock baseline observations: **1,087 = 319 + 19 + 740 + 9**, including
 one expected invalid-argv probe, not 1,087 successful operational commands.
 Do not pool validation, conditioning, first use, profile or different-case rows.
 
-[Canonical survey](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_survey.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_survey.md")
-[Catalog audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/supplementary_evidence_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/supplementary_evidence_audit.md")
-[Drain audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/drain_scale_audit.md")
+[Workloads and observation accounting](../../reports/Letopis%20comprehensive%20performance%20profiling.md#methodology-and-workload-accounting "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 
 ## November 17 per-command stock measurements {#profiling-latency-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Values below are medians except n=1. Wall and combined CPU are seconds;
 RSS is median individual lifetime peak in MiB. CPU is the median of each
@@ -321,11 +317,10 @@ No causal cache/wait explanation was established for inspect's first call.
 363.67 MiB RSS, n=1; it is not unchanged-query latency.
 
 [Command table and ranges](../../reports/Letopis%20comprehensive%20performance%20profiling.md "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
-[100k stock evidence](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_stress.md")
 [Scaling](#profiling-scale-2026-11-17 "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#profiling-scale-2026-11-17")
 
 ## November 17 scale-specific measurements {#profiling-scale-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Each entry is **n / median wall seconds / median combined CPU seconds /
 median peak RSS MiB**, from source-rich canonical fixtures. Do not substitute
@@ -357,12 +352,11 @@ scales used prepared scenario copies. Configurations also differ across scales.
 Consequently ratios are observed associations, not controlled complexity proofs,
 cold/warm equivalence, tail-percentile estimates or production capacity limits.
 
-[Small-scale exact tables](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_survey.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_survey.md")
-[100k exact tables and order](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_stress.md")
+[Scale-specific results](../../reports/Letopis%20comprehensive%20performance%20profiling.md#small-and-large-workloads "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Publication hypothesis](#graph-publication-2026-11-17 "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#graph-publication-2026-11-17")
 
 ## Remaining status and check bottleneck at 100k {#check-status-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Status/check consume approximately ten CPU-seconds and 370 MiB RSS at 100k,
 not merely ten seconds waiting on disk. Three complete 10k check profiles
@@ -398,7 +392,7 @@ confinement, no-follow checks, concurrent replacement detection and pinned views
 is open; it records baselines, reproduction, code links and acceptance criteria.
 It is a scoped follow-up to #100, not another historical-read reuse proposal.
 
-[CPU evidence](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_profiles.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_cpu_profiles.md")
+[CPU findings](../../reports/Letopis%20comprehensive%20performance%20profiling.md#sampled-bottlenecks-and-code-locations "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Shared diagnostics](../../src/service/utils.rs#L279-L360 "letopis:type=external;path=src/service/utils.rs#L279-L360")
 [Provenance contract](../../src/service/mod.rs#L747-L778 "letopis:type=external;path=src/service/mod.rs#L747-L778")
 [Confined capture](../../src/filesystem/local.rs#L557-L703 "letopis:type=external;path=src/filesystem/local.rs#L557-L703")
@@ -406,7 +400,7 @@ It is a scoped follow-up to #100, not another historical-read reuse proposal.
 [Prior historical reuse](#historical-range-reuse-2026-11-10 "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#historical-range-reuse-2026-11-10")
 
 ## Full-index graph publication bottleneck {#graph-publication-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 The complete 100k symbolized full-index capture contained 183,971 usable stacks
 and 177.888334 s observed CPU; sampler-wrapper elapsed was 185.133 s.
@@ -444,13 +438,13 @@ Do not transfer provenance's fresh-per-binding contract blindly to publication.
 is open. It covers repeated graph scans and memory, separate from #111.
 No optimization, numeric speedup or new representation has been accepted.
 
-[CPU audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_cpu_audit.md")
+[Publication profile results](../../reports/Letopis%20comprehensive%20performance%20profiling.md#sampled-bottlenecks-and-code-locations "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Publication loop](../../src/service/document_refresher.rs#L365-L406 "letopis:type=external;path=src/service/document_refresher.rs#L365-L406")
 [Graph scans](../../src/service/document_refresher.rs#L947-L1007 "letopis:type=external;path=src/service/document_refresher.rs#L947-L1007")
 [Source publication](../../src/service/document_refresher.rs#L731-L811 "letopis:type=external;path=src/service/document_refresher.rs#L731-L811")
 
 ## Inspect writes and unchanged-query overhead {#inspect-change-detection-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 A complete 10k inspect capture placed Git object writing at 62.40%,
 object synchronization at 24.64% and native `__fcntl` at 22.17% inclusive
@@ -479,13 +473,12 @@ Populated mock search showed `wire_embedding_executor_at_root` at
 23,660 / 39,704 µs; a broad constructor scope is not an exclusive leaf cause.
 No 100k hybrid-query or real-provider inference measurement was made here.
 
-[Canonical CPU scopes](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_profiles.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_cpu_profiles.md")
-[Direct-root audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/direct_root_cpu_audit.md")
+[Sampled CPU results and qualifications](../../reports/Letopis%20comprehensive%20performance%20profiling.md#sampled-bottlenecks-and-code-locations "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Git operations](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")
 [Object synchronization](../../src/git/durability.rs "letopis:type=external;path=src/git/durability.rs")
 
 ## Startup profiles and sampling coverage {#profiling-startup-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Canonical profiling produced 12 validated captures: ten complete 10k captures,
 one complete 100k index and one deliberately censored 100k status prefix.
@@ -517,12 +510,10 @@ latency or exclusive savings. Product-only counters were saved separately
 from all-library stacks for eligible PIDs. All eight public commands and
 internal drain have usable evidence across campaigns; help/version do not.
 
-[Direct results and capture inventory](../../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_results.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/direct_root_cpu_results.md")
-[Independent inner-scope audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/direct_root_cpu_audit.md")
-[Canonical profiles](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_cpu_profiles.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_cpu_profiles.md")
+[Startup results and sampling coverage](../../reports/Letopis%20comprehensive%20performance%20profiling.md#startup-and-capture-quality "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 
 ## Mock embedding drain scale and commit scopes {#embedding-drain-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 The separate completed v2 sweep used deterministic localhost OpenAI-protocol
 vectors at 32 dimensions, N unique texts/hashes and three baseline repeats
@@ -557,12 +548,10 @@ Real model/network latency, model RAM, semantics and the adjunct search sweep
 were not measured. Native populated search separately verified the same DB
 before/after with 100 covered, zero missing and 32 dimensions.
 
-[Scale results and raw receipts](../../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_results.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/drain_scale_results.md")
-[Drain audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/drain_scale_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/drain_scale_audit.md")
-[Inner CPU audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/direct_root_cpu_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/direct_root_cpu_audit.md")
+[Drain scale and CPU results](../../reports/Letopis%20comprehensive%20performance%20profiling.md#mock-embedding-drain-results "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 
 ## Live allocation snapshots and memory limits {#profiling-memory-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Four valid 10k live snapshots were collected: early full index plus later
 check, inspect and full index. Full history means recorded history only
@@ -600,18 +589,17 @@ Separate helper and `/usr/bin/time -l` runs calibrated CPU/sleep/64 MiB touch:
 wait4 CPU .513/.0125/.0179 s and RSS 12,550,144/12,517,376/79,593,472 bytes.
 They were independent invocations, not exact paired-accounting equivalence.
 
-[Allocation results and errors](../../research_notes/Letopis%20comprehensive%20performance%20profiling/memory_results.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/memory_results.md")
-[Memory evidence audit](../../research_notes/Letopis%20comprehensive%20performance%20profiling/memory_evidence_audit.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/memory_evidence_audit.md")
+[Allocation results and limitations](../../reports/Letopis%20comprehensive%20performance%20profiling.md#memory-results "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Graph materialization](../../src/service/graph_diagnostics.rs "letopis:type=external;path=src/service/graph_diagnostics.rs")
 
 ## Profiling reproduction and retained evidence {#profiling-reproduction-2026-11-17}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
-Detailed synthesis is `reports/Letopis comprehensive performance profiling.md`;
-notes and raw receipts are under
+The final report is `reports/Letopis comprehensive performance profiling.md`;
+intermediate notes and raw receipts remain local under
 `research_notes/Letopis comprehensive performance profiling/`.
-They were untracked/unpublished when issues #111/#112 were filed; local links
-are not GitHub downloads. No multi-gigabyte evidence upload/commit is implied.
+Only final results are versioned; local archive paths are not GitHub downloads.
+No multi-gigabyte evidence upload/commit is implied.
 
 Key evidence directories within that notes root:
 
@@ -643,13 +631,12 @@ fixtures unlike the old stable-fixture launcher. Never rerun old hardcoded
 launchers unchanged or overwrite saved evidence; review/update output paths.
 Validate source/binary/config/fixture identity and command results before timing.
 
-[Exact canonical commands](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_survey.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_survey.md")
-[100k method](../../research_notes/Letopis%20comprehensive%20performance%20profiling/canonical_stress.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/canonical_stress.md")
+[Reproduction and retained evidence](../../reports/Letopis%20comprehensive%20performance%20profiling.md#reproduction-and-retained-evidence "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
 [Tracked runner](../../tests/performance/run.py "letopis:type=external;path=tests/performance/run.py")
 [Fixture and build contracts](../../tests/performance/scenarios.py "letopis:type=external;path=tests/performance/scenarios.py")
 
 ## Profiling verification, limitations and optimization follow-ups {#profiling-followups-2026-11-18}
-<!-- letopis: {"created_at":1794952486,"source_snapshot":"669397e5464b9e15eedb91a54dfd68875e07d2d3"} -->
+<!-- letopis: {"created_at":1794952486,"source_snapshot":"ba696b852786a2b6fd7534a76474944d19e17637"} -->
 
 Independent CPU, memory, catalog, drain and direct-root audits passed with
 documented qualifications. Final report recheck returned READY TO DELIVER.
@@ -687,6 +674,4 @@ small/incremental controls, report CPU/wall/RSS and all failures/regressions,
 preserve confinement/identity/audit/transaction/durability guarantees, add
 mutation-checked correctness tests and run `make verify` for Rust changes.
 
-[Final report recheck](../../research_notes/Letopis%20comprehensive%20performance%20profiling/report_final_recheck.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/report_final_recheck.md")
-[Earlier helper error diagnosis](../../research_notes/Letopis%20comprehensive%20performance%20profiling/existing_suite_diagnosis.md "letopis:type=external;path=research_notes/Letopis comprehensive performance profiling/existing_suite_diagnosis.md")
-[Full report and source index](../../reports/Letopis%20comprehensive%20performance%20profiling.md "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
+[Validation results and limits](../../reports/Letopis%20comprehensive%20performance%20profiling.md#limitations-and-validation "letopis:type=external;path=reports/Letopis comprehensive performance profiling.md")
