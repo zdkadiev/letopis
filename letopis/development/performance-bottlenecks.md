@@ -1,7 +1,7 @@
 # Performance measurements and bottlenecks
 
 ## Check and status before historical range reuse {#check-status}
-<!-- letopis: {"created_at":1794000000,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
+<!-- letopis: {"created_at":1794000000,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 On 2026-11-06, check and status on the synthetic 100k corpus were sampled
 after tree-validation reuse. Historical snapshot hashing accounted for 66.11%
@@ -31,7 +31,7 @@ and failure-order constraints.
 [Issue 108 measurements](#historical-range-reuse-2026-11-10 "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#historical-range-reuse-2026-11-10")
 
 ## Search bottlenecks {#search}
-<!-- letopis: {"created_at":1794000000,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
+<!-- letopis: {"created_at":1794000000,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 For the 2026-11-07 bounded hybrid search on 100k elements, Samply observed
 3,323 usable stacks and 1.537790 s CPU. Document refresh accounted for 44.846%,
@@ -55,7 +55,7 @@ reuse. Each comparison applies to its own campaign.
 [Current search behavior](../architecture/search-pipeline.md#request-bounds "letopis:type=related_to;path=letopis/architecture/search-pipeline.md#request-bounds")
 
 ## Measured latencies and speedups {#measurements}
-<!-- letopis: {"created_at":1794000000,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
+<!-- letopis: {"created_at":1794000000,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 Repeated inspect: 100k 40.957→7.963s (5.14x, three pairs); 10k 3.774622→0.760819s (4.96x, ten per side). Structural-validation reuse at 100k: check 42.452→32.038s (1.325x), status 42.218→31.566s (1.337x), three pairs each. Earlier 100k first publication took 162.648s and one full index 207.402s; neither is a speedup claim.
 
@@ -171,7 +171,7 @@ Raw captures and receipts are local ignored artifacts under
 [Earlier check and status findings](performance-bottlenecks.md#check-status "letopis:type=related_to;path=letopis/development/performance-bottlenecks.md#check-status")
 
 ## Historical range reuse after issue 108 {#historical-range-reuse-2026-11-10}
-<!-- letopis: {"created_at":1794274714,"source_snapshot":"cd688426bf88773c9d3fc3fb3f658a0a31302cd9"} -->
+<!-- letopis: {"created_at":1794274714,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 The issue 108 candidate `557d8ef` was measured on synthetic embeddings-disabled
 shared-source corpora. Three alternating pairs measured check/status medians

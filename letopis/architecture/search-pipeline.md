@@ -1,7 +1,7 @@
 # Knowledge retrieval
 
 ## Graph model and traversal {#graph-and-traversal}
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 Knowledge elements are identified by repository path or path plus anchor. A graph
 edge is identified by the triple `(source, target, type)`; `external` targets a
 source address and other types target knowledge. Self-loops and target-kind/type
@@ -27,7 +27,7 @@ links and metadata, not the Markdown body.
 [Traversal service](../../src/service/traversal.rs "letopis:type=external;path=src/service/traversal.rs")
 
 ## Request bounds and retrieval {#request-bounds}
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 A search request requires a query. An omitted limit defaults to 100; an explicit
 positive limit uses min(limit, 100). Zero/null/invalid numeric forms are errors.
@@ -57,7 +57,7 @@ runtime, embedding identity reset or physical vector ownership change is involve
 [Agreed design](../../docs/superpowers/specs/2026-11-07-bounded-search-design.md "letopis:type=external;path=docs/superpowers/specs/2026-11-07-bounded-search-design.md")
 
 ## Measured search behavior {#measurements}
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 The 2026-11-07 trials used separate synthetic 10k and 100k corpora with real
 768-dimensional Gemma vectors and the warm-model query `case 000000`. At each

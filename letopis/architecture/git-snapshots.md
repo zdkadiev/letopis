@@ -40,7 +40,7 @@ state of one exact root and never creates, writes or retains objects.
 [Shared-permission test oracle](#shared-permissions "letopis:type=related_to;path=letopis/architecture/git-snapshots.md#shared-permissions")
 
 ## Git write cleanup ownership {#write-cleanup}
-<!-- letopis: {"created_at":1793816837,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793816837,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 Composition shares one `Arc<GitWriteCleanup>` across the writing Git adapters of
 a command. It owns the actual temporary resources independently of the foreground
 stack, so a handled interruption can release them before process exit.
@@ -80,7 +80,7 @@ filesystem failure can leave residue.
 [Git snapshot storage](#snapshot-storage "letopis:type=related_to;path=letopis/architecture/git-snapshots.md#snapshot-storage")
 
 ## Shared Git object-directory permission oracle {#shared-permissions}
-<!-- letopis: {"created_at":1793790634,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793790634,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 The linked-worktree durability test compares the mode of the object directory
 created by Letopis with a directory containing an object written by Git after
 `core.sharedRepository` is set to `group`. The fixture initializes a repository
