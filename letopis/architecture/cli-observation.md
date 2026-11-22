@@ -1,7 +1,7 @@
 # Repository setup and observation
 
 ## Initialization and configuration {#initialization}
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 `init` discovers the repository and validates an existing configuration before
 opening service storage. It initializes storage, installs generated configuration
@@ -25,7 +25,7 @@ when the JSON root and discovery section remain valid.
 [Command dispatch](../../src/commands.rs "letopis:type=external;path=src/commands.rs")
 
 ## Status observation {#status}
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 
 `status` observes the last published revision, diagnostics, embedding backlog and
 failures, configuration validity and lock state. It reads a status view if one is
@@ -53,7 +53,7 @@ The status/config read paths report observations and do not perform this reset.
 [Embedding execution](embedding-execution.md#service "letopis:type=related_to;path=letopis/architecture/embedding-execution.md#service")
 
 ## Check scope {#check-scope}
-<!-- letopis: {"created_at":1793278642,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793278642,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 `check` refreshes the corpus and returns validation problems from a pinned storage
 view. With omitted or empty `paths`, it requests a verified refresh with a full
 source-snapshot audit. A scoped check uses ordinary refresh and restricts reported
@@ -68,7 +68,7 @@ internal error instead of reporting the newer, unaudited revision as checked.
 [CLI check contract](../../src/cli/help.rs "letopis:type=external;path=src/cli/help.rs")
 
 ## Check findings {#check-findings}
-<!-- letopis: {"created_at":1793816837,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793816837,"source_snapshot":"331ae0dd190b2aa304e1476fe8726bd016f3d4d8"} -->
 `check` joins findings from two observers over the same pinned read view. Graph
 diagnostics report a file whose latest parse failed (`invalid_markup`, or a
 classified parser diagnostic), a knowledge link whose target is absent
