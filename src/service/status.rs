@@ -2,7 +2,7 @@ use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandProblem, CommandResult, Configuration,
     EmbeddingFailure, EmbeddingProvider, FileReader, GraphDiagnostics, SourceProvenance,
     StatusReader, StatusReport, StorageError, StorageErrorKind, StorageResult, TransactionError,
-    utils::{CheckObservations, REASON, TARGET, sort_problems},
+    utils::{CheckObservations, REASON, TARGET, get_reported_problems},
 };
 use super::{HeldLock, LockName};
 use crate::domain::Sha256;
@@ -85,7 +85,7 @@ impl<C: CacheDatabase> StatusReader for StatusService<'_, C> {
             report.problems.push(problem);
         }
         report.locks = self.get_locks()?;
-        report.problems = sort_problems(report.problems);
+        report.problems = get_reported_problems(report.problems);
         Ok(report)
     }
 }

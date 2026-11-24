@@ -220,9 +220,9 @@ fn check_reports_remaining_links_to_excluded_knowledge() {
     let output = repo.invoke(&["check"], b"{}");
     let response: Value = serde_json::from_slice(&output.stdout).unwrap();
     // Then: the missing knowledge target remains a visible graph problem.
-    assert_eq!(response["result"]["errors"].as_array().unwrap().len(), 1);
+    assert_eq!(response["result"]["problems"].as_array().unwrap().len(), 1);
     assert_eq!(
-        response["result"]["errors"][0]["details"]["target"],
+        response["result"]["problems"][0]["details"]["target"],
         "vendor/drop.md"
     );
 }

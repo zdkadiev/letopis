@@ -29,9 +29,12 @@ pub(super) const PATH: &str = "path";
 pub(super) const REASON: &str = "reason";
 pub(super) const ELEMENT_ID: &str = "element_id";
 pub(super) const TARGET: &str = "target";
+const TARGETS: &str = "targets";
 const MISSING_SNAPSHOT: &str = "missing_source_snapshot";
 const UNAVAILABLE_SNAPSHOT: &str = "source_snapshot_unavailable";
 const SOURCE_NOT_FOUND: &str = "source_not_found";
+const SOURCE_CHANGED: &str = "source_changed";
+const REPORTED_PROBLEMS_LIMIT: usize = 100;
 
 /// Selects document candidates for one operation using borrowed infrastructure capabilities.
 pub(super) struct CandidateSelection<'a> {
@@ -277,7 +280,7 @@ impl std::fmt::Debug for CheckObservations<'_> {
 }
 
 impl CheckObservations<'_> {
-    /// Collects sorted graph and source findings from one read view.
+    /// Collects graph and source findings from one read view.
     ///
     /// # Arguments
     ///
@@ -291,7 +294,7 @@ impl CheckObservations<'_> {
     ) -> CommandResult<Vec<CommandProblem>> {
         let mut problems = self.graph.find_problems(paths)?;
         problems.extend(self.find_source_problems(paths)?);
-        Ok(sort_problems(problems))
+        Ok(problems)
     }
 
     fn find_source_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
@@ -299,7 +302,7 @@ impl CheckObservations<'_> {
             .storage_read
             .nodes_get()
             .map_err(map_storage_error_to_check_corpus_command_error)?;
-        let sources = self.get_source_bindings()?;
+        let sources_by_id = self.get_source_bindings()?;
         let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
         let empty = BTreeSet::new();
         let mut problems = Vec::new();
@@ -323,7 +326,7 @@ impl CheckObservations<'_> {
                 .iter()
                 .map(|metadata| ProvenanceRequest {
                     source_snapshot: metadata.source_snapshot.as_ref(),
-                    sources: sources.get(&metadata.id).unwrap_or(&empty),
+                    sources: sources_by_id.get(&metadata.id).unwrap_or(&empty),
                 })
                 .collect();
             let observations = self
@@ -337,6 +340,10 @@ impl CheckObservations<'_> {
                         .iter()
                         .map(|issue| format_source_problem(metadata, issue)),
                 );
+                problems.extend(format_changed_sources_problem(
+                    metadata,
+                    &observation.changed_sources,
+                ));
             }
         }
         Ok(problems)
@@ -380,14 +387,15 @@ pub(super) fn is_current_knowledge(node: &KnowledgeMetadata, parsed: Option<&Par
 
 /// Sorts findings by path, reason, element ID and target.
 ///
-/// Duplicates are removed.
+/// Returns at most the first 100 distinct findings.
 ///
 /// # Arguments
 ///
 /// * `problems` — Findings to sort and deduplicate.
-pub(super) fn sort_problems(mut problems: Vec<CommandProblem>) -> Vec<CommandProblem> {
+pub(super) fn get_reported_problems(mut problems: Vec<CommandProblem>) -> Vec<CommandProblem> {
     problems.sort_by(|left, right| get_sort_key(left).cmp(&get_sort_key(right)));
     problems.dedup_by(|left, right| get_sort_key(left) == get_sort_key(right));
+    problems.truncate(REPORTED_PROBLEMS_LIMIT);
     problems
 }
 
@@ -422,6 +430,26 @@ fn format_source_problem(metadata: &KnowledgeMetadata, issue: &ProvenanceIssue) 
         message,
         details,
     }
+}
+
+fn format_changed_sources_problem(
+    metadata: &KnowledgeMetadata,
+    changed_sources: &BTreeSet<SourceUri>,
+) -> Option<CommandProblem> {
+    if changed_sources.is_empty() {
+        return None;
+    }
+    let targets: Vec<_> = changed_sources.iter().map(SourceUri::as_str).collect();
+    Some(CommandProblem {
+        code: CommandErrorKind::ValidationFailed,
+        message: "knowledge source changed",
+        details: BTreeMap::from([
+            (PATH.into(), Value::from(get_owner_path_by_id(&metadata.id))),
+            (REASON.into(), Value::from(SOURCE_CHANGED)),
+            (ELEMENT_ID.into(), Value::from(metadata.id.as_str())),
+            (TARGETS.into(), Value::from(targets)),
+        ]),
+    })
 }
 
 pub(super) fn get_owner_path_by_id(id: &KnowledgeId) -> &str {

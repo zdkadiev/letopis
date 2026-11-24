@@ -207,6 +207,60 @@ struct Provenance {
 }
 
 #[test]
+fn status_limits_findings_after_adding_configuration_problem() {
+    // Given: 100 corpus findings and an invalid configuration that sorts before them.
+    let root = TempDir::new().unwrap();
+    let mut storage = open_storage(&root);
+    publish_node(&mut storage, 1);
+    let files = Files {
+        config: Some(b"invalid configuration".to_vec()).into(),
+        is_failing: false,
+        count: Cell::new(0),
+    };
+    let provider = build_provider();
+    let provenance = Provenance { is_failing: false };
+    let mut graph = MockScopeDiagnostics::new();
+    graph.expect_find_problems().returning(|_| {
+        Ok((0..99)
+            .rev()
+            .map(|index| CommandProblem {
+                code: CommandErrorKind::ValidationFailed,
+                message: "graph fixture",
+                details: [(
+                    "path".into(),
+                    serde_json::Value::from(format!("f{index:03}.md")),
+                )]
+                .into(),
+            })
+            .collect())
+    });
+    let mut service = build_service(
+        Some(storage),
+        Rc::new(Cell::new(0)),
+        &files,
+        &provider,
+        &provenance,
+    );
+    service.graph = &graph;
+
+    // When: status assembles the report.
+    let report = service.get_status().unwrap();
+
+    // Then: the configuration problem takes the first slot in the common limit.
+    assert_eq!(report.problems.len(), 100);
+    assert_eq!(
+        report.problems[0].details["reason"],
+        "invalid_embedding_config"
+    );
+    assert_eq!(
+        report.problems[1].details["reason"],
+        "missing_source_snapshot"
+    );
+    assert_eq!(report.problems[2].details["path"], "f000.md");
+    assert_eq!(report.problems[99].details["path"], "f097.md");
+}
+
+#[test]
 fn selects_only_required_observations_for_each_configuration_mode() {
     // Given: one exhausted current hash and query failure under the configured identity.
     let config = crate::service::Configuration::parse(VALID_CONFIG).unwrap();
@@ -1010,6 +1064,7 @@ impl SourceProvenance for Provenance {
             ));
         }
         Ok(ProvenanceObservation {
+            changed_sources: BTreeSet::new(),
             flags: BTreeSet::new(),
             issues: BTreeSet::from([ProvenanceIssue::MissingSnapshot]),
         })

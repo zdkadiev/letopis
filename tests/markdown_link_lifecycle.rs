@@ -54,7 +54,7 @@ fn status_reports_published_path_mismatch_until_a_refresh_repairs_it() {
         "letopis/cache/target.md",
         build_whole(7, "Target").as_bytes(),
     );
-    assert_eq!(invoke(&repo, "check")["result"]["errors"], json!([]));
+    assert_eq!(invoke(&repo, "check")["result"]["problems"], json!([]));
     let original = get_state(&repo);
     repo.write(NOTE_PATH, build_whole(42, INVALID_NOTE).as_bytes());
     repo.write("unrelated.md", build_whole(73, "UnrelatedToken").as_bytes());
@@ -67,7 +67,7 @@ fn status_reports_published_path_mismatch_until_a_refresh_repairs_it() {
     let finding = json!({"code":"validation_failed","message":
         "Markdown link path does not match letopis path","details":{
         "path":"letopis/cache/note.md","reason":"link_path_mismatch"}});
-    assert_eq!(checked["result"]["errors"], json!([finding]));
+    assert_eq!(checked["result"]["problems"], json!([finding]));
     assert!(!invalid.get_file(NOTE_PATH).valid);
     assert_eq!(
         invalid.get_file(NOTE_PATH).error.as_deref(),
@@ -87,7 +87,7 @@ fn status_reports_published_path_mismatch_until_a_refresh_repairs_it() {
     assert_eq!(after_edit["result"]["revision"], invalid.revision);
     assert_eq!(get_state(&repo), invalid);
     // When: successful refresh publishes the repaired file.
-    assert_eq!(invoke(&repo, "check")["result"]["errors"], json!([]));
+    assert_eq!(invoke(&repo, "check")["result"]["problems"], json!([]));
     // Then: its invalid state clears only with the new publication.
     let repaired = get_state(&repo);
     assert!(repaired.revision > invalid.revision);
@@ -114,7 +114,7 @@ fn legacy_titles_never_publish_into_a_fresh_cache() {
     // Then: no partial owner, FTS entry or edge is published from that invalid file.
     let expected = json!([{"code":"validation_failed","message":"invalid letopis link title",
         "details":{"path":"legacy.md","reason":"invalid_link_title"}}]);
-    assert_eq!(checked["result"]["errors"], expected);
+    assert_eq!(checked["result"]["problems"], expected);
     assert_eq!(invoke(&repo, "status")["result"]["problems"], expected);
     let state = get_state(&repo);
     assert!(!state.get_file("legacy.md").valid);
@@ -146,9 +146,9 @@ fn reindex_reparses_unchanged_pre_upgrade_rows() {
     // When: ordinary refresh sees unchanged bytes and preserves pre-upgrade errors.
     let ordinary = invoke(&repo, "check");
     // Then: both seeded observations survive unchanged, with no new projection.
-    assert_eq!(ordinary["result"]["errors"].as_array().unwrap().len(), 2);
+    assert_eq!(ordinary["result"]["problems"].as_array().unwrap().len(), 2);
     assert!(
-        ordinary["result"]["errors"]
+        ordinary["result"]["problems"]
             .as_array()
             .unwrap()
             .iter()
@@ -263,7 +263,7 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
         fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
         vectors
     );
-    assert_eq!(invoke(&repo, "check")["result"]["errors"], json!([]));
+    assert_eq!(invoke(&repo, "check")["result"]["problems"], json!([]));
 }
 
 #[test]
@@ -316,7 +316,7 @@ fn matching_missing_targets_keep_existing_diagnostics() {
         {"code":"validation_failed","message":"knowledge source is not found",
          "details":{"path":"missing-links.md","reason":"source_not_found","element_id":"missing-links.md","target":"absent.rs"}}
     ]);
-    assert_eq!(checked["result"]["errors"], expected);
+    assert_eq!(checked["result"]["problems"], expected);
     assert_eq!(status["result"]["problems"], expected);
     let state = get_state(&repo);
     assert!(state.get_file("missing-links.md").valid);

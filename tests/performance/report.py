@@ -77,9 +77,10 @@ def validate_command(scenario: dict, result) -> dict:
             raise ValueError("unexpected search IDs")
         return {"ids": identifiers}
     if command == "check":
-        if result["errors"] != []:
-            raise ValueError("corpus validation findings")
-        return {"errors": 0}
+        field = scenario.get("check_field", "problems")
+        if result != {field: []}:
+            raise ValueError("unexpected check result or corpus validation findings")
+        return {"problems": 0}
     if command == "status":
         if result["problems"] or result["revision"] is None or result["locks"]:
             raise ValueError("unexpected problems or locks")

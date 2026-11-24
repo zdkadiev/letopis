@@ -116,6 +116,24 @@ with a changed configuration identity or a vector reset, not merely on the next
 publication. `status` does not rebuild a missing or stale cache and does not make a
 subsequent live-file read atomic.
 
+## Review check and status findings
+
+Read `result.problems` on both commands. An empty array means no findings.
+The commands return the first 100 sorted, deduplicated findings. For `check`,
+this replaces the former `result.errors` field. A successful report exits
+`0` with `ok:true`, including when findings are present. A command failure
+exits `1` with `ok:false` and a top-level `error`.
+
+The `source_changed` reason identifies a difference in addressed bytes
+between a declared `source_snapshot` and the working tree. Each affected
+element gets one diagnostic with all unique changed addresses in
+`details.targets`. `status` checks the last published bindings.
+`source_not_found` identifies a missing source, `missing_source_snapshot`
+identifies an absent basis, and `source_snapshot_unavailable` identifies a
+declared basis that cannot be used. The `stale` flag on read results indicates
+that the working copy of the knowledge element could not be matched to its
+indexed projection.
+
 ## Mandatory-path upgrade (issue #69)
 
 Marked links require `letopis:type=TYPE;path=ADDRESS` with the complete terminal

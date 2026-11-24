@@ -68,10 +68,14 @@ const CHECK_DETAILS: &str = r#"Input (JSON object):
   paths  array of repo-relative paths; optional, default is the whole corpus
 
 Result:
-  {"errors": [{"code", "message", "details"}]}
-  An empty errors array means the corpus is valid. Never modifies corpus
-  files; refreshes the index cache. Empty/omitted paths also audit complete
-  source snapshots before publication. Nonempty paths skip that full audit.
+  {"problems": [{"code", "message", "details"}]}
+  Reports up to 100 current findings. An empty array means no findings.
+  Changed source bytes produce one source_changed finding per knowledge
+  element with all changed addresses in details.targets.
+  For every request, check refreshes the index cache for the whole corpus.
+  Nonempty paths filter findings by owner file and skip the full snapshot
+  audit. Empty or omitted paths audit complete source snapshots.
+  A report with findings still exits 0. Command failure exits 1.
 "#;
 
 const INSPECT_DETAILS: &str = r#"Input (JSON object):
@@ -140,7 +144,11 @@ const STATUS_DETAILS: &str = r#"Input (JSON object): {} (no fields)
 Result:
   {"revision": <integer or null>, "embedding_backlog", "embedding_failed",
    "locks": [{"name": "index" or "embed", "pid"}], "problems": [...]}
-  Read-only: does not refresh or rebuild the index.
+  Read-only: does not refresh or rebuild the index. Checks current source
+  files using the last published bindings.
+  Reports up to 100 current problems, or an empty array when there are none.
+  Changed source bytes produce one source_changed finding per knowledge
+  element with all changed addresses in details.targets.
 "#;
 
 const CONFIG_DETAILS: &str = r#"Input (JSON object): {} (no fields)

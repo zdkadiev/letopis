@@ -49,7 +49,7 @@ enum ResultBody<'a> {
     },
     Config(Option<ConfigurationOutput<'a>>),
     Check {
-        errors: Vec<Problem<'a>>,
+        problems: Vec<Problem<'a>>,
     },
     Inspect {
         snapshot: &'a str,
@@ -212,7 +212,7 @@ fn result_build(result: &ResponseResult) -> ResultBody<'_> {
             ResultBody::Config(config.as_ref().map(configuration_build))
         }
         ResponseResult::Check(report) => ResultBody::Check {
-            errors: report.errors.iter().map(problem_build).collect(),
+            problems: report.problems.iter().map(problem_build).collect(),
         },
         ResponseResult::Inspect(inspection) => ResultBody::Inspect {
             snapshot: inspection.snapshot.as_str(),

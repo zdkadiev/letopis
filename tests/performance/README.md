@@ -170,6 +170,11 @@ An executable/hash alone is insufficient: comparisons require a frozen receipt a
 its original release receipt and archives. These are local provenance records,
 not signed compiler attestations; preserve the entire evidence directory.
 
+Both `compare.py` and `historical.py` expect `result.problems` for each build's
+`check` output. Pass `--before-check-field errors` when the frozen baseline
+predates that rename. The same override is available as `--after-check-field errors`
+for a frozen candidate using the old contract. Each side must match its selected field.
+
 ```sh
 /opt/homebrew/bin/python3.12 -B tests/performance/compare.py --freeze-build \
   --source "$PWD" --evidence "$PWD/.artifacts/issue-67/before-unique"
@@ -177,6 +182,7 @@ not signed compiler attestations; preserve the entire evidence directory.
 /opt/homebrew/bin/python3.12 -B tests/performance/compare.py --stage timings \
   --before "$PWD/.artifacts/issue-67/before-unique/build.json" \
   --after "$PWD/.artifacts/issue-67/after-unique/build.json" \
+  --before-check-field errors --after-check-field errors \
   --nodes 60 --scenarios check --pairs 10 --timeout 120 --initial-timeout 600 \
   --evidence "$PWD/.artifacts/issue-67/check60-unique"
 ```
@@ -242,6 +248,7 @@ different source cardinalities mean absolute times do not isolate one variable.
   --source "$PWD" --evidence "$PWD/.artifacts/issue-108/before-build"
 /opt/homebrew/bin/python3.12 -B tests/performance/historical.py \
   --before "$PWD/.artifacts/issue-108/before-build/build.json" \
+  --before-check-field errors \
   --nodes 10000 --variant shared --stage timings \
   --evidence "$PWD/.artifacts/issue-108/before-shared-10k-timings"
 # Repeat with distinct and 100000; each evidence directory must be new.

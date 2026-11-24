@@ -313,6 +313,7 @@ mod bindings {
                 SearchFlag::SourceChanged
             };
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags: BTreeSet::from([flag]),
                 issues: BTreeSet::new(),
             })
@@ -737,6 +738,7 @@ mod scoped {
                 ));
             }
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags: BTreeSet::from([SearchFlag::SourceChanged]),
                 issues: BTreeSet::new(),
             })

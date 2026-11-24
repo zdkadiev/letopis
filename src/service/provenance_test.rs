@@ -171,6 +171,15 @@ mod batches {
                 BTreeSet::from([SearchFlag::SourceChanged])
             );
             assert!(results[1].flags.is_empty());
+            assert_eq!(
+                results[0].issues,
+                BTreeSet::from([ProvenanceIssue::SnapshotUnavailable {
+                    snapshot: tree.clone()
+                }])
+            );
+            assert!(results[0].changed_sources.is_empty());
+            assert!(results[1].changed_sources.is_empty());
+            assert!(results[1].issues.is_empty());
             assert_eq!(service.git.verified.borrow().len(), 2);
             assert_eq!(service.git.reads.get(), 1);
         }
@@ -307,6 +316,17 @@ mod batches {
             results[3].flags,
             BTreeSet::from([SearchFlag::SourceChanged])
         );
+        assert!(results[0].changed_sources.is_empty());
+        assert_eq!(
+            results[1].changed_sources,
+            BTreeSet::from([SourceUri::parse("a#L2-L2").unwrap()])
+        );
+        assert!(results[2].changed_sources.is_empty());
+        assert_eq!(
+            results[3].changed_sources,
+            BTreeSet::from([SourceUri::parse("a").unwrap()])
+        );
+        assert!(results.iter().all(|result| result.issues.is_empty()));
         assert_eq!(service.git.reads.get(), 1);
         assert_eq!(service.filesystem.reads.get(), 4);
     }
@@ -384,6 +404,11 @@ mod batches {
         assert_eq!(
             results[2].flags,
             BTreeSet::from([SearchFlag::SourceNotFound])
+        );
+        assert!(
+            results
+                .iter()
+                .all(|result| result.changed_sources.is_empty())
         );
         assert_eq!(service.git.reads.get(), 2);
         assert_eq!(service.filesystem.reads.get(), 3);
@@ -471,6 +496,16 @@ mod batches {
             BTreeSet::from([SearchFlag::SourceChanged])
         );
         assert!(results[3].flags.is_empty());
+        assert_eq!(
+            results[2].issues,
+            BTreeSet::from([ProvenanceIssue::MissingSnapshot])
+        );
+        assert!(results[3].issues.is_empty());
+        assert!(
+            results
+                .iter()
+                .all(|result| result.changed_sources.is_empty())
+        );
         assert_eq!(
             service.git.paths.borrow().as_slice(),
             &["a".to_owned(), "b".to_owned()]
@@ -635,6 +670,13 @@ mod batches {
             actual[2].flags,
             BTreeSet::from([SearchFlag::SourceNotFound])
         );
+        assert_eq!(
+            actual[2].issues,
+            BTreeSet::from([ProvenanceIssue::SourceNotFound {
+                source: SourceUri::parse("a").unwrap()
+            }])
+        );
+        assert!(actual[2].changed_sources.is_empty());
         assert_eq!(actual, sequential);
         assert_eq!(batch.git.reads.get(), 1);
         assert_eq!(singleton.git.reads.get(), 3);

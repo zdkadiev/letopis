@@ -254,11 +254,14 @@ class ComparisonTests(unittest.TestCase):
             self.assertFalse(result["valid"])
 
     def test_orchestration_alternates_order_and_flushes_each_attempt(self):
-        # Given: two frozen copies of a tiny CLI with independently counted projection.
+        # Given: equivalent frozen binaries on either side of the check field rename.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            _, pin = _freeze(root)
-            args = _args(root, pin)
+            _, before = _freeze(root / "before", check_field="errors")
+            _, after = _freeze(root / "after")
+            args = _args(root, before)
+            args.before_check_field = "errors"
+            args.after = Path(after["receipt"])
             # When: two warmups and two measured pairs execute as fresh processes.
             result = run_comparison(args)
             rows = [json.loads(line) for line in (args.evidence / "samples.jsonl").read_text().splitlines()]
@@ -268,6 +271,12 @@ class ComparisonTests(unittest.TestCase):
             self.assertEqual(result["series"][0]["before"]["n"], 2)
             self.assertEqual(result["series"][0]["after"]["n"], 2)
             self.assertEqual({row["projection_revision"] for row in rows if row["phase"] == "measured"}, {1})
+            expected_fields = {"before": "errors", "after": "problems"}
+            for row in rows:
+                if row["name"] == "check":
+                    self.assertTrue(row["validation"]["valid"], row)
+                    output = json.loads(bytes.fromhex(row["stdout"]["capture_hex"]))
+                    self.assertEqual(output, {"ok": True, "result": {expected_fields[row["side"]]: []}})
             with self.assertRaises(ValueError):
                 run_comparison(args)
 
@@ -384,7 +393,7 @@ def _record_failed_counter(case, build, output, interrupted=False, invalid=False
     cancellation = threading.Event()
     if interrupted:
         cancellation.set()
-    script = 'print(\'{"ok":true,"result":{"errors":[{"code":"bad"}]}}\')' if invalid else "import time;time.sleep(60)"
+    script = 'print(\'{"ok":true,"result":{"problems":[{"code":"bad"}]}}\')' if invalid else "import time;time.sleep(60)"
     measurement = measure_process([sys.executable, "-c", script], case["repository"], b"",
                                   {"timeout": 5 if invalid else 0.01, "cancel_event": cancellation})
     return _write_counter_receipt(case, output, measurement)
@@ -422,7 +431,7 @@ def _args(root, pin):
                            initial_timeout=5, stage_seconds=60, evidence=root / "comparison")
 
 
-def _freeze(root, bad=False, rustc="rustc test fixture", delay=0):
+def _freeze(root, bad=False, rustc="rustc test fixture", delay=0, check_field="problems"):
     source = root / "source"
     (source / "src").mkdir(parents=True)
     (source / "src/main.rs").write_text("fn main() {}\n")
@@ -435,7 +444,8 @@ def _freeze(root, bad=False, rustc="rustc test fixture", delay=0):
         binary = evidence / "product/letopis"
         binary.parent.mkdir()
         script = f"#!{sys.executable}\nimport time; time.sleep({delay})\n" + _CLI
-        binary.write_text(script.replace("ERRORS", '[{"code":"drift"}]' if bad else "[]"))
+        script = script.replace("CHECK_FIELD", repr(check_field))
+        binary.write_text(script.replace("FINDINGS", '[{"code":"drift"}]' if bad else "[]"))
         binary.chmod(0o755)
         pin = {"executable": str(binary), "sha256": hash_file(binary),
                "inputs": read_product_inputs(repository),
@@ -458,8 +468,8 @@ if connection.execute('SELECT count(*) FROM nodes').fetchone()[0] == 0:
     connection.commit()
 connection.close()
 request = json.load(sys.stdin)
-result = {'errors': ERRORS} if sys.argv[1] == 'check' else ([{'element_id': 'knowledge/part-0000.md#node-000000', 'flags': []}] if request.get('query') else [])
-print(json.dumps({'ok': not bool(ERRORS), 'result': result}))
+result = {CHECK_FIELD: FINDINGS} if sys.argv[1] == 'check' else ([{'element_id': 'knowledge/part-0000.md#node-000000', 'flags': []}] if request.get('query') else [])
+print(json.dumps({'ok': not bool(FINDINGS), 'result': result}))
 '''
 
 

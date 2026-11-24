@@ -84,7 +84,7 @@ class RunnerTests(unittest.TestCase):
         from jsonschema import ValidationError
         root = Path(__file__).resolve().parents[2]
         catalogue = json.loads((root / run.SCHEMA).read_text())
-        valid = {'ok': True, 'result': {'errors': []}}
+        valid = {'ok': True, 'result': {'problems': []}}
         # When
         run.validate_response(catalogue, 'check', valid, 0)
         # When / Then
@@ -97,13 +97,33 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             run.validate_response(catalogue, 'check', {**valid, 'extra': 1}, 0)
 
+    def test_check_and_status_schemas_require_problems_and_limit_the_array(self):
+        # Given: a changed-source diagnostic and the required fields of both reports.
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        problem = {'code': 'validation_failed', 'message': 'knowledge source changed',
+                   'details': {'element_id': 'a.md', 'path': 'a.md',
+                               'targets': ['src/x.rs#L1-L5'], 'reason': 'source_changed'}}
+        status = {'revision': 1, 'embedding_backlog': 0, 'embedding_failed': 0, 'locks': []}
+        for command, result in [('check', {}), ('status', status)]:
+            with self.subTest(command=command):
+                # When / Then: the schema accepts empty and full reports with exit zero.
+                for problems in ([], [problem] * 100):
+                    run.validate_response(catalogue, command,
+                                          {'ok': True, 'result': {**result, 'problems': problems}}, 0)
+                # When / Then: it rejects an oversized, absent, or legacy array.
+                for fields in ({'problems': [problem] * 101}, {}, {'errors': []}):
+                    with self.assertRaises(ValidationError):
+                        run.validate_response(catalogue, command, {'ok': True, 'result': {**result, **fields}}, 0)
+
     def test_handler_capture_classifies_lists_without_loosening_validation(self):
         # Given
         from jsonschema import ValidationError
         root = Path(__file__).resolve().parents[2]
         catalogue = json.loads((root / run.SCHEMA).read_text())
         records = [
-            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'problems': []}}},
             {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
             {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
             {'exit': 0, 'response': {'ok': True, 'result': []}},
@@ -160,7 +180,7 @@ class RunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             evidence = Path(directory)
             for field, value, error in [('exit', 1, AssertionError),
-                    ('response', {'ok': True, 'result': {'errors': []}}, ValidationError),
+                    ('response', {'ok': True, 'result': {'problems': []}}, ValidationError),
                     ('command', 'inspect', ValidationError),
                     ('case', 'not_found', AssertionError)]:
                 # When / Then
@@ -216,7 +236,7 @@ class RunnerTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         catalogue = json.loads((root / run.SCHEMA).read_text())
         records = [
-            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'problems': []}}},
             {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
             {'exit': 0, 'response': {'ok': True, 'result': []}},
             {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
@@ -262,7 +282,7 @@ class RunnerTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         catalogue = json.loads((root / run.SCHEMA).read_text())
         base = [
-            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'problems': []}}},
             {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
             {'exit': 0, 'response': {'ok': True, 'result': []}},
             {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
@@ -300,7 +320,7 @@ class RunnerTests(unittest.TestCase):
                 if argv[1:] == ['check'] and stdin == b'{}':
                     self.assertEqual(expected, 0)
                     (cwd / '.letopis').mkdir()
-                    response = {'ok': True, 'result': {'errors': []}}
+                    response = {'ok': True, 'result': {'problems': []}}
                 elif argv[1] == 'inspect' and stdin != b'{}':
                     (cwd / '.letopis').mkdir(exist_ok=True)
                     response = {'ok': False, 'error': {'code': 'not_found', 'message': 'unknown', 'details': {}}}
@@ -326,7 +346,7 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(len(repositories), len(set(repositories)))
             self.assertEqual(check_cases, [(b'{}', 0, True), (b'{"extra":1}', 1, False)])
             observed = json.loads((evidence / 'product-transport-responses.json').read_text())
-            self.assertEqual(observed[0]['response'], {'ok': True, 'result': {'errors': []}})
+            self.assertEqual(observed[0]['response'], {'ok': True, 'result': {'problems': []}})
             self.assertTrue(any(r['command'] == 'reindex' and r['exit'] == 0 for r in observed))
             terminator = "\n{}\n"
             # When / Then
@@ -361,7 +381,7 @@ class RunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             evidence = Path(directory)
             for change, error in [({'exit': 1}, AssertionError),
-                                  ({'response': {'ok': True, 'result': {'errors': []}}}, ValidationError),
+                                  ({'response': {'ok': True, 'result': {'problems': []}}}, ValidationError),
                                   ({'case': 'invented'}, AssertionError)]:
                 with self.subTest(change=change):
                     # When / Then

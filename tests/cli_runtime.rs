@@ -155,7 +155,7 @@ fn check_preserves_corpus_index_and_refs_after_lost_response() {
         let response: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(
             response,
-            serde_json::json!({"ok":true,"result":{"errors":[]}})
+            serde_json::json!({"ok":true,"result":{"problems":[]}})
         );
     }
     assert_eq!(fs::read(root.path().join("knowledge.md")).unwrap(), corpus);

@@ -373,8 +373,8 @@ impl ElementAddress {
 /// Validation findings; nonempty findings are still a successful report.
 #[derive(Debug)]
 pub struct CheckReport {
-    /// Safe findings for the requested scope.
-    pub errors: Vec<CommandProblem>,
+    /// Up to 100 ordered, distinct findings for the requested scope.
+    pub problems: Vec<CommandProblem>,
 }
 
 /// Metadata observed from one immutable snapshot.
@@ -616,6 +616,8 @@ pub struct ProvenanceObservation {
     pub flags: BTreeSet<SearchFlag>,
     /// Exact current causes for owner-scoped check diagnostics.
     pub issues: BTreeSet<ProvenanceIssue>,
+    /// Exact local source addresses whose available snapshot and current bytes differ.
+    pub changed_sources: BTreeSet<SourceUri>,
 }
 
 /// A current validation finding rather than an infrastructure error.
@@ -672,7 +674,7 @@ pub struct StatusReport {
     pub embedding_failed: u64,
     /// Best-effort recorded PIDs for observed-busy kernel locks.
     pub locks: Vec<HeldLock>,
-    /// Deterministically ordered current safe diagnostics.
+    /// Up to 100 ordered, distinct current diagnostics.
     pub problems: Vec<CommandProblem>,
 }
 

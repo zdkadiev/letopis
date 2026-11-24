@@ -206,7 +206,7 @@ def run_campaign(args, build: dict, evidence: Path) -> None:
         if not record["validation"]["valid"]:
             raise ValueError("fake-vector query participation not demonstrated")
         _, checked = invoke_cli(Path(build["executable"]), repository, {"args": ["check"], "request": {}})
-        if checked["errors"]:
+        if checked["problems"]:
             raise ValueError("post-contention integrity failure")
         write_json(evidence / "integrity.json", checked)
 

@@ -315,6 +315,7 @@ impl SourceProvenance for TestProvenance {
 
     fn observe_sources(&self, _: ProvenanceRequest<'_>) -> DocumentResult<ProvenanceObservation> {
         Ok(ProvenanceObservation {
+            changed_sources: BTreeSet::new(),
             flags: BTreeSet::new(),
             issues: BTreeSet::new(),
         })
@@ -1176,6 +1177,7 @@ mod basis {
                 ));
             }
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags: BTreeSet::new(),
                 issues: BTreeSet::new(),
             })

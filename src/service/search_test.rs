@@ -1011,6 +1011,7 @@ mod scoped {
                 .borrow_mut()
                 .push((request.source_snapshot.cloned(), request.sources.clone()));
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags: BTreeSet::from([SearchFlag::SourceChanged]),
                 issues: BTreeSet::new(),
             })
@@ -1431,6 +1432,7 @@ mod filters {
                 BTreeSet::new()
             };
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags,
                 issues: BTreeSet::new(),
             })
@@ -2025,6 +2027,7 @@ mod parse_reuse {
             _: ProvenanceRequest<'_>,
         ) -> DocumentResult<ProvenanceObservation> {
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags: BTreeSet::new(),
                 issues: BTreeSet::new(),
             })

@@ -132,7 +132,7 @@ fn assert_successful_check(repo: &ReadingRepo) {
     assert!(output.status.success(), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(value, json!({"ok":true,"result":{"errors":[]}}));
+    assert_eq!(value, json!({"ok":true,"result":{"problems":[]}}));
 }
 
 fn assert_successful_status(repo: &ReadingRepo, revision: u64) {

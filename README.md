@@ -217,15 +217,17 @@ Output:
 
 ### Validate: `check`
 
-Input: `{}` to check the whole corpus, or `{"paths":["letopis/retry-budget.md"]}` to select findings for particular paths. An omitted or empty `paths` also audits complete source snapshots; a nonempty selection skips that full audit.
+Send `{}` to check the whole corpus or `{"paths":["letopis/retry-budget.md"]}` to select findings by the Markdown file that owns each element. Both requests refresh the whole corpus cache. An omitted or empty `paths` also audits complete source snapshots. A nonempty selection skips that full audit.
 
 Output for valid knowledge:
 
 ```json
-{"ok":true,"result":{"errors":[]}}
+{"ok":true,"result":{"problems":[]}}
 ```
 
-Inspect `result.errors` even when `ok` is true. Each finding contains `code`, `message`, and `details`; an empty array means no validation errors were found.
+Both `check` and `status` report up to 100 sorted, deduplicated findings in `result.problems`. An empty array means no findings. Clients reading the previous `check` field `result.errors` must switch to `result.problems`. A completed report exits `0` with `ok:true` even when it contains findings. A command failure exits `1` with `ok:false` and a top-level `error`.
+
+Each finding contains `code`, `message`, and `details`. A `source_changed` finding uses `code: "validation_failed"` and lists all unique changed addresses for one knowledge element in `details.targets`. Letopis compares the addressed whole file or inclusive line range in the declared `source_snapshot` with the corresponding bytes in the working tree. `status` uses the last published bindings. Missing sources and snapshot problems have their own `details.reason` values: `source_not_found`, `missing_source_snapshot`, and `source_snapshot_unavailable`. The `stale` flag on read results indicates that the working copy of the knowledge element could not be matched to its indexed projection.
 
 ### Find knowledge: `search`
 

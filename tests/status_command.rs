@@ -120,7 +120,7 @@ fn status_reuses_published_check_findings_without_refreshing() {
     let checked: Value = serde_json::from_slice(&checked.stdout).unwrap();
     let expected = json!({"code":"validation_failed","message":"knowledge target is missing",
         "details":{"path":"owner.md","reason":"dangling_target","element_id":"owner.md","target":"missing.md"}});
-    assert_eq!(checked["result"]["errors"], json!([expected]));
+    assert_eq!(checked["result"]["problems"], json!([expected]));
     let cache = repo.get_root().join(".letopis/cache.db");
     let before = fs::read(&cache).unwrap();
     let vectors = repo.get_root().join(".letopis/vectors.db");
@@ -158,7 +158,10 @@ fn status_and_check_track_repairs_across_processes() {
     let status = get_status(&repo);
     let problems = status["result"]["problems"].as_array().unwrap();
     // Then
-    assert_eq!(Value::Array(problems.clone()), checked["result"]["errors"]);
+    assert_eq!(
+        Value::Array(problems.clone()),
+        checked["result"]["problems"]
+    );
     let actual: Vec<_> = problems
         .iter()
         .map(|p| {
@@ -203,7 +206,7 @@ fn status_and_check_track_repairs_across_processes() {
     // Then
     assert!(refreshed.status.success(), "{refreshed:?}");
     let refreshed: Value = serde_json::from_slice(&refreshed.stdout).unwrap();
-    assert_eq!(refreshed["result"]["errors"], json!([]));
+    assert_eq!(refreshed["result"]["problems"], json!([]));
     assert_eq!(get_status(&repo)["result"]["problems"], json!([]));
 }
 
