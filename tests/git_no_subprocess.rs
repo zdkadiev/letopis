@@ -126,7 +126,7 @@ fn model_free_commands_use_only_local_library_git() {
         );
         assert_eq!(
             denial.run_successful_command(repo.get_root(), &["check"], "{}"),
-            json!({"errors":[]})
+            json!({"problems":[]})
         );
         let config = denial.run_successful_command(repo.get_root(), &["config"], "{}");
         assert_eq!(config["embedding_model"]["enabled"], false);

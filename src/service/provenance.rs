@@ -303,6 +303,7 @@ impl<'service, 'request, F: FileReader> SnapshotObservations<'service, 'request,
                 observation.flags.insert(SearchFlag::SourceNotFound);
             } else if source_hash.is_some_and(|hash| hash != current_source_hash) {
                 observation.flags.insert(SearchFlag::SourceChanged);
+                observation.changed_sources.insert(source.clone());
             }
         }
         Ok(observation)
@@ -458,6 +459,7 @@ fn build_observation(
             .into_iter()
             .collect(),
         issues: issue.into_iter().collect(),
+        changed_sources: BTreeSet::new(),
     }
 }
 

@@ -202,7 +202,7 @@ fn configure_and_publish(workflow: &Workflow, endpoint: &str) {
 
 fn assert_reading_workflow(workflow: &Workflow) {
     let checked = workflow.invoke_command("check", b"{}", 0);
-    assert_eq!(checked, json!({"ok":true,"result":{"errors":[]}}));
+    assert_eq!(checked, json!({"ok":true,"result":{"problems":[]}}));
     let searched = workflow.invoke_command(
         "search",
         format!(r#"{{"query":"{CACHE_TOKEN}","limit":5}}"#).as_bytes(),
@@ -327,7 +327,7 @@ fn assert_repaired_configuration(workflow: &Workflow, endpoint: &str) {
         endpoint
     );
     let checked = workflow.invoke_command("check", b"{}", 0);
-    assert_eq!(checked["result"]["errors"], json!([]));
+    assert_eq!(checked["result"]["problems"], json!([]));
     let status = workflow.invoke_command("status", b"{}", 0);
     assert_problem_reason(&status, "invalid_embedding_config", false);
     let searched = workflow.invoke_command(
@@ -357,7 +357,7 @@ fn assert_cancelled_refresh_is_retryable(workflow: &Workflow) {
     barrier.assert_owned();
     barrier.release();
     let retried = workflow.invoke_command("check", b"{}", 0);
-    assert_eq!(retried, json!({"ok":true,"result":{"errors":[]}}));
+    assert_eq!(retried, json!({"ok":true,"result":{"problems":[]}}));
 }
 
 fn spawn_check_with_path(repo: &ReadingRepo, path: &OsStr) -> cli::OwnedChild {

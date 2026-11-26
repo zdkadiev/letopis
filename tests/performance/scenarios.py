@@ -121,7 +121,7 @@ def prepare_scenario(fixture: dict, name: str, output: Path) -> dict:
         expected["inspection"] = build_inspection_oracle(output, FIRST_ID)
     argv = ["index", "--full"] if command == "index" else [command]
     return {"repository": output, "argv": argv, "stdin": encode_json(request),
-            "expected": expected,
+            "expected": expected, "check_field": fixture.get("check_field", "problems"),
             "setup_seconds": time.monotonic() - started, "state_hashes": hashes,
             "cache_label": "initialized_projection_os_cache_uncontrolled",
             "embedding_mode": "fts_disabled", "changed_paths": changed, "name": name}
@@ -179,7 +179,7 @@ def initialize_projection(repository: Path, binary: str, full_audit: bool = True
     output = subprocess.run([binary, command], input=request, cwd=repository,
                             env=get_environment(), capture_output=True, timeout=120, check=True)
     response = json.loads(output.stdout)
-    expected = {"errors": []} if full_audit else []
+    expected = {"problems": []} if full_audit else []
     if response.get("ok") is not True or response.get("result") != expected:
         raise ValueError("fixture projection is invalid")
 

@@ -239,7 +239,7 @@ mod transport_tests {
         assert_eq!(exit, 0);
         assert_eq!(
             value,
-            json!({"ok":true,"result":{"errors":[{"code":"validation_failed","message":"safe finding","details":{"path":"a.md"}}]}})
+            json!({"ok":true,"result":{"problems":[{"code":"validation_failed","message":"safe finding","details":{"path":"a.md"}}]}})
         );
     }
     #[test]
@@ -430,15 +430,31 @@ mod transport_tests {
         assert_eq!(writer.bytes, b"{\"ok\":true,\"result\":{}}\n");
     }
     #[test]
-    fn check_without_background_warning_omits_warnings_field() {
-        // Given
-        let result = ResponseResult::Check(build_report());
+    fn clean_check_renders_empty_problems() {
+        // Given: an empty check report and a quiet background runner.
+        let result = ResponseResult::Check(CheckReport { problems: vec![] });
         let mut background = build_background(1, 0);
-        // When
+        // When: the foreground command finishes.
         let (exit, value) = render(finish_foreground(result, &mut background));
-        // Then
+        // Then: the successful envelope contains only the empty problem array.
         assert_eq!(exit, 0);
-        assert!(value.get("warnings").is_none());
+        assert_eq!(value, json!({"ok":true,"result":{"problems":[]}}));
+    }
+    #[test]
+    fn check_with_background_warning_preserves_findings() {
+        // Given: a check finding and a background runner that returns a warning.
+        let result = ResponseResult::Check(build_report());
+        let mut background = build_warning_background();
+        // When: the foreground command finishes.
+        let (exit, value) = render(finish_foreground(result, &mut background));
+        // Then: the finding and the warning occupy their own fields in the successful envelope.
+        let problem =
+            json!({"code":"validation_failed","message":"safe finding","details":{"path":"a.md"}});
+        assert_eq!(exit, 0);
+        assert_eq!(
+            value,
+            json!({"ok":true,"result":{"problems":[problem]},"warnings":[problem]})
+        );
     }
     #[test]
     fn run_cli_rejects_invalid_input() {
@@ -461,7 +477,7 @@ mod transport_tests {
     }
     fn build_report() -> CheckReport {
         CheckReport {
-            errors: vec![make_problem()],
+            problems: vec![make_problem()],
         }
     }
     fn build_inspection() -> Inspection {

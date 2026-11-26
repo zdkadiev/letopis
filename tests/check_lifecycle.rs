@@ -151,7 +151,7 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
 
     assert_eq!(
         response,
-        json!({"ok":true,"result":{"errors":[
+        json!({"ok":true,"result":{"problems":[
             {"code":"validation_failed","message":"invalid letopis metadata",
              "details":{"path":"retained.md","reason":"invalid_metadata"}}
         ]}})
@@ -215,8 +215,8 @@ fn concurrent_check_publishes_edits_from_both_writers() {
             checker.check(&[]).unwrap()
         });
         // Then: both checkers complete without findings.
-        assert!(first.join().unwrap().errors.is_empty());
-        assert!(second.join().unwrap().errors.is_empty());
+        assert!(first.join().unwrap().problems.is_empty());
+        assert!(second.join().unwrap().problems.is_empty());
     });
 
     // Then: one pinned view observes both IDs, authored times and FTS texts.
@@ -326,11 +326,11 @@ fn check(repo: &ReadingRepo) -> Value {
 }
 
 fn build_clean() -> Value {
-    json!({"ok":true,"result":{"errors":[]}})
+    json!({"ok":true,"result":{"problems":[]}})
 }
 
 fn build_dangling(target: &str) -> Value {
-    json!({"ok":true,"result":{"errors":[
+    json!({"ok":true,"result":{"problems":[
         {"code":"validation_failed","message":"knowledge target is missing",
          "details":{"path":"source.md","reason":"dangling_target","element_id":"source.md","target":target}}
     ]}})

@@ -644,7 +644,7 @@
       "value": {
         "ok": true,
         "result": {
-          "errors": []
+          "problems": []
         }
       }
     },
@@ -655,13 +655,24 @@
       "value": {
         "ok": true,
         "result": {
-          "errors": [
+          "problems": [
             {
               "code": "validation_failed",
               "message": "Dangling link",
               "details": {
                 "path": "knowledge/design.md",
-                "target": "knowledge/gone.md"
+                "target": "knowledge/gone.md",
+                "reason": "dangling_target"
+              }
+            },
+            {
+              "code": "validation_failed",
+              "message": "knowledge source changed",
+              "details": {
+                "element_id": "knowledge/design.md",
+                "path": "knowledge/design.md",
+                "targets": ["src/x.rs#L1-L5", "src/y.rs"],
+                "reason": "source_changed"
               }
             }
           ]
@@ -675,13 +686,7 @@
       "value": {
         "ok": true,
         "result": {
-          "errors": [
-            {
-              "code": "conflict",
-              "message": "stale",
-              "details": {}
-            }
-          ]
+          "errors": []
         }
       }
     },
@@ -882,6 +887,16 @@
               "details": {
                 "path": "knowledge/a.md",
                 "target": "knowledge/gone.md"
+              }
+            },
+            {
+              "code": "validation_failed",
+              "message": "knowledge source changed",
+              "details": {
+                "element_id": "knowledge/design.md",
+                "path": "knowledge/design.md",
+                "targets": ["src/x.rs#L1-L5", "src/y.rs"],
+                "reason": "source_changed"
               }
             },
             {

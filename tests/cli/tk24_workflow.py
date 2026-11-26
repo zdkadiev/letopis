@@ -93,7 +93,7 @@ def write_knowledge(repo, basis, *, renamed=False):
 
 def check_empty(workflow):
     response = command(workflow, 'check', {})
-    assert response['result']['errors'] == [], response
+    assert response['result']['problems'] == [], response
 
 
 def prepare_repository(workflow):
@@ -135,8 +135,17 @@ def verify_initial_read(workflow, fixture):
 
 
 def verify_edited_source(workflow, fixture):
+    # Given: published knowledge still bound to the original source tree.
     (workflow.repo / 'src/cache.rs').write_bytes(EDITED_SOURCE)
-    check_empty(workflow)
+    # When: check compares the working source with the declared basis.
+    checked = command(workflow, 'check', {})
+    # Then: the successful report names the changed source range and its owner.
+    assert checked == {'ok': True, 'result': {'problems': [{
+        'code': 'validation_failed',
+        'message': 'knowledge source changed',
+        'details': {'element_id': KNOWLEDGE_ID, 'path': 'knowledge/decision.md',
+                    'targets': [SOURCE_ID], 'reason': 'source_changed'},
+    }]}}, checked
     stale = command(workflow, 'search', {'query': 'Checked cache source', 'limit': 10,
                     'filters': {'needs_recheck': True}})
     matches = [row for row in stale['result'] if row['element_id'] == KNOWLEDGE_ID]
@@ -161,15 +170,18 @@ def verify_edited_source(workflow, fixture):
 
 
 def verify_rename_and_repair(workflow, fixture, verified_tree):
+    # Given: the old target is removed and its replacement has a different address.
     fixture.decision.unlink()
     write_knowledge(workflow.repo, verified_tree, renamed=True)
+    # When: check validates the graph with the remaining old reference.
     dangling = command(workflow, 'check', {})
-    errors = dangling['result']['errors']
-    assert len(errors) == 1, dangling
-    assert errors[0]['code'] == 'validation_failed', dangling
-    assert errors[0]['details']['reason'] == 'dangling_target', dangling
-    assert errors[0]['details']['element_id'] == 'knowledge/referer.md', dangling
-    assert errors[0]['details']['target'] == KNOWLEDGE_ID, dangling
+    # Then: the report names the referer and the old target.
+    problems = dangling['result']['problems']
+    assert len(problems) == 1, dangling
+    assert problems[0]['code'] == 'validation_failed', dangling
+    assert problems[0]['details']['reason'] == 'dangling_target', dangling
+    assert problems[0]['details']['element_id'] == 'knowledge/referer.md', dangling
+    assert problems[0]['details']['target'] == KNOWLEDGE_ID, dangling
     fixture.referer.write_text('<!-- letopis: {"created_at":1792800000} -->\n'
                                '[decision](new.md#cache-new "letopis:type=depends_on;path=knowledge/new.md#cache-new")\n')
     check_empty(workflow)
@@ -177,7 +189,7 @@ def verify_rename_and_repair(workflow, fixture, verified_tree):
     assert set(renamed['result']['elements']) == {RENAMED_ID, SOURCE_ID}
     command(workflow, 'inspect', {'element_ids': [KNOWLEDGE_ID, RENAMED_ID]},
             error='not_found')
-    return renamed['result']['snapshot'], errors[0]
+    return renamed['result']['snapshot'], problems[0]
 
 
 def verify_user_git_state(workflow, fixture):

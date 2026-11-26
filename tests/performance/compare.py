@@ -30,6 +30,9 @@ def main() -> None:
     parser.add_argument("--stage", choices=("timings", "initialization", "contention", "profiles"))
     parser.add_argument("--before", type=Path)
     parser.add_argument("--after", type=Path)
+    for side in SIDES:
+        parser.add_argument(f"--{side}-check-field", choices=("errors", "problems"),
+                            help=f"field emitted by the {side} build (default: problems)")
     parser.add_argument("--nodes", type=int, choices=(60, 1000), default=60)
     parser.add_argument("--scenarios", nargs="+", choices=SCENARIOS)
     parser.add_argument("--pairs", type=int)
@@ -38,7 +41,8 @@ def main() -> None:
     parser.add_argument("--stage-seconds", type=float, default=STAGE_SECONDS)
     args = parser.parse_args()
     if args.freeze_build:
-        if args.stage or args.before or args.after or args.pairs is not None or args.scenarios:
+        if (args.stage or args.before or args.after or args.pairs is not None or args.scenarios
+                or args.before_check_field or args.after_check_field):
             parser.error("comparison flags cannot be used in freeze mode")
         freeze_build(args.source, args.evidence)
         return
@@ -142,7 +146,8 @@ def run_stages(args, builds: dict, evidence: Path, stream, rows: list) -> None:
     for side in SIDES:
         repository = evidence / f"initialized-{side}"
         shutil.copytree(fixture["repository"], repository)
-        fixtures[side] = dict(fixture, repository=repository, binary=builds[side]["executable"])
+        fixtures[side] = dict(fixture, repository=repository, binary=builds[side]["executable"],
+                              check_field=getattr(args, f"{side}_check_field", None) or "problems")
         command, request = build_request("search")
         case = {"repository": repository, "argv": [command], "stdin": encode_json(request),
                 "expected": {"command": "search", "id": "knowledge/part-0000.md#node-000000",

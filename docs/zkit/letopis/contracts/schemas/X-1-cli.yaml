@@ -170,16 +170,16 @@
         "result": {
           "type": "object",
           "properties": {
-            "errors": {
+            "problems": {
               "type": "array",
               "items": {
                 "$ref": "#/$defs/Diagnostic"
               },
-              "minItems": 0
+              "maxItems": 100
             }
           },
           "required": [
-            "errors"
+            "problems"
           ],
           "additionalProperties": false
         },
@@ -197,7 +197,7 @@
         "result"
       ],
       "additionalProperties": false,
-      "description": "Validation findings of the checked files: markup, duplicate anchors, nested elements, dangling links, includes cycles, missing created_at/source_snapshot problems. Empty list = valid."
+      "description": "Current findings selected by owner path after a whole-corpus refresh. The problems array is empty when there are no findings and is limited to the first 100 sorted, deduplicated diagnostics. Each element with changed addressed source bytes has one validation_failed diagnostic with reason source_changed and all unique changed addresses in details.targets. Missing sources and missing or unavailable source snapshots have separate reasons. A report with findings is successful (exit 0); a command failure returns the separate error envelope (exit 1)."
     },
     "InspectInput": {
       "type": "object",
@@ -568,7 +568,7 @@
               "items": {
                 "$ref": "#/$defs/Diagnostic"
               },
-              "minItems": 0
+              "maxItems": 100
             }
           },
           "required": [
@@ -579,7 +579,7 @@
             "problems"
           ],
           "additionalProperties": false,
-          "description": "D-95: observes the last publication without refresh, bootstrap/repair, vector reset, inference or drain. No publication: revision null, zero published counts and no cache findings; config/locks still observed. Missing databases/service directory are not created; malformed/inaccessible storage is an error. One database read view; no atomicity with config, Git or locks. problems = invalid files, dangling links, includes cycles, missing source snapshots, exhausted embedding attempts, invalid/unreadable config.json and the last query embedding error independent of config. No history or lifecycle flag."
+          "description": "D-95: observes the last publication without refresh, bootstrap/repair, vector reset, inference or drain. No publication: revision null, zero published counts and no cache findings; config/locks still observed. Missing databases/service directory are not created; malformed/inaccessible storage is an error. One database read view; no atomicity with config, Git or locks. Problems include invalid files, dangling links, includes cycles, changed or missing sources, missing or unavailable source snapshots, exhausted embedding attempts, invalid/unreadable config.json and the last query embedding error independent of config. The command compares published source bindings with the working tree. Each element with changed addressed source bytes has one validation_failed diagnostic with reason source_changed and all unique changed addresses in details.targets. Empty problems means no findings. Up to 100 sorted, deduplicated current diagnostics are reported."
         },
         "warnings": {
           "type": "array",
@@ -784,7 +784,7 @@
       },
       "required": [],
       "additionalProperties": false,
-      "description": "Empty or missing paths = whole corpus. Never writes files (D-93)."
+      "description": "Nonempty paths filter findings by owner file after refreshing the whole corpus. Empty or missing paths report all findings and audit complete source snapshots. Corpus files are never modified (D-93, D-105)."
     },
     "Revision": {
       "type": "integer",
@@ -963,7 +963,7 @@
         "$ref": "#/$defs/Failure"
       },
       "x-idempotency": "natural",
-      "description": "Validate the corpus or given paths; never writes files.",
+      "description": "Refresh the whole corpus cache and report current problems without modifying corpus files. Paths filter only the reported problems.",
       "stdout": "one JSON",
       "exit": {
         "success": 0,

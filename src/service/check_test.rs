@@ -13,6 +13,7 @@ use crate::{
         ProvenanceObservation, ProvenanceRequest, RefreshOutcome, Refresher, SearchFlag,
         SnapshotError, SnapshotState, SnapshotVerifier, SourceProvenance, SourceRevisionComparison,
         SourceRevisionRequest, StorageError, StorageErrorKind, StorageRead,
+        utils::CheckObservations,
     },
     storage::TestDatabases,
 };
@@ -46,10 +47,148 @@ struct PublishingDiagnostics {
 
 struct FindingDiagnostics;
 
+struct RepeatedDiagnostics(Vec<CommandProblem>);
+
+struct ChangedSources;
+
 struct Verifier {
     probes: Probes,
     result: SnapshotState,
     is_failing: bool,
+}
+
+#[test]
+fn collection_groups_changed_sources_by_element_and_keeps_independent_issues() {
+    // Given: two elements share an owner, one source is missing and two bases need rechecking.
+    let directory = tempfile::tempdir().unwrap();
+    let mut storage = open_storage(&directory);
+    let mut missing = build_node("c.md", "a");
+    let NodeMetadata::Knowledge(metadata) = &mut missing else {
+        panic!("expected knowledge metadata");
+    };
+    metadata.source_snapshot = None;
+    publish_nodes(
+        &mut storage,
+        &[
+            build_node("a.md#one", "a"),
+            build_node("a.md#two", "a"),
+            build_node("b.md", "b"),
+            missing,
+        ],
+    );
+    publish_sources(&storage, "a.md#one", &["z.rs", "a.rs#L2-L4", "missing.rs"]);
+    publish_sources(&storage, "a.md#two", &["sibling.rs"]);
+    let cache = Rc::new(storage.cache_storage);
+    let graph = GraphDiagnosticsService::new(Rc::clone(&cache));
+    let observations = CheckObservations {
+        storage_read: cache.as_ref(),
+        graph: &graph,
+        provenance: &ChangedSources,
+    };
+
+    // When: the shared collector observes the published bindings.
+    let problems = cache
+        .with_read_tx(|| observations.collect_check_problems(&[]))
+        .unwrap();
+
+    // Then: each element retains its addresses, and rechecking alone yields no change finding.
+    let mut findings = Vec::new();
+    for problem in problems {
+        assert_eq!(problem.code, CommandErrorKind::ValidationFailed);
+        if problem.details["reason"] == "source_changed" {
+            assert_eq!(problem.message, "knowledge source changed");
+        }
+        findings.push(json!(problem.details));
+    }
+    assert_eq!(findings.len(), 5);
+    for details in [
+        json!({"path":"a.md","reason":"source_changed","element_id":"a.md#one","targets":["a.rs#L2-L4","z.rs"]}),
+        json!({"path":"a.md","reason":"source_changed","element_id":"a.md#two","targets":["sibling.rs"]}),
+        json!({"path":"a.md","reason":"source_not_found","element_id":"a.md#one","target":"missing.rs"}),
+        json!({"path":"b.md","reason":"source_snapshot_unavailable","element_id":"b.md","target":"b".repeat(40)}),
+        json!({"path":"c.md","reason":"missing_source_snapshot","element_id":"c.md"}),
+    ] {
+        assert!(findings.contains(&details), "missing finding {details}");
+    }
+}
+
+#[test]
+fn check_filters_owner_before_limiting_and_keeps_all_targets() {
+    // Given: 100 earlier findings and a separate owner with 101 changed addresses.
+    let directory = tempfile::tempdir().unwrap();
+    let mut storage = open_storage(&directory);
+    let mut nodes: Vec<_> = (0..100)
+        .map(|index| build_node(&format!("f{index:03}.md"), "b"))
+        .collect();
+    nodes.push(build_node("z.md#part", "a"));
+    publish_nodes(&mut storage, &nodes);
+    let targets: Vec<_> = (0..101).map(|index| format!("file{index:03}.rs")).collect();
+    let source_addresses: Vec<_> = targets.iter().map(String::as_str).collect();
+    publish_sources(&storage, "z.md#part", &source_addresses);
+    let cache = Rc::new(storage.cache_storage);
+    let mut service = CheckService::new(
+        Refresh(|| {
+            Ok(RefreshOutcome {
+                revision: 2,
+                ..build_outcome()
+            })
+        }),
+        Rc::clone(&cache),
+        Box::new(GraphDiagnosticsService::new(cache)),
+        ChangedSources,
+    );
+
+    // When: check observes the whole corpus, an absent owner, and the last owner.
+    let whole = service.check(&[]).unwrap();
+    let empty = service
+        .check(&[RepoPath::parse("absent.md").unwrap()])
+        .unwrap();
+    let scoped = service.check(&[RepoPath::parse("z.md").unwrap()]).unwrap();
+
+    // Then: the last owner is outside the full report cutoff and complete in the scoped report.
+    assert_eq!(whole.problems.len(), 100);
+    assert_eq!(whole.problems[0].details["element_id"], "f000.md");
+    assert_eq!(whole.problems[99].details["element_id"], "f099.md");
+    assert!(empty.problems.is_empty());
+    assert_eq!(scoped.problems.len(), 1);
+    assert_eq!(scoped.problems[0].details["element_id"], "z.md#part");
+    assert_eq!(scoped.problems[0].details["targets"], json!(targets));
+}
+
+#[test]
+fn check_orders_and_deduplicates_exactly_one_hundred_findings() {
+    // Given: exactly 100 distinct findings, reversed, with a duplicate near the cutoff.
+    let directory = tempfile::tempdir().unwrap();
+    let storage = open_storage(&directory);
+    let mut problems: Vec<_> = (0..100)
+        .rev()
+        .map(|index| CommandProblem {
+            code: CommandErrorKind::ValidationFailed,
+            message: "graph fixture",
+            details: [("path".into(), json!(format!("f{index:03}.md")))].into(),
+        })
+        .collect();
+    problems.insert(0, problems[1].clone());
+    let mut service = CheckService::new(
+        Refresh(|| {
+            Ok(RefreshOutcome {
+                revision: 0,
+                ..build_outcome()
+            })
+        }),
+        Rc::new(storage.cache_storage),
+        Box::new(RepeatedDiagnostics(problems)),
+        ChangedSources,
+    );
+
+    // When: check reports the findings.
+    let report = service.check(&[]).unwrap();
+
+    // Then: the duplicate does not displace the last distinct finding.
+    assert_eq!(report.problems.len(), 100);
+    for (index, problem) in report.problems.iter().enumerate() {
+        assert_eq!(problem.details["path"], format!("f{index:03}.md"));
+    }
 }
 
 #[test]
@@ -112,7 +251,7 @@ fn scoped_check_requests_routine_refresh() {
         .check(&[RepoPath::parse("fresh.md").unwrap()])
         .unwrap();
     // Then: regular diagnostics are returned without an exhaustive audit.
-    assert_eq!(report.errors.len(), 1);
+    assert_eq!(report.problems.len(), 1);
 }
 
 #[test]
@@ -153,10 +292,10 @@ fn check_reports_missing_address_from_selected_knowledge() {
     let report = service.check(&[RepoPath::parse("a.md").unwrap()]).unwrap();
 
     // Then: the report includes the missing source finding.
-    assert_eq!(report.errors.len(), 2);
-    assert_eq!(report.errors[1].details["reason"], "source_not_found");
-    assert_eq!(report.errors[1].details["path"], "a.md");
-    assert_eq!(report.errors[1].details["target"], "gone.rs");
+    assert_eq!(report.problems.len(), 2);
+    assert_eq!(report.problems[1].details["reason"], "source_not_found");
+    assert_eq!(report.problems[1].details["path"], "a.md");
+    assert_eq!(report.problems[1].details["target"], "gone.rs");
 }
 
 #[test]
@@ -206,7 +345,7 @@ fn check_refreshes_before_opening_one_read() {
     assert_eq!(*events.borrow(), ["refresh", "read", "diagnostics"]);
     assert_eq!(*probes.borrow(), ["a".repeat(40)]);
     assert_eq!(
-        get_findings(&report.errors),
+        get_findings(&report.problems),
         json!([
             {"path":"fresh.md","reason":"source_snapshot_unavailable","element_id":"fresh.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
         ])
@@ -253,7 +392,7 @@ fn check_reuses_same_view_for_each_knowledge_observation() {
     // Then
     assert_eq!(*probes.borrow(), ["a".repeat(40), "a".repeat(40)]);
     assert_eq!(
-        get_findings(&report.errors),
+        get_findings(&report.problems),
         json!([
             {"path":"a.md","reason":"source_snapshot_unavailable","element_id":"a.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
             {"path":"b.md","reason":"source_snapshot_unavailable","element_id":"b.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
@@ -271,8 +410,8 @@ fn check_reuses_same_view_for_each_knowledge_observation() {
             "b".repeat(40)
         ]
     );
-    assert_eq!(report.errors.len(), 2);
-    assert_eq!(report.errors[0].details["target"], "b".repeat(40));
+    assert_eq!(report.problems.len(), 2);
+    assert_eq!(report.problems[0].details["target"], "b".repeat(40));
 }
 
 #[test]
@@ -332,7 +471,7 @@ fn check_filters_snapshot_owners_before_probing_git() {
         service
             .check(&[RepoPath::parse("absent.md").unwrap()])
             .unwrap()
-            .errors
+            .problems
             .is_empty()
     );
     // Then
@@ -478,6 +617,60 @@ impl GraphDiagnostics for FindingDiagnostics {
     }
 }
 
+impl GraphDiagnostics for RepeatedDiagnostics {
+    fn find_problems(&self, _: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
+        Ok(self.0.clone())
+    }
+}
+
+impl SourceProvenance for ChangedSources {
+    fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        panic!("check does not validate requested revisions")
+    }
+
+    fn observe_sources(
+        &self,
+        request: ProvenanceRequest<'_>,
+    ) -> DocumentResult<ProvenanceObservation> {
+        let mut observation = ProvenanceObservation {
+            flags: BTreeSet::from([SearchFlag::SourceChanged]),
+            issues: BTreeSet::new(),
+            changed_sources: BTreeSet::new(),
+        };
+        match request.source_snapshot {
+            None => {
+                observation.issues.insert(ProvenanceIssue::MissingSnapshot);
+            }
+            Some(snapshot) if snapshot.as_str().starts_with('b') => {
+                observation
+                    .issues
+                    .insert(ProvenanceIssue::SnapshotUnavailable {
+                        snapshot: snapshot.clone(),
+                    });
+            }
+            Some(_) => {
+                for source in request.sources {
+                    if source.as_str() == "missing.rs" {
+                        observation.issues.insert(ProvenanceIssue::SourceNotFound {
+                            source: source.clone(),
+                        });
+                    } else {
+                        observation.changed_sources.insert(source.clone());
+                    }
+                }
+            }
+        }
+        Ok(observation)
+    }
+
+    fn compare_revision(
+        &self,
+        _: SourceRevisionRequest<'_>,
+    ) -> Result<SourceRevisionComparison, SnapshotError> {
+        panic!("check does not compare requested revisions")
+    }
+}
+
 impl SourceProvenance for Verifier {
     fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
         panic!("this scenario does not validate requested revisions")
@@ -508,6 +701,7 @@ impl SourceProvenance for Verifier {
             });
         }
         Ok(ProvenanceObservation {
+            changed_sources: BTreeSet::new(),
             flags: BTreeSet::from([SearchFlag::SourceNotFound]),
             issues,
         })
@@ -600,6 +794,27 @@ fn publish_nodes(storage: &mut TestDatabases, nodes: &[NodeMetadata]) {
             }
 
             unit.project_get_revision()
+        })
+        .unwrap();
+}
+
+fn publish_sources(storage: &TestDatabases, id: &str, sources: &[&str]) {
+    let id = KnowledgeId::parse(id).unwrap();
+    storage
+        .cache_storage
+        .with_write_tx(|| {
+            for source in sources {
+                let edge = Edge::new(
+                    id.clone(),
+                    EdgeTarget::Source(SourceUri::parse(source).unwrap()),
+                    EdgeType::parse("external").unwrap(),
+                )
+                .unwrap();
+                storage
+                    .cache_storage
+                    .edges_save_by_source_id_and_target_id_and_type(&edge)?;
+            }
+            Ok::<_, StorageError>(())
         })
         .unwrap();
 }
@@ -704,7 +919,7 @@ mod pinned {
         let report = service.check(&[]).unwrap();
 
         // Then: all observations come from the original pinned view.
-        assert!(report.errors.is_empty());
+        assert!(report.problems.is_empty());
         assert_eq!(count.get(), 1);
         assert_eq!(
             *observations.borrow(),
@@ -749,6 +964,7 @@ mod pinned {
                 .borrow_mut()
                 .push((request.source_snapshot.cloned(), request.sources.clone()));
             Ok(ProvenanceObservation {
+                changed_sources: BTreeSet::new(),
                 flags: BTreeSet::new(),
                 issues: BTreeSet::new(),
             })
@@ -845,7 +1061,7 @@ mod batches {
     }
 
     #[test]
-    fn check_batches_selected_owners_without_losing_diagnostic_order() {
+    fn check_batches_selected_owners_without_losing_findings() {
         // Given: 257 owners with unavailable bases in the already pinned metadata.
         let directory = tempfile::tempdir().unwrap();
         let mut storage = open_storage(&directory);
@@ -872,11 +1088,15 @@ mod batches {
         let problems = cache
             .with_read_tx(|| observations.collect_check_problems(&[]))
             .unwrap();
-        // Then: bounded batches preserve all owner mappings and sorted diagnostics.
+        // Then: bounded batches preserve every owner finding.
         assert_eq!(*provenance.sizes.borrow(), [256, 1]);
         assert_eq!(problems.len(), 257);
-        assert_eq!(problems[0].details["element_id"], "f000.md");
-        assert_eq!(problems[256].details["element_id"], "f256.md");
+        let reported_ids: BTreeSet<_> = problems
+            .iter()
+            .map(|problem| problem.details["element_id"].as_str().unwrap().to_owned())
+            .collect();
+        let expected_ids = (0..257).map(|index| format!("f{index:03}.md")).collect();
+        assert_eq!(reported_ids, expected_ids);
         assert_eq!(provenance.verifier.probes.borrow().len(), 257);
     }
 

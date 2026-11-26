@@ -120,8 +120,11 @@ version. Verify every local binding against that replacement before saving it.
 printf '%s\n' '{}' | letopis check
 ```
 
-Read `result.errors` even with `ok:true`. Fix relevant findings in the Markdown and
-rerun the check. Confirm the saved element and its evidence using
+Read `result.problems` even with `ok:true`. Fix relevant findings in the Markdown and
+rerun the check. For `source_changed`, review every address in `details.targets`
+before updating the element's source basis.
+See the [check and status reporting rules](references/operations.md#review-check-and-status-findings).
+Confirm the saved element and its evidence using
 [a single inspect snapshot](../letopis-search/SKILL.md#read-snapshot-evidence).
 If the saved element is missing, check discovery before editing its markup or
 rebuilding the index. Use [Dream's repair workflow](../letopis-dream/references/workflow.md#plan-changes-and-their-links)

@@ -219,7 +219,7 @@ def _campaign(arguments, failure=None):
 
 def _measurement(outcome, seconds):
     return {"outcome": outcome, "duration_seconds": seconds, "exit_code": 0,
-            "pid": 123, "resources": {}, "stdout": {"capture_hex": b'{"ok":true,"result":{"errors":[]}}'.hex(),
+            "pid": 123, "resources": {}, "stdout": {"capture_hex": b'{"ok":true,"result":{"problems":[]}}'.hex(),
             "truncated": False}, "stderr": {"capture_hex": "", "truncated": False}}
 
 

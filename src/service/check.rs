@@ -1,5 +1,6 @@
 use super::utils::{
-    map_document_error_to_command_error, map_storage_error_to_check_corpus_command_error,
+    get_reported_problems, map_document_error_to_command_error,
+    map_storage_error_to_check_corpus_command_error,
 };
 use super::{
     CacheDatabase, CheckReport, Checker, CommandError, CommandErrorKind, CommandResult,
@@ -76,8 +77,10 @@ impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckServi
                     graph: self.diagnostics.as_ref(),
                     provenance: &self.provenance,
                 };
-                let errors = observations.collect_check_problems(paths)?;
-                Ok(CheckReport { errors })
+                let problems = observations.collect_check_problems(paths)?;
+                Ok(CheckReport {
+                    problems: get_reported_problems(problems),
+                })
             })
             .map_err(map_transaction_error_to_check_corpus_command_error)
     }

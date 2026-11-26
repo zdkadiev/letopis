@@ -21,7 +21,7 @@ fn check_succeeds_with_markdown_symlink() {
     // Then: the corpus is accepted without validation errors.
     assert!(output.status.success());
     let response: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(response, json!({"ok":true,"result":{"errors":[]}}));
+    assert_eq!(response, json!({"ok":true,"result":{"problems":[]}}));
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn check_binary_reports_multiple_errors_and_repairs() {
     // Then: safe ordered findings reflect the current declarations.
     assert_eq!(
         response,
-        json!({"ok":true,"result":{"errors":[
+        json!({"ok":true,"result":{"problems":[
             {"code":"validation_failed","message":"knowledge participates in an includes cycle","details":{"path":"a.md","reason":"includes_cycle","element_id":"a.md"}},
             {"code":"validation_failed","message":"knowledge participates in an includes cycle","details":{"path":"b.md","reason":"includes_cycle","element_id":"b.md"}},
             {"code":"validation_failed","message":"duplicate explicit anchor","details":{"path":"duplicate.md","reason":"duplicate_anchor"}},
@@ -66,21 +66,21 @@ fn check_binary_reports_multiple_errors_and_repairs() {
     // Given: the declaration in duplicate.md is repaired.
     repo.write_knowledge("duplicate.md", "Repaired duplicate");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
-    assert_eq!(get_error_count(&check(&repo, b"{}")), 4);
+    assert_eq!(get_problem_count(&check(&repo, b"{}")), 4);
     // Given: the declaration in nested.md is repaired.
     repo.write_knowledge("nested.md", "Repaired nesting");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
-    assert_eq!(get_error_count(&check(&repo, b"{}")), 3);
+    assert_eq!(get_problem_count(&check(&repo, b"{}")), 3);
     // Given: the declaration in missing.md is repaired.
     repo.write_knowledge("missing.md", "Target restored");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
-    assert_eq!(get_error_count(&check(&repo, b"{}")), 2);
+    assert_eq!(get_problem_count(&check(&repo, b"{}")), 2);
     // Given: the declaration in b.md is repaired.
     repo.write_knowledge("b.md", "Cycle repaired");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
     assert_eq!(
         check(&repo, b"{}"),
-        json!({"ok":true,"result":{"errors":[]}})
+        json!({"ok":true,"result":{"problems":[]}})
     );
 }
 
@@ -101,13 +101,13 @@ fn check_paths_filters_owners_after_full_graph_validation() {
     // Then: full-graph validation still precedes owner filtering.
     assert_eq!(
         response,
-        json!({"ok":true,"result":{"errors":[
+        json!({"ok":true,"result":{"problems":[
             {"code":"validation_failed","message":"knowledge participates in an includes cycle","details":{"path":"a/item.md","reason":"includes_cycle","element_id":"a/item.md"}}
         ]}})
     );
     assert_eq!(
         check(&repo, br#"{"paths":["target.md","absent.md"]}"#),
-        json!({"ok":true,"result":{"errors":[]}})
+        json!({"ok":true,"result":{"problems":[]}})
     );
     let storage = repo.open_storage();
     assert_eq!(
@@ -137,7 +137,7 @@ fn check_preserves_agent_layout_and_relation_names() {
     // When / Then: check publishes the repository corpus; authored layout and relation names remain intact.
     assert_eq!(
         check(&repo, b"{}"),
-        json!({"ok":true,"result":{"errors":[]}})
+        json!({"ok":true,"result":{"problems":[]}})
     );
 
     for (path, expected) in [
@@ -233,7 +233,7 @@ fn check_snapshot_findings_are_current_and_safe() {
     // Then: findings classify unavailable snapshots without exposing snapshot contents.
     assert_eq!(
         response,
-        json!({"ok":true,"result":{"errors":[
+        json!({"ok":true,"result":{"problems":[
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"absent.md","reason":"source_snapshot_unavailable","element_id":"absent.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"blob.md","reason":"source_snapshot_unavailable","element_id":"blob.md","target":blob.as_str()}},
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"foreign.md","reason":"source_snapshot_unavailable","element_id":"foreign.md","target":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}},
@@ -257,7 +257,7 @@ fn check_snapshot_findings_are_current_and_safe() {
     // When / Then: the repaired repository has no remaining findings.
     assert_eq!(
         check(&repo, b"{}"),
-        json!({"ok":true,"result":{"errors":[]}})
+        json!({"ok":true,"result":{"problems":[]}})
     );
 }
 
@@ -267,14 +267,14 @@ fn check_keeps_invalid_files_previous_projection_and_snapshot_findings() {
     let repo = ReadingRepo::new();
     repo.write("retained.md", b"<!-- letopis: {\"created_at\":42,\"source_snapshot\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"} -->\nKnowledge\n");
     // When / Then
-    assert_eq!(get_error_count(&check(&repo, b"{}")), 1);
+    assert_eq!(get_problem_count(&check(&repo, b"{}")), 1);
     repo.write("retained.md", b"<!-- letopis: broken SECRET_RAW_BODY -->\n");
 
     let response = check(&repo, b"{}");
 
     assert_eq!(
         response,
-        json!({"ok":true,"result":{"errors":[
+        json!({"ok":true,"result":{"problems":[
             {"code":"validation_failed","message":"invalid letopis metadata","details":{"path":"retained.md","reason":"invalid_metadata"}},
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"retained.md","reason":"source_snapshot_unavailable","element_id":"retained.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
         ]}})
@@ -296,7 +296,7 @@ fn check_binary_reports_literal_single_dangling_target() {
     // Then
     assert_eq!(
         response,
-        json!({"ok":true,"result":{"errors":[
+        json!({"ok":true,"result":{"problems":[
             {"code":"validation_failed","message":"knowledge target is missing","details":{"path":"owner.md","reason":"dangling_target","element_id":"owner.md","target":"missing.md"}}
         ]}})
     );
@@ -316,6 +316,6 @@ fn check(repo: &ReadingRepo, input: &[u8]) -> Value {
     response
 }
 
-fn get_error_count(response: &serde_json::Value) -> usize {
-    response["result"]["errors"].as_array().unwrap().len()
+fn get_problem_count(response: &serde_json::Value) -> usize {
+    response["result"]["problems"].as_array().unwrap().len()
 }

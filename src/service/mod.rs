@@ -731,7 +731,10 @@ pub trait SourceProvenance {
     /// repository or object integrity failures remain `InternalError`.
     fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError>;
 
-    /// Returns source flags and current diagnostics without source bytes.
+    /// Returns source flags, current issues and exact changed addresses without source bytes.
+    ///
+    /// An address is recorded as changed only when its snapshot and current bytes
+    /// are both available and their hashes differ.
     ///
     /// # Arguments
     ///
@@ -1407,9 +1410,9 @@ pub trait Embedder {
 /// All cache-derived findings share that view. Exact owner selectors filter findings
 /// after full graph validation; they never restrict refresh or graph membership.
 /// Source bases and bindings come from that view; live byte observations are read-only.
-/// Missing sources or bases produce findings without removing knowledge.
+/// Missing sources or bases and changed source bytes produce findings.
 pub trait Checker {
-    /// Returns validation findings for the given paths or the whole corpus.
+    /// Returns up to 100 ordered, distinct validation findings in `CheckReport::problems`.
     ///
     /// # Arguments
     ///
@@ -1424,7 +1427,7 @@ pub trait Checker {
 /// Read the latest published diagnostics without refreshing or mutating state.
 pub trait StatusReader {
     /// Returns one report from a pinned database view, the current configuration and busy
-    /// locks.
+    /// locks. Includes up to 100 ordered, distinct problems.
     ///
     /// # Errors
     /// Reports storage, provenance or unsafe lock failures without a partial report.

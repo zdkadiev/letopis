@@ -188,7 +188,7 @@ class ContentionTests(unittest.TestCase):
             self.assertEqual(receipt["vector_ids"], ["b.md"])
             self.assertEqual(receipt["drain"]["outcome"], "success")
             self.assertTrue(receipt["embed_lock_interoperable"])
-            self.assertEqual(receipt["final_check"]["errors"], [])
+            self.assertEqual(receipt["final_check"]["problems"], [])
             self.assertGreater(receipt["query_request_delta"], 0)
 
     @unittest.skipUnless(os.environ.get("PERF_LETOPIS_BINARY"), "requires pinned release executable")
@@ -272,7 +272,7 @@ if sys.argv[1] == 'index':
     with open('.letopis/index.lock', 'a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         time.sleep(60)
-print(json.dumps({'ok': True, 'result': {'errors': []}}))
+print(json.dumps({'ok': True, 'result': {'problems': []}}))
 '''
 
 

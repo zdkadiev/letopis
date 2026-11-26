@@ -72,7 +72,7 @@ class ProfileTests(unittest.TestCase):
             def make_result():
                 return {"outcome": "success", "duration_seconds": .1, "exit_code": 0,
                         "stdout": {"truncated": False, "capture_hex":
-                            b'{"ok":true,"result":{"errors":[]}}'.hex()}}
+                            b'{"ok":true,"result":{"problems":[]}}'.hex()}}
             # When: recording an ordinary/profiled pair with an unavailable artifact.
             with (root / "samples").open("wb") as stream, patch("profile.verify_build"), \
                     patch("profile.prepare_scenario", return_value=scenario), \
@@ -93,7 +93,7 @@ class ProfileTests(unittest.TestCase):
             sampler.write_text(f'#!{sys.executable}\nimport sys\nfrom pathlib import Path\n'
                                'Path(sys.argv[-1]).write_text(sys.argv[1])\n')
             sampler.chmod(0o755)
-            code = 'import time;time.sleep(.1);print(\'{"ok":true,"result":{"errors":[]}}\')'
+            code = 'import time;time.sleep(.1);print(\'{"ok":true,"result":{"problems":[]}}\')'
             scenario = {"repository": root, "argv": ["-c", code], "stdin": b"",
                         "expected": {"command": "check"}}
             # When: observing only the owned process using its exact PID.

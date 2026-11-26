@@ -26,6 +26,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--before", type=Path, required=True)
     parser.add_argument("--after", type=Path)
+    for side in ("before", "after"):
+        parser.add_argument(f"--{side}-check-field", choices=("errors", "problems"),
+                            help=f"field emitted by the {side} build (default: problems)")
     parser.add_argument("--nodes", type=int, choices=(10000, 100000), required=True)
     parser.add_argument("--variant", choices=("shared", "distinct", "distinct-sharded"), required=True)
     parser.add_argument("--stage", choices=("timings", "profiles"), required=True)
@@ -66,6 +69,7 @@ def run_campaign(arguments: argparse.Namespace) -> dict:
         fixtures = {}
         for side in sides:
             fixtures[side] = prepare_historical_fixture(evidence / f"fixture-{side}", arguments.nodes, arguments.variant)
+            fixtures[side]["check_field"] = getattr(arguments, f"{side}_check_field", None) or "problems"
             manifest["fixtures"][side] = {key: value for key, value in fixtures[side].items() if key != "repository"}
         write_json(evidence / "manifest.json", manifest)
         with (evidence / "samples.jsonl").open("xb") as stream:
@@ -200,6 +204,7 @@ def run_series(arguments, builds, fixtures, stream, rows):
 def build_case(fixture, name):
     return {"repository": fixture["repository"], "name": name, "argv": [name],
             "stdin": encode_json(fixture["requests"][name]), "expected": fixture["expected"][name],
+            "check_field": fixture.get("check_field", "problems"),
             "state_hashes": fixture["input_sha256"], "changed_paths": []}
 
 

@@ -124,7 +124,7 @@ def capture_transport(root, evidence, execute, binary, catalogue):
             if args == ['reindex'] and not error:
                 assert response == {'ok': True, 'result': {'revision': 1}}
             if args == ['check'] and not error:
-                assert response == {'ok': True, 'result': {'errors': []}}
+                assert response == {'ok': True, 'result': {'problems': []}}
             if pre_io:
                 assert not (repo / '.letopis').exists()
             observations.append({'source': 'actual product executable', 'command': ' '.join(args),

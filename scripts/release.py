@@ -122,7 +122,7 @@ def run_smoke(binary: Path):
         nested.mkdir()
         element_id = 'letopis/retry-budget.md'
         report = invoke(binary, nested, ['check'], {})
-        if report != {'errors': []}:
+        if report != {'problems': []}:
             raise ValueError(f'unexpected validation report: {report}')
         links = invoke(binary, nested, ['search'], {'query': 'retry', 'limit': 10})
         if not any(link['element_id'] == element_id for link in links):

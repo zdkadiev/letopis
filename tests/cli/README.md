@@ -16,7 +16,7 @@ schema and records `product-reading-responses.json`. Injected `CLI_RESPONSE` rec
 remain separately labelled and cannot satisfy this coverage. The earlier TK-11/TK-14
 receipts cover only their then-current knowledge inspection; their historical limits
 remain attached to those revisions. The transport collector accepts a real
-`check {}` with empty errors and cache initialization; malformed input must fail
+`check {}` with empty `result.problems` and cache initialization; malformed input must fail
 before initialization. TK-19 lifecycle acceptance is in `tests/check_lifecycle.rs`.
 
 Use Python 3.11+ with the development dependency `jsonschema==4.26.0` prepared in

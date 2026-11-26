@@ -110,7 +110,7 @@ class ReportTests(unittest.TestCase):
         malformed["stdout"]["capture_hex"] = b"not json".hex()
         # When / Then: these are correctness failures, not fast successes.
         self.assertFalse(validate_result(scenario, malformed)["valid"])
-        response = {"ok": True, "result": {"errors": [{"code": "bad"}]}}
+        response = {"ok": True, "result": {"problems": [{"code": "bad"}]}}
         self.assertFalse(validate_result(scenario, make_measurement(response))["valid"])
 
     def test_rejects_incomplete_traversal_and_unverifiable_inspection(self):

@@ -94,7 +94,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
             // When / Then: the invalid file contributes no partial nodes, edges or searchable text.
             assert_eq!(
                 run_check(&repo),
-                json!({"ok":true,"result":{"errors":[{
+                json!({"ok":true,"result":{"problems":[{
                     "code":"validation_failed", "message":"invalid graph target",
                     "details":{"path":"bad.md","reason":"invalid_target"}
                 }]}})
@@ -123,7 +123,10 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
         // Given: editing away the bad link allows recovery without a cache rebuild.
         repo.write("bad.md", build_whole(3, "RepairedToken").as_bytes());
         // When / Then: the repaired file publishes without rebuilding the cache.
-        assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
+        assert_eq!(
+            run_check(&repo),
+            json!({"ok":true,"result":{"problems":[]}})
+        );
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
         assert!(!refresher.refresh(&[]).unwrap().is_published);
         let (nodes, edges, matches) = get_repaired_projection(&repo);
